@@ -1,0 +1,342 @@
+##### authors #####
+
+# ZrNoxb
+
+##### /authors #####
+
+##### translated strings #####
+MΛ ツ
+== MΛ ツ
+
+Enable MΛ ツ features
+== Activar funciones MΛ ツ
+
+Optimizer
+== Optimizador
+
+Enable optimizer
+== Activar optimizador
+
+FPS Fog
+== Niebla FPS
+
+FPS fog radius (tiles)
+== Radio niebla FPS (tiles)
+
+Disable all particles
+== Desactivar todas las particulas
+
+High priority process
+== Proceso alta prioridad
+
+Gores Mode
+== Modo Gores
+
+Enable Gores Mode
+== Activar Modo Gores
+
+Auto-detect gores servers
+== Auto-detectar servidores gores
+
+3D Particles
+== Particulas 3D
+
+Enable 3D particles
+== Activar particulas 3D
+
+Particle count
+== Cantidad particulas
+
+Speed
+== Velocidad
+
+Alpha
+== Opacidad
+
+Music Player
+== Reproductor de Musica
+
+Enable music player
+== Activar reproductor de musica
+
+Volume
+== Volumen
+
+Shuffle
+== Aleatorio
+
+Loop playlist
+== Repetir lista
+
+HUD position
+== Posicion HUD
+
+Paused
+== Pausado
+
+Component Editor
+== Editor de Componentes
+
+Toggle individual MΛ ツ features on/off. Changes take effect immediately.
+== Activa/desactiva funciones MΛ ツ. Los cambios se aplican al instante.
+
+Friend HUD
+== HUD de Amigos
+
+Chat History
+== Historial de Chat
+
+Settings
+== Ajustes
+
+Lluvia
+== Lluvia
+
+Enable weather particles
+== Activar particulas de clima
+
+Particle type
+== Tipo de particula
+
+Amount
+== Cantidad
+
+Snow
+== Nieve
+
+Rain
+== Lluvia
+
+Stars
+== Estrellas
+
+Particles
+== Particulas
+
+Size
+== Tamano
+
+Opacity
+== Opacidad
+
+Anime Love
+== Anime Love
+
+Enable Anime Love
+== Activar Anime Love
+
+Character skin
+== Skin del personaje
+
+Kurumi
+== Kurumi
+
+Crimson
+== Carmesi
+
+Midnight
+== Medianoche
+
+Pastel
+== Pastel
+
+Animation type
+== Tipo de animacion
+
+Wave
+== Saludo
+
+Walk
+== Caminar
+
+Mixed
+== Mixto
+
+Sit
+== Sentarse
+
+Sleep
+== Dormir
+
+Celebrate
+== Celebrar
+
+Follow tee
+== Seguir al tee
+
+Visibility
+== Visibilidad
+
+Menu and ingame
+== Menu e ingame
+
+Menu only
+== Solo menu
+
+Ingame only
+== Solo ingame
+
+Floating phrases
+== Frases flotantes
+
+Greeting phrase
+== Frase de saludo
+
+Hi!
+== Hola!
+
+Zzz
+== Zzz
+
+Yay!
+== Genial!
+
+Resting
+== Descansando
+
+I'm here
+== Estoy aqui
+
+Bind Anime Love
+== Tecla Anime Love
+
+Anime Love Size
+== Tamano Anime Love
+
+Anime Love Speed
+== Velocidad Anime Love
+
+Walk Distance
+== Distancia al caminar
+
+Anime Love Opacity
+== Opacidad Anime Love
+
+Position
+== Posicion
+
+Right
+== Derecha
+
+Left
+== Izquierda
+
+Above
+== Arriba
+
+Below
+== Abajo
+
+Auto Reply
+== Respuesta automatica
+
+Auto reply to muted players
+== Responder automaticamente a jugadores silenciados
+
+Auto reply when tabbed out
+== Responder automaticamente al salir de la ventana
+
+Custom Sounds
+== Sonidos personalizados
+
+Sound pack
+== Pack de sonido
+
+Classic
+== Clasico
+
+Cyber
+== Cyber
+
+Minimal
+== Minimalista
+
+Friend join sound
+== Sonido al entrar amigo
+
+Map finish sound
+== Sonido al terminar mapa
+
+Highlight sound
+== Sonido al recibir highlight
+
+Sound volume
+== Volumen de sonido
+
+Test Friend
+== Probar amigo
+
+Test Finish
+== Probar finish
+
+Test Highlight
+== Probar highlight
+
+Action Sounds
+== Sonidos de accion
+
+Hook attach player
+== Gancho enganchar jugador
+
+Hook attach ground
+== Gancho enganchar suelo
+
+Hammer hit
+== Golpe de martillo
+
+Gun fire
+== Disparo de pistola
+
+Shotgun fire
+== Disparo de escopeta
+
+Grenade fire
+== Disparo de granada
+
+Laser fire
+== Disparo de laser
+
+Custom .opus files (put in data/tclient/sounds/)
+== Archivos .opus personalizados (poner en data/tclient/sounds/)
+
+Hook player
+== Gancho jugador
+
+Hook ground
+== Gancho suelo
+
+Tee Trails
+== Estelas de tee
+
+Enable tee trails
+== Activar estelas
+
+Show other tees' trails
+== Mostrar estelas de otros
+
+Fade trail alpha
+== Desvanecer opacidad de estela
+
+Taper trail width
+== Afinar ancho de estela
+
+Solid
+== Solido
+
+Tee
+== Tee
+
+Rainbow
+== Arcoiris
+
+Tee trail color
+== Color de estela
+
+Trail width
+== Ancho de estela
+
+Trail length
+== Largo de estela
+
+Trail alpha
+== Opacidad de estela

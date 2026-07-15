@@ -1,0 +1,7 @@
+user/
+dumps/
+screenshots/
+videos/
+*.log
+*.tmp
+*.bak

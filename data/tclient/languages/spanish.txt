@@ -1,0 +1,1474 @@
+##### authors #####
+
+# ZrNoxb
+
+##### /authors #####
+
+##### translated strings #####
+TClient
+== TClient
+
+Settings
+== Ajustes
+
+Lluvia
+== Lluvia
+
+Enable weather particles
+== Activar particulas de clima
+
+Particle type
+== Tipo de particula
+
+Normales
+== Normales
+
+Corazones
+== Corazones
+
+Particle color
+== Color de particulas
+
+Amount
+== Cantidad
+
+Snow
+== Nieve
+
+Rain
+== Lluvia
+
+Stars
+== Estrellas
+
+Particles
+== Particulas
+
+Speed
+== Velocidad
+
+Size
+== Tamano
+
+Opacity
+== Opacidad
+
+Anime Love
+== Anime Love
+
+Enable Anime Love
+== Activar Anime Love
+
+Character skin
+== Skin del personaje
+
+Kurumi
+== Kurumi
+
+Crimson
+== Carmesi
+
+Midnight
+== Medianoche
+
+Pastel
+== Pastel
+
+Position
+== Posicion
+
+Right
+== Derecha
+
+Left
+== Izquierda
+
+Above
+== Arriba
+
+Below
+== Abajo
+
+Animation type
+== Tipo de animacion
+
+Animation settings
+== Ajustes de animacion
+
+Wave
+== Saludo
+
+Walk
+== Caminar
+
+Mixed
+== Mixto
+
+Sit
+== Sentarse
+
+Sleep
+== Dormir
+
+Celebrate
+== Celebrar
+
+Follow tee
+== Seguir al tee
+
+Visibility
+== Visibilidad
+
+Menu and ingame
+== Menu e ingame
+
+Menu only
+== Solo menu
+
+Ingame only
+== Solo ingame
+
+Floating phrases
+== Frases flotantes
+
+Greeting phrase
+== Frase de saludo
+
+Hi!
+== Hola!
+
+Zzz
+== Zzz
+
+Yay!
+== Genial!
+
+Resting
+== Descansando
+
+I'm here
+== Estoy aqui
+
+Bind Anime Love
+== Tecla Anime Love
+
+Anime Love Size
+== Tamano Anime Love
+
+Anime Love Speed
+== Velocidad Anime Love
+
+Walk Distance
+== Distancia al caminar
+
+Anime Love Opacity
+== Opacidad Anime Love
+
+TClient Theme
+== Tema TClient
+
+Dark
+== Oscuro
+
+Pink Anime
+== Rosa anime
+
+Cyber
+== Cyber
+
+Minimal
+== Minimalista
+
+Custom menu colors
+== Colores personalizados del menu
+
+Accent color
+== Color de acento
+
+Panel color
+== Color de panel
+
+Custom settings background
+== Fondo personalizado de configuracion
+
+Background color
+== Color de fondo
+
+Custom Sounds
+== Sonidos personalizados
+
+Classic
+== Clasico
+
+Anime
+== Anime
+
+Sound pack
+== Pack de sonido
+
+Friend join sound
+== Sonido al entrar amigo
+
+Map finish sound
+== Sonido al terminar mapa
+
+Highlight sound
+== Sonido al recibir highlight
+
+Sound volume
+== Volumen de sonido
+
+Test Friend
+== Probar amigo
+
+Test Finish
+== Probar finish
+
+Test Highlight
+== Probar highlight
+
+Mode
+== Modo
+
+Global
+== Global
+
+Lobby
+== Lobby
+
+Team
+== Equipo
+
+Proximity
+== Proximidad
+
+Overlay
+== Overlay
+
+Close
+== Cerca
+
+Medium
+== Medio
+
+Far
+== Lejos
+
+Muted
+== Silenciado
+
+No nearby voice players
+== No hay jugadores cercanos con voz
+
+Warlist
+== Lista de guerra
+
+Chat Binds
+== Binds de chat
+
+Status Bar
+== Barra de estado
+
+Info
+== Información
+
+Kaomoji
+== Kaomoji
+
+Shrug:
+== Encogerse de hombros:
+
+Flip:
+== Voltear:
+
+Unflip:
+== Desvoltear:
+
+Mute:
+== Silenciar:
+
+Name:
+== Nombre:
+
+Name
+== Nombre
+
+Command:
+== Comando:
+
+Command
+== Comando
+
+Override Selected
+== Sobrescribir seleccionado
+
+Add Bind
+== Añadir bind
+
+Remove Bind
+== Quitar bind
+
+Use left mouse to select
+== Usa el botón izquierdo para seleccionar
+
+Use right mouse to swap with selected
+== Usa el botón derecho para intercambiar con el seleccionado
+
+Use middle mouse select without copy
+== Usa el botón central para seleccionar sin copiar
+
+Reset position of mouse when opening bindwheel
+== Reiniciar posición del ratón al abrir la rueda de binds
+
+Visual
+== Visual
+
+Appearance
+== Apariencia
+
+Custom Font: 
+== Fuente personalizada: 
+
+Hide nameplates in spec
+== Ocultar nombres en espectador
+
+Show skin names in nameplate
+== Mostrar nombre de skin en la placa de nombre
+
+Freeze stars
+== Estrellas de congelación
+
+Color frozen tee skins
+== Colorear skins congeladas
+
+Render all custom colored feet as white feet skin
+== Mostrar pies personalizados como pies blancos
+
+Input
+== Entrada
+
+Fast Inputs (-20ms visual delay)
+== Entradas rápidas (-20ms de retraso visual)
+
+Extra tick other tees (increases other tees latency, \nmakes dragging slightly easier when using fast input)
+== Tick extra a otros tees (aumenta su latencia, \nhace arrastrar más fácil con entradas rápidas)
+
+Anti Latency Tools
+== Herramientas anti-lag
+
+Prediction Margin
+== Margen de predicción
+
+Remove prediction & antiping in freeze
+== Quitar predicción y antiping al congelarse
+
+Amount
+== Cantidad
+
+Delay
+== Retardo
+
+Dont predict other players if you are frozen
+== No predecir a otros jugadores si estás congelado
+
+Adjust your prediction margin while frozen
+== Ajustar margen de predicción estando congelado
+
+Frozen Margin
+== Margen congelado
+
+Anti Ping Smoothing
+== Suavizado de antiping
+
+Use new smoothing algorithm
+== Usar nuevo algoritmo de suavizado
+
+Optimistic prediction along stable direction
+== Predicción optimista en dirección estable
+
+Negative stability buffer (for Gores)
+== Búfer negativo de estabilidad (para Gores)
+
+Uncertainty duration
+== Duración de incertidumbre
+
+Other
+== Otro
+
+Voting
+== Votación
+
+Auto vote no to map changes when far
+== Votar no automáticamente si estás lejos del cambio de mapa
+
+Minimum Time
+== Tiempo mínimo
+
+Leave empty to disable
+== Deja vacío para desactivar
+
+Message to send in chat:
+== Mensaje para enviar al chat:
+
+Auto Reply
+== Respuesta automática
+
+Auto reply to muted players
+== Responder automáticamente a jugadores silenciados
+
+Auto reply when tabbed out
+== Responder automáticamente al salir de la ventana
+
+Player Indicator
+== Indicador de jugador
+
+Show any enabled Indicators
+== Mostrar indicadores activados
+
+Hide indicator for tees on your screen
+== Ocultar indicador para tees en pantalla
+
+Show only freeze Players
+== Mostrar solo jugadores congelados
+
+Only show after joining a team
+== Mostrar solo tras unirse a un equipo
+
+Render tiny tees instead of circles
+== Mostrar tees pequeños en vez de círculos
+
+Use warlist groups for indicator
+== Usar grupos de guerra para indicadores
+
+Indicator size
+== Tamaño del indicador
+
+Indicator opacity
+== Opacidad del indicador
+
+Change indicator offset based on distance to other tees
+== Cambiar desplazamiento según distancia a otros tees
+
+Indicator min offset
+== Desplazamiento mínimo del indicador
+
+Indicator max offset
+== Desplazamiento máximo del indicador
+
+Indicator max distance
+== Distancia máxima del indicador
+
+Indicator offset
+== Desplazamiento del indicador
+
+Use warlist colors instead of regular colors
+== Usar colores de guerra en vez de normales
+
+Show all warlist groups
+== Mostrar todos los grupos de guerra
+
+Indicator alive color
+== Color de vivo
+
+Indicator in freeze color
+== Color congelado
+
+Indicator safe color
+== Color seguro
+
+HUD
+== HUD
+
+Show position and angle (mini debug)
+== Mostrar posición y ángulo (mini debug)
+
+Show your cursor when in free spectate
+== Mostrar cursor al estar en espectador libre
+
+Spectate cursor alpha
+== Opacidad del cursor en espectador
+
+Show when you are the last alive
+== Mostrar si eres el último vivo
+
+Last!
+== ¡Último!
+
+Frozen Tee Display
+== Mostrar tees congelados
+
+Show frozen tee display
+== Mostrar ventana de tees congelados
+
+Use skins instead of ninja tees
+== Usar skins normales en vez de ninja
+
+Max Rows
+== Filas máximas
+
+Tee Size
+== Tamaño del tee
+
+Tees left alive text
+== Texto de tees vivos
+
+Count frozen tees
+== Contar tees congelados
+
+Tile Outlines
+== Bordes de tiles
+
+Show any enabled outlines
+== Mostrar bordes activados
+
+Only show outlines in entities
+== Mostrar bordes solo en entidades
+
+Outline freeze & deep
+== Borde congelado y profundo
+
+Outline walls
+== Borde de paredes
+
+Outline teleporter
+== Borde de teletransporte
+
+Outline unfreeze & undeep
+== Borde de descongelar y superficial
+
+Outline kill
+== Borde de muerte
+
+Outline width
+== Ancho del borde
+
+Outline alpha
+== Opacidad del borde
+
+Outline Alpha (walls)
+== Opacidad del borde (paredes)
+
+Freeze outline color
+== Color de borde congelado
+
+Walls outline color
+== Color de borde de paredes
+
+Teleporter outline color
+== Color de borde de teletransporte
+
+Unfreeze outline color
+== Color de borde de descongelar
+
+Kill outline color
+== Color de borde de muerte
+
+Ghost Tools
+== Herramientas de fantasma
+
+Show unpredicted ghosts for other players
+== Mostrar fantasmas sin predecir de otros jugadores
+
+Swap ghosts and normal players
+== Intercambiar fantasmas y jugadores
+
+Predicted alpha
+== Opacidad predicha
+
+Unpredicted alpha
+== Opacidad no predicha
+
+Hide ghosts of frozen players
+== Ocultar fantasmas de jugadores congelados
+
+Render ghosts as circles
+== Mostrar fantasmas como círculos
+
+Rainbow
+== Arcoíris
+
+Rainbow Tees
+== Tees arcoíris
+
+Rainbow weapons
+== Armas arcoíris
+
+Rainbow hook
+== Gancho arcoíris
+
+Rainbow others
+== Otros arcoíris
+
+Pulse
+== Pulso
+
+Black
+== Negro
+
+Random
+== Aleatorio
+
+Rainbow speed
+== Velocidad arcoíris
+
+Tee Trails
+== Estelas de tee
+
+Enable tee trails
+== Activar estelas
+
+Show other tees' trails
+== Mostrar estelas de otros
+
+Fade trail alpha
+== Desvanecer opacidad de estela
+
+Taper trail width
+== Afinar ancho de estela
+
+Trail style
+== Estilo de estela
+
+Default
+== Predeterminada
+
+Movement
+== Movimiento
+
+Movement speed
+== Velocidad de movimiento
+
+Solid
+== Sólido
+
+Tee
+== Tee
+
+Speed
+== Velocidad
+
+Tee trail color
+== Color de estela
+
+Trail width
+== Ancho de estela
+
+Trail length
+== Largo de estela
+
+Trail alpha
+== Opacidad de estela
+
+War Entries
+== Entradas de guerra
+
+Edit Entry
+== Editar entrada
+
+Clan
+== Clan
+
+Reason
+== Razón
+
+Override Entry
+== Sobrescribir entrada
+
+Add Entry
+== Añadir entrada
+
+Allow Duplicate Entries
+== Permitir entradas duplicadas
+
+Enable warlist
+== Activar lista de guerra
+
+Colors in chat
+== Colores en el chat
+
+Colors in scoreboard
+== Colores en el marcador
+
+Colors in spectate select
+== Colores en selección de espectador
+
+Show clan if war
+== Mostrar clan si hay guerra
+
+War Groups
+== Grupos de guerra
+
+Are you sure that you want to remove '%s' from your war groups?
+== ¿Seguro que quieres quitar a '%s' de tus grupos de guerra?
+
+Remove War Group
+== Quitar grupo de guerra
+
+Yes
+== Sí
+
+No
+== No
+
+Color
+== Color
+
+Override Group
+== Sobrescribir grupo
+
+Add Group
+== Añadir grupo
+
+Online Players
+== Jugadores en línea
+
+TClient Links
+== Enlaces TClient
+
+Discord
+== Discord
+
+Website
+== Sitio web
+
+Github
+== Github
+
+Support ♥
+== Soporte ♥
+
+Config Files
+== Archivos de configuración
+
+TClient Settings
+== Ajustes de TClient
+
+Profiles
+== Perfiles
+
+TClient Developers
+== Desarrolladores de TClient
+
+Hide Settings Tabs
+== Ocultar pestañas de ajustes
+
+Integration
+== Integración
+
+Enable Discord Integration
+== Activar integración de Discord
+
+Your profile
+== Tu perfil
+
+Name: %s
+== Nombre: %s
+
+Clan: %s
+== Clan: %s
+
+Skin: %s
+== Skin: %s
+
+After Load
+== Tras cargar
+
+Dummy
+== Dummy
+
+Custom colors
+== Colores personalizados
+
+Save/Load Skin
+== Guardar/Cargar skin
+
+Save/Load Colors
+== Guardar/Cargar colores
+
+Save/Load Emote
+== Guardar/Cargar gesto
+
+Save/Load Name
+== Guardar/Cargar nombre
+
+Save/Load Clan
+== Guardar/Cargar clan
+
+Save/Load Flag
+== Guardar/Cargar bandera
+
+Load
+== Cargar
+
+Save
+== Guardar
+
+Delete
+== Eliminar
+
+Override
+== Sobrescribir
+
+Profiles file
+== Archivo de perfiles
+
+Show status bar
+== Mostrar barra de estado
+
+Show labels on status bar items
+== Mostrar etiquetas en barra de estado
+
+Status bar height
+== Altura de la barra
+
+Local Time
+== Hora local
+
+Use 12 hour clock
+== Usar reloj de 12 horas
+
+Show seconds on clock
+== Mostrar segundos en el reloj
+
+Colors
+== Colores
+
+Status bar color
+== Color de barra de estado
+
+Text color
+== Color del texto
+
+Status bar alpha
+== Opacidad de la barra de estado
+
+Text alpha
+== Opacidad del texto
+
+Status Bar Codes:
+== Códigos de la barra:
+
+a = Angle
+== a = Ángulo
+
+p = Ping
+== p = Ping
+
+d = Prediction
+== d = Predicción
+
+c = Position
+== c = Posición
+
+l = Local Time
+== l = Hora local
+
+r = Race Time
+== r = Tiempo de carrera
+
+f = FPS
+== f = FPS
+
+v = Velocity
+== v = Velocidad
+
+z = Zoom
+== z = Zoom
+
+Apply
+== Aplicar
+
+Status Scheme:
+== Esquema de estado
+
+Add Item
+== Añadir elemento
+
+Remove Item
+== Quitar elemento
+
+Add [group] [name] [reason]:
+== Añadir [grupo] [nombre] [razón]
+
+Add [group] [clan] [reason]:
+== Añadir [grupo] [clan] [razón]
+
+Remove [group] [name]:
+== Quitar [grupo] [nombre]
+
+Remove [group] [clan]:
+== Quitar [grupo] [clan]
+
+Translated text hidden due to streamer mode
+== Texto traducido oculto por modo streamer
+
+(On Latest)
+== (Última versión)
+
+(Fetching Update Info)
+== (Obteniendo actualización)
+
+[bgdraw]
+Failed to create bgdraw folder
+== [bgdraw] Error al crear carpeta bgdraw
+
+[bgdraw]
+No items to write
+== [bgdraw] Sin elementos para escribir
+
+[bgdraw]
+No changes since last save
+== [bgdraw] Sin cambios desde último guardado
+
+[bgdraw]
+Writing item %d failed
+== [bgdraw] Error al escribir elemento %d
+
+[bgdraw]
+Written %d items
+== [bgdraw] %d elementos escritos
+
+[bgdraw]
+Loaded %d items
+== [bgdraw] %d elementos cargados
+
+[bgdraw]
+Loaded %d items (discarded %d items)
+== [bgdraw] %d elementos cargados (%d descartados)
+
+Cute:
+== Lindo:
+
+Lenny:
+== Lenny:
+
+Add war name:
+== Añadir nombre guerra:
+
+Add war clan:
+== Añadir clan guerra:
+
+Add team name:
+== Añadir nombre equipo:
+
+Add team clan:
+== Añadir clan equipo:
+
+Remove war name:
+== Quitar nombre guerra:
+
+Remove war clan:
+== Quitar clan guerra:
+
+Remove team name:
+== Quitar nombre equipo:
+
+Remove team clan:
+== Quitar clan equipo:
+
+Translate:
+== Traducir:
+
+Translate ID:
+== ID traducción:
+
+Unmute:
+== Quitar silencio:
+
+Bind Wheel
+== Rueda de binds
+
+War List
+== Lista de guerra
+
+[Hammer Mode]
+Normal
+== Normal
+
+[Hammer Mode]
+Rotate with cursor
+== Girar con cursor
+
+[Hammer Mode]
+Rotate with cursor like gun
+== Girar con cursor como arma
+
+Hammer Mode:
+== Modo martillo:
+
+Ingame cursor scale
+== Escala del cursor
+
+Wheel animate
+== Animación de rueda
+
+Show ping colored circle in nameplates
+== Mostrar círculo de ping en nombres
+
+Show country flags in nameplates
+== Mostrar banderas en nombres
+
+Show katan on frozen players
+== Mostrar katana en congelados
+
+Tiny Tees
+== Tees pequeños
+
+Tiny Tee Size
+== Tamaño Tee pequeño
+
+Fake CTF flags
+== Banderas CTF falsas
+
+Auto execute
+== Auto ejecutar
+
+Pet
+== Mascota
+
+Show the pet
+== Mostrar mascota
+
+Pet size
+== Tamaño mascota
+
+Pet alpha
+== Opacidad mascota
+
+Pet Skin:
+== Skin mascota:
+
+Show mini vote HUD
+== Mostrar mini HUD de votación
+
+Horizontal Position
+== Posición horizontal
+
+Vertical Position
+== Posición vertical
+
+Font Size
+== Tamaño de fuente
+
+Show screen center lines
+== Mostrar líneas centrales
+
+Screen center line color
+== Color línea central
+
+Screen center line width
+== Ancho línea central
+
+[Outlines]
+Width
+== Ancho
+
+Unhook & hook
+== Soltar y enganchar
+
+Freeze & deep
+== Congelación y profundo
+
+Unfreeze & undeep
+== Descongelar y superficial
+
+Kill
+== Muerte
+
+Tele
+== Tele
+
+Toggle ghosts key
+== Tecla de fantasmas
+
+Background Draw
+== Dibujo de fondo
+
+Time until strokes disappear
+== Tiempo hasta borrar trazos
+
+ seconds (never)
+==  segundos (nunca)
+
+ seconds
+==  segundos
+
+Width
+== Ancho
+
+Draw where mouse is
+== Dibujar donde está el mouse
+
+Finish Name
+== Nombre al terminar
+
+Attempt to change your name when near finish
+== Cambiar nombre al acercarse al final
+
+Finish Name:
+== Nombre al terminar:
+
+The command is ran in console not chat
+== El comando se ejecuta en consola, no en chat
+
+Bind Wheel Key
+== Tecla rueda de binds
+
+_ or ' ' = Space
+== _ o ' ' = Espacio
+
+Overwrite clan even if empty
+== Sobrescribir clan aunque esté vacío
+
+Activating mod weapon on %d: %s\n
+== Activando arma mod en %d: %s\n
+
+[data_version.h]
+You have probably only installed the TClient DDNet.exe which is not supported, please use the entire TClient folder
+== [data_version.h] Solo instalaste el DDNet.exe de TClient, usa la carpeta completa
+
+Changing name to %s near finish
+== Cambiando nombre a %s cerca del final
+
+[translate]
+%s translating to %s
+== [translate] %s traduciendo a %s
+
+[translate]
+%s to %s failed: %s
+== [translate] Error al traducir %s a %s: %s
+
+##### new sections #####
+
+How it works
+== Cómo funciona
+
+Scans ahead for freeze tiles and automatically
+== Escanea adelante por tiles de congelación y automáticamente
+
+hooks away from them. If Auto A/D Steering
+== se engancha lejos de ellos. Si Dirección automática A/D
+
+is enabled, it also presses A or D to steer
+== está activado, también presiona A o D para moverse
+
+away from freeze tiles automatically.
+== lejos de los tiles de congelación automáticamente.
+
+Limit mouse to screen
+== Limitar ratón a pantalla
+
+Scale mouse distance
+== Escalar distancia del ratón
+
+Show player hit boxes
+== Mostrar hitboxes de jugadores
+
+Mod weapon
+== Arma de moderador
+
+MISC
+== VARIOS
+
+Chat Spammer
+== Spammer de chat
+
+Spam Text:
+== Texto de spam:
+
+Enter spam message...
+== Ingresa mensaje de spam...
+
+Spam Delay
+== Retraso de spam
+
+Spoof Country
+== Falsificar país
+
+Auto Jump (bunny hop)
+== Salto automático (bunny hop)
+
+No Blood
+== Sin sangre
+
+No Smoke
+== Sin humo
+
+Auto Record Demos
+== Grabar demos automáticamente
+
+Spoof Skin
+== Falsificar skin
+
+Spoof Skin:
+== Skin falsa:
+
+VISUALS
+== VISUALES
+
+Wireframe Walls
+== Paredes en wireframe
+
+No Weapon Render
+== Sin renderizado de armas
+
+No Hook Lines
+== Sin líneas de gancho
+
+No Nameplates
+== Sin nombres
+
+Transparent Tees
+== Tees transparentes
+
+Transparency
+== Transparencia
+
+Zoom Override
+== Anular zoom
+
+Zoom Level
+== Nivel de zoom
+
+HUD
+== HUD
+
+Show FPS
+== Mostrar FPS
+
+Show Velocity
+== Mostrar velocidad
+
+Show Ping
+== Mostrar ping
+
+Show Race Time
+== Mostrar tiempo de carrera
+
+Show Speed Graph
+== Mostrar gráfico de velocidad
+
+HUD Text Color
+== Color de texto HUD
+
+Kill Sound
+== Sonido al matar
+
+Death Sound
+== Sonido al morir
+
+Dummy HUD
+== HUD del dummy
+
+Show Dummy Position
+== Mostrar posición del dummy
+
+Show Dummy Speed
+== Mostrar velocidad del dummy
+
+Show Dummy Angle
+== Mostrar ángulo del dummy
+
+Keystroke HUD
+== HUD de teclas
+
+Enable keystroke overlay
+== Activar overlay de teclas
+
+Position
+== Posición
+
+Horizontal position %
+== Posición horizontal %
+
+Vertical position %
+== Posición vertical %
+
+Appearance
+== Apariencia
+
+Size
+== Tamaño
+
+Opacity
+== Opacidad
+
+Colors
+== Colores
+
+Pressed key color
+== Color tecla presionada
+
+Unpressed key color
+== Color tecla sin presionar
+
+Options
+== Opciones
+
+Show key labels (A, D, SPACE)
+== Mostrar etiquetas (A, D, SPACE)
+
+Show space bar
+== Mostrar barra espaciadora
+
+Only show when keys pressed
+== Solo mostrar al presionar teclas
+
+Mouse Buttons
+== Botones del mouse
+
+Show mouse clicks (LMB/RMB)
+== Mostrar clicks del mouse (LMB/RMB)
+
+Mouse HUD horizontal %
+== HUD mouse horizontal %
+
+Mouse HUD vertical %
+== HUD mouse vertical %
+
+Edit mode (drag to move)
+== Modo editar (arrastrar para mover)
+
+Preview
+== Vista previa
+
+A, D = move keys. Space = jump. Open edit mode to drag the overlay into position.
+== A, D = mover. Space = saltar. Activa modo editar para arrastrar el overlay.
+
+A, D = move keys. Space = jump. LMB = fire, RMB = hook. Open edit mode to drag the overlay into position.
+== A, D = mover. Space = saltar. LMB = disparo, RMB = hook. Activa modo editar para arrastrar el overlay.
+
+Friend Notifications
+== Notificaciones de Amigos
+
+Show when a friend joins
+== Mostrar cuando un amigo entra
+
+Duration (seconds)
+== Duracion (segundos)
+
+Position
+== Posicion
+
+Top Left
+== Arriba Izquierda
+
+Top Right
+== Arriba Derecha
+
+Bottom Left
+== Abajo Izquierda
+
+Bottom Right
+== Abajo Derecha
+
+Show clan in notification
+== Mostrar clan en notificacion
+
+joined the server
+== entro al servidor
+
+Chat History
+== Historial de Chat
+
+Enable chat history
+== Activar historial de chat
+
+Max history lines
+== Max lineas del historial
+
+Panel height
+== Altura del panel
+
+Open chat history
+== Abrir historial de chat
+
+Search
+== Buscar
+
+matches
+== coincidencias
+
+Visual
+== Visual
+
+Media Background
+== Fondo multimedia
+
+Enable to main menu
+== Activar en menu principal
+
+Enable to game background
+== Activar en fondo del juego
+
+No media files in backgrounds folder
+== No hay archivos en la carpeta backgrounds
+
+Map offset
+== Desplazamiento del mapa
+
+0 keeps the image fixed to the screen. 100 fixes it to the map for a full parallax effect.
+== 0 fija la imagen a la pantalla. 100 la fija al mapa con efecto parallax completo.
+
+Disabled.
+== Desactivado.
+
+No media selected.
+== Ningun medio seleccionado.
+
+Loaded image.
+== Imagen cargada.
+
+Loaded video.
+== Video cargado.
+
+Failed to load PNG.
+== No se pudo cargar el PNG.
+
+Failed to upload PNG.
+== No se pudo subir el PNG.
+
+Failed to read file.
+== No se pudo leer el archivo.
+
+Failed to upload image.
+== No se pudo subir la imagen.
+
+Failed to decode image.
+== No se pudo decodificar la imagen.
+
+Video backgrounds are unavailable in this build.
+== Los fondos de video no estan disponibles en esta compilacion.
+
+Failed to open video.
+== No se pudo abrir el video.
+
+Failed to read video info.
+== No se pudo leer la informacion del video.
+
+No video stream found.
+== No se encontro pista de video.
+
+Unsupported video codec.
+== Codec de video no soportado.
+
+Failed to initialize video decoder.
+== No se pudo iniciar el decodificador de video.
+
+Invalid video dimensions.
+== Dimensiones de video invalidas.
+
+Failed to allocate video frames.
+== No se pudieron reservar frames de video.
+
+Failed to allocate RGBA frame.
+== No se pudo reservar el frame RGBA.
+
+Failed to initialize video scaler.
+== No se pudo iniciar el escalador de video.
+
+Failed to decode first video frame.
+== No se pudo decodificar el primer frame de video.
+
+Failed while decoding video.
+== Fallo al decodificar el video.
