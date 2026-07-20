@@ -1,6 +1,6 @@
 # MΛ ツ Client 2.0
 
-Cliente personalizado basado en DDNet/TClient para Windows x64, preparado para jugar, compartir y publicar como release en GitHub.
+Cliente personalizado basado en DDNet/TClient para Windows x64, preparado para descargar, extraer y jugar.
 
 Repositorio oficial: [thecoderma69/M-client](https://github.com/thecoderma69/M-client)
 
@@ -8,7 +8,7 @@ Repositorio oficial: [thecoderma69/M-client](https://github.com/thecoderma69/M-c
 
 MΛ ツ Client es una version modificada del cliente DDNet con mejoras visuales, opciones de personalizacion, herramientas de comodidad y recursos propios. Esta carpeta contiene una compilacion lista para ejecutar en Windows de 64 bits.
 
-La version 2.0 reorganiza el cliente para que las opciones principales esten mejor distribuidas entre `MΛ ツ`, `Visual` y `Recursos`, evitando duplicados y dejando la configuracion mas limpia.
+La version 2.0 reorganiza el cliente para que las opciones principales esten mejor distribuidas entre `MΛ ツ`, `Visual` y `Recursos`, evitando duplicados y dejando la configuracion mas limpia para jugar.
 
 ## Novedades de la version 2.0
 
@@ -78,7 +78,7 @@ Esto permite que el cliente pueda leer configuraciones existentes del usuario, c
 - mapas descargados
 - otros datos guardados por DDNet
 
-La carpeta `user/` esta ignorada por Git para evitar subir configuraciones personales, cuentas, dumps o archivos locales.
+Tus configuraciones personales no vienen incluidas en la descarga. Cada jugador mantiene sus propios ajustes, skins, mapas y datos guardados desde su carpeta local de DDNet.
 
 ## Recursos
 
@@ -137,25 +137,6 @@ MΛ ツ client/
 |-- license.txt           # Licencia del proyecto base
 `-- *.dll                 # Librerias necesarias
 ```
-
-## Publicar una nueva release
-
-Para GitHub se recomienda publicar la version 2.0 como:
-
-```txt
-Tag: v2.0.0
-Titulo: MΛ ツ Client 2.0
-Asset: M-Client-v2.0-win64.zip
-```
-
-Antes de crear el `.zip`, revisa que no se incluya:
-
-- `.git/`
-- `user/`
-- `dumps/`
-- `screenshots/`
-- `videos/`
-- archivos `.log`, `.tmp` o `.bak`
 
 ## Solucion de problemas
 
