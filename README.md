@@ -1,4 +1,4 @@
-# MΛ ツ Client 2.1
+# MΛ ツ Client 2.1.1
 
 Cliente personalizado basado en DDNet/TClient para Windows x64, preparado para descargar, extraer y jugar.
 
@@ -8,7 +8,7 @@ Repositorio oficial: [thecoderma69/M-client](https://github.com/thecoderma69/M-c
 
 MΛ ツ Client es una version modificada del cliente DDNet con mejoras visuales, opciones de personalizacion, herramientas de comodidad y recursos propios.
 
-La version 2.1 mejora el fondo multimedia, agrega controles nuevos para audio y mantiene las opciones principales mejor distribuidas entre `MΛ ツ`, `Visual` y `Recursos`.
+La version 2.1.1 mejora el editor de HUD, el reproductor de musica y el efecto musica video, manteniendo las opciones principales distribuidas entre `MΛ ツ`, `Visual` y `Recursos`.
 
 ## Descargar
 
@@ -19,7 +19,7 @@ El juego listo para usar esta en:
 Descarga:
 
 ```txt
-M-Client-v2.1-win64.zip
+M-Client-v2.1.1-win64.zip
 ```
 
 Luego extrae el `.zip` y abre:
@@ -35,6 +35,14 @@ El codigo fuente esta en:
 ```txt
 M-source/
 ```
+
+## Novedades De La Version 2.1.1
+
+- El reproductor de musica puede ocultar el timer original del juego y usar su propio tiempo como HUD principal.
+- El contador de tees vivos/congelados ahora se puede mover y escalar desde el editor de HUD.
+- El efecto musica video engancha el ritmo mas rapido al iniciar una cancion.
+- Correccion para evitar reconfigurar el visualizador de audio en cada frame.
+- Ajustes del editor de HUD para mover y redimensionar elementos con mas precision.
 
 ## Novedades De La Version 2.1
 
@@ -169,7 +177,7 @@ Desde `MΛ ツ > Visual` puedes recargar la lista, elegir la imagen y ajustar ta
 ## Estructura De La Descarga
 
 ```txt
-M-Client-v2.1-win64/
+M-Client-v2.1.1-win64/
 |-- data/                 # Archivos de datos y recursos del cliente
 |-- DDNet.exe             # Ejecutable principal
 |-- DDNet-Server.exe      # Ejecutable del servidor

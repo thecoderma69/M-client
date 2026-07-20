@@ -59,6 +59,9 @@ Music Player
 Enable music player
 == Activar reproductor de musica
 
+No mostrar tiempo en juego
+== No mostrar tiempo en juego
+
 Volume
 == Volumen
 

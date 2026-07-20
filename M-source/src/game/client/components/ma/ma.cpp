@@ -39,6 +39,7 @@ namespace
 
 constexpr float MAX_EFFECT_DELTA = 0.1f;
 constexpr int MAX_MUSIC_VIDEO_POINTS = 192;
+constexpr float MUSIC_VIDEO_EDITOR_RECT_SCALE = 0.70f;
 
 static float ApproachEffectValue(float Current, float Target, float Delta, float Speed)
 {
@@ -473,6 +474,7 @@ void CMa::ResetMusicVideoEffect()
 	m_pMusicVideoVisualizer.reset();
 	m_MusicVideoFrame = BestClientVisualizer::SVisualizerFrame();
 	m_LastMusicVideoPollTick = 0;
+	m_MusicVideoUsingAudio = false;
 	m_MusicVideoLevel = 0.0f;
 	m_MusicVideoKick = 0.0f;
 	m_MusicVideoRollingPeak = 0.05f;
@@ -628,7 +630,34 @@ CUIRect CMa::GetMusicVideoEffectHudEditorRect(bool ForcePreview) const
 {
 	const float Height = HudLayout::CANVAS_HEIGHT;
 	const float Width = Height * (m_pGraphics ? m_pGraphics->ScreenAspect() : 1.0f);
-	return GetMusicVideoEffectRect(Width, Height, ForcePreview);
+	const CUIRect RenderRect = GetMusicVideoEffectRect(Width, Height, ForcePreview);
+	if(RenderRect.w <= 0.0f || RenderRect.h <= 0.0f)
+		return RenderRect;
+
+	const float EditorW = RenderRect.w * MUSIC_VIDEO_EDITOR_RECT_SCALE;
+	const float EditorH = RenderRect.h * MUSIC_VIDEO_EDITOR_RECT_SCALE;
+	return {
+		RenderRect.x + (RenderRect.w - EditorW) * 0.5f,
+		RenderRect.y + (RenderRect.h - EditorH) * 0.5f,
+		EditorW,
+		EditorH};
+}
+
+void CMa::ApplyMusicVideoEffectHudEditorRect(const CUIRect &EditorRect, float HudWidth, float HudHeight)
+{
+	if(EditorRect.w <= 0.0f || EditorRect.h <= 0.0f)
+		return;
+
+	const float RenderW = EditorRect.w / MUSIC_VIDEO_EDITOR_RECT_SCALE;
+	const float RenderH = EditorRect.h / MUSIC_VIDEO_EDITOR_RECT_SCALE;
+	const float RenderX = EditorRect.x - (RenderW - EditorRect.w) * 0.5f;
+	const float RenderY = EditorRect.y - (RenderH - EditorRect.h) * 0.5f;
+	const float ClampedRenderX = std::clamp(RenderX, 0.0f, maximum(0.0f, HudWidth - RenderW));
+	const float ClampedRenderY = std::clamp(RenderY, 0.0f, maximum(0.0f, HudHeight - RenderH));
+	HudLayout::SetPosition(
+		HudLayout::MODULE_MUSIC_VIDEO_EFFECT,
+		ClampedRenderX * (HudLayout::CANVAS_WIDTH / maximum(HudWidth, 1.0f)),
+		ClampedRenderY);
 }
 
 void CMa::RenderMusicVideoEffectHudEditor(bool ForcePreview)
@@ -651,27 +680,35 @@ float CMa::UpdateMusicVideoEffect(float Delta, bool ForcePreview, bool MusicPlay
 		return 0.0f;
 	}
 
-	const bool ShouldReadAudio = ForcePreview || !g_Config.m_MaMusicVideoEffectMusicOnly || MusicPlaying;
-	if(!ShouldReadAudio)
+	const bool ShouldUseAudio = ForcePreview || !g_Config.m_MaMusicVideoEffectMusicOnly || MusicPlaying;
+	const bool ShouldWarmAudio = ForcePreview || g_Config.m_MaMusicVideoEffect != 0;
+	if(ShouldUseAudio && !m_MusicVideoUsingAudio)
 	{
-		m_MusicVideoLevel = ApproachEffectValue(m_MusicVideoLevel, 0.0f, Delta, 8.0f);
-		m_MusicVideoKick = ApproachEffectValue(m_MusicVideoKick, 0.0f, Delta, 14.0f);
-		return m_MusicVideoLevel;
+		m_LastMusicVideoPollTick = 0;
+		m_MusicVideoRollingPeak = 0.05f;
 	}
+	m_MusicVideoUsingAudio = ShouldUseAudio;
 
-	if(!m_pMusicVideoVisualizer)
+	if(ShouldWarmAudio && !m_pMusicVideoVisualizer)
 		m_pMusicVideoVisualizer = std::make_unique<BestClientVisualizer::CRealtimeMusicVisualizer>();
 
 	const int64_t Now = time_get();
-	if(m_LastMusicVideoPollTick == 0 || Now - m_LastMusicVideoPollTick >= time_freq() / 30)
+	if(m_pMusicVideoVisualizer && (m_LastMusicVideoPollTick == 0 || Now - m_LastMusicVideoPollTick >= time_freq() / 30))
 	{
 		BestClientVisualizer::SVisualizerPlaybackHint Hint;
 		Hint.m_Title = pTitle ? pTitle : "";
 		Hint.m_Artist = pArtist ? pArtist : "";
-		Hint.m_Playing = MusicPlaying || ForcePreview;
+		Hint.m_Playing = ShouldUseAudio;
 		m_pMusicVideoVisualizer->SetPlaybackHint(Hint);
 		m_pMusicVideoVisualizer->PollFrame(m_MusicVideoFrame);
 		m_LastMusicVideoPollTick = Now;
+	}
+
+	if(!ShouldUseAudio)
+	{
+		m_MusicVideoLevel = ApproachEffectValue(m_MusicVideoLevel, 0.0f, Delta, 8.0f);
+		m_MusicVideoKick = ApproachEffectValue(m_MusicVideoKick, 0.0f, Delta, 14.0f);
+		return m_MusicVideoLevel;
 	}
 
 	const BestClientVisualizer::SVisualizerFrame &Frame = m_MusicVideoFrame;

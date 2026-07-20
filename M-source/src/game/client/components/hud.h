@@ -136,6 +136,8 @@ class CHud : public CComponent
 	CUIRect GetLocalTimeRect(bool ForcePreview) const;
 	void RenderFrozenHud(bool ForcePreview = false);
 	CUIRect GetFrozenHudRect(bool ForcePreview) const;
+	void RenderFrozenCounterText(const char *pText, bool ForcePreview = false);
+	CUIRect GetFrozenCounterRect(const char *pText, bool ForcePreview = false) const;
 
 	static constexpr float MOVEMENT_INFORMATION_LINE_HEIGHT = 8.0f;
 
@@ -157,6 +159,8 @@ public:
 	void RenderLocalTimePreview();
 	CUIRect GetFrozenHudEditorRect(float Width, float Height) const;
 	void RenderFrozenHudPreview();
+	CUIRect GetFrozenCounterHudEditorRect(float Width, float Height) const;
+	void RenderFrozenCounterPreview();
 
 	void ResetHudContainers();
 	void OnWindowResize() override;

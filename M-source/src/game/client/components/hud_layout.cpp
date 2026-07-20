@@ -38,6 +38,7 @@ namespace HudLayout
 			{0.0f, 182.0f, 100, 0, true, false, 0x66000000U},
 			{96.0f, 182.0f, 100, 0, true, false, 0x66000000U},
 			{150.0f, 50.0f, 100, 0, true, false, 0x66000000U},
+			{250.0f, 11.0f, 100, 0, true, false, 0x66000000U},
 		};
 
 		static SModuleLayout gs_aRuntimeModuleLayouts[MODULE_COUNT];
@@ -91,6 +92,7 @@ namespace HudLayout
 			"Keyboard",
 			"Mouse",
 			"Efecto Musica Video",
+			"Contador congelados",
 		};
 
 		SModuleLayout ConfigLayout(EModule Module)

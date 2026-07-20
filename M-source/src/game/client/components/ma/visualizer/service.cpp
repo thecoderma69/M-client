@@ -20,6 +20,18 @@ namespace
 std::mutex s_VisualizerSourceMutex;
 std::weak_ptr<IVisualizerSource> s_pSharedVisualizerSource;
 
+static bool ConfigEquals(const SVisualizerConfig &A, const SVisualizerConfig &B)
+{
+	return A.m_SampleRate == B.m_SampleRate &&
+	       A.m_ChannelMode == B.m_ChannelMode &&
+	       A.m_BandCount == B.m_BandCount &&
+	       A.m_LowCutHz == B.m_LowCutHz &&
+	       A.m_HighCutHz == B.m_HighCutHz &&
+	       A.m_BassSplitHz == B.m_BassSplitHz &&
+	       A.m_NoiseReduction == B.m_NoiseReduction &&
+	       A.m_Sensitivity == B.m_Sensitivity;
+}
+
 static std::unique_ptr<IVisualizerSource> CreatePlatformVisualizerSource()
 {
 #if defined(CONF_PLATFORM_LINUX) && defined(BC_MUSICPLAYER_HAS_PULSE) && BC_MUSICPLAYER_HAS_PULSE
@@ -64,6 +76,10 @@ void CRealtimeMusicVisualizer::RefreshConfig()
 	Config.m_NoiseReduction = std::clamp(g_Config.m_MaMusicPlayerVisualizerSmoothing / 100.0f, 0.0f, 0.99f);
 	const float RawSensitivity = std::clamp(g_Config.m_MaMusicPlayerVisualizerSensitivity / 100.0f, 0.5f, 3.0f);
 	Config.m_Sensitivity = powf(RawSensitivity, 1.35f);
+
+	if(m_ConfigInitialized && ConfigEquals(m_Config, Config))
+		return;
+
 	m_Config = Config;
 	m_ConfigInitialized = true;
 	if(m_pSource)

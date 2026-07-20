@@ -50,6 +50,7 @@ class CMa : public CComponent
 	std::unique_ptr<BestClientVisualizer::CRealtimeMusicVisualizer> m_pMusicVideoVisualizer;
 	BestClientVisualizer::SVisualizerFrame m_MusicVideoFrame;
 	int64_t m_LastMusicVideoPollTick = 0;
+	bool m_MusicVideoUsingAudio = false;
 	float m_MusicVideoLevel = 0.0f;
 	float m_MusicVideoKick = 0.0f;
 	float m_MusicVideoRollingPeak = 0.05f;
@@ -76,6 +77,7 @@ public:
 
 	bool IsComponentDisabled(int Component) const;
 	CUIRect GetMusicVideoEffectHudEditorRect(bool ForcePreview) const;
+	void ApplyMusicVideoEffectHudEditorRect(const CUIRect &EditorRect, float HudWidth, float HudHeight);
 	void RenderMusicVideoEffectHudEditor(bool ForcePreview);
 	void RenderMusicVideoEffectBackground();
 	void ReloadMusicVideoCenterImage();

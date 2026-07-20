@@ -22,6 +22,14 @@ public:
 
 private:
 	static constexpr int MAX_MODULE_VISUALS = 26;
+	enum class EResizeHandle
+	{
+		NONE = 0,
+		TOP_LEFT,
+		TOP_RIGHT,
+		BOTTOM_LEFT,
+		BOTTOM_RIGHT,
+	};
 
 	struct SModuleVisual
 	{
@@ -41,12 +49,17 @@ private:
 	bool m_MouseDownLast = false;
 	bool m_RightMouseDownLast = false;
 	bool m_Dragging = false;
+	bool m_Resizing = false;
 	bool m_PressedOnReset = false;
+	EResizeHandle m_ResizeHandle = EResizeHandle::NONE;
 	HudLayout::EModule m_PressedModule = HudLayout::MODULE_COUNT;
 	HudLayout::EModule m_HoveredModule = HudLayout::MODULE_COUNT;
 	HudLayout::EModule m_SelectedModule = HudLayout::MODULE_COUNT;
 	vec2 m_DragMouseOffset = vec2(0.0f, 0.0f);
 	vec2 m_PressMousePos = vec2(0.0f, 0.0f);
+	vec2 m_ResizeAnchor = vec2(0.0f, 0.0f);
+	CUIRect m_ResizeStartRect{};
+	int m_ResizeStartScale = 100;
 	SPopupMenuId m_SettingsPopupId;
 	CButtonContainer m_ResetAllButton;
 	CButtonContainer m_ToggleModuleButton;
@@ -59,13 +72,21 @@ private:
 	float HudHeight() const;
 	bool IsEditableModule(HudLayout::EModule Module) const;
 	bool IsModuleEnabled(HudLayout::EModule Module) const;
+	bool IsResizableModule(HudLayout::EModule Module) const;
+	int GetModuleScale(HudLayout::EModule Module) const;
+	void SetModuleScale(HudLayout::EModule Module, int Scale);
 	void RenderModulePreview(const SModuleVisual &Visual) const;
 	void RenderChatExtraPreview(const SModuleVisual &Visual) const;
 	void CollectModuleVisuals(SModuleVisual *pOut, int &Count) const;
 	HudLayout::EModule HitTestModule(vec2 MousePos) const;
+	EResizeHandle HitTestResizeHandle(vec2 MousePos, HudLayout::EModule *pModule = nullptr) const;
+	CUIRect ResizeHandleRect(const CUIRect &Rect, EResizeHandle Handle) const;
+	vec2 ResizeAnchor(const CUIRect &Rect, EResizeHandle Handle) const;
 	void UpdateDragging(vec2 MousePos);
+	void UpdateResizing(vec2 MousePos);
 	void RenderOverlay(vec2 MousePos);
 	void RenderModuleOutline(const SModuleVisual &Visual, bool Hovered, bool Selected) const;
+	void RenderResizeHandles(const SModuleVisual &Visual, bool Hovered, bool Selected) const;
 	void RenderModuleLabel(const SModuleVisual &Visual) const;
 	void OpenModuleSettings(const SModuleVisual &Visual);
 	void ApplyDraggedPosition(HudLayout::EModule Module, const CUIRect &Rect);

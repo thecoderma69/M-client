@@ -4411,6 +4411,8 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 		RightView.HSplitTop(LineSize, &Button, &RightView);
 		Ui()->DoScrollbarOption(&g_Config.m_MaMusicPlayerAnimationMs, &g_Config.m_MaMusicPlayerAnimationMs, &Button, TCLocalize("Animation speed"), 50, 1000, &CUi::ms_LinearScrollbarScale, 0, "ms");
 
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaMusicPlayerHideGameTimer, TCLocalize("No mostrar tiempo en juego"), &g_Config.m_MaMusicPlayerHideGameTimer, &RightView, LineSize);
+
 		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaMusicPlayerVisualizer, TCLocalize("Visualizer"), &g_Config.m_MaMusicPlayerVisualizer, &RightView, LineSize);
 		if(g_Config.m_MaMusicPlayerVisualizer)

@@ -678,7 +678,7 @@ void CHud::RenderTextInfo()
 		else if(g_Config.m_TcShowFrozenText == 2)
 			str_format(aBuf, sizeof(aBuf), "%d / %d", NumFrozen, NumInTeam);
 		if(g_Config.m_TcShowFrozenText > 0)
-			TextRender()->Text(m_Width / 2.0f - TextRender()->TextWidth(10.0f, aBuf) / 2.0f, 12.0f, 10.0f, aBuf);
+			RenderFrozenCounterText(aBuf);
 
 		// str_format(aBuf, sizeof(aBuf), "%d", GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_PrevPredicted.m_FreezeEnd);
 		// str_format(aBuf, sizeof(aBuf), "%d", g_Config.m_ClWhatsMyPing);
@@ -2236,6 +2236,50 @@ void CHud::RenderFrozenHud(bool ForcePreview)
 	}
 }
 
+CUIRect CHud::GetFrozenCounterRect(const char *pText, bool ForcePreview) const
+{
+	if((!ForcePreview && (!HudLayout::IsEnabled(HudLayout::MODULE_FROZEN_COUNTER) || g_Config.m_TcShowFrozenText <= 0)) || pText == nullptr || pText[0] == '\0')
+		return {0.0f, 0.0f, 0.0f, 0.0f};
+
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_FROZEN_COUNTER, m_Width, m_Height);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float FontSize = 10.0f * Scale;
+	const float PaddingX = 2.0f * Scale;
+	const float PaddingY = 1.0f * Scale;
+	const float TextWidth = TextRender()->TextWidth(FontSize, pText, -1, -1.0f);
+	HudLayout::SModuleRect RawRect;
+	RawRect.m_W = TextWidth + PaddingX * 2.0f;
+	RawRect.m_H = FontSize + PaddingY * 2.0f;
+	RawRect.m_Rounding = 3.0f * Scale;
+	if(!HudLayout::HasRuntimeOverride(HudLayout::MODULE_FROZEN_COUNTER))
+	{
+		RawRect.m_X = m_Width * 0.5f - RawRect.m_W * 0.5f;
+		RawRect.m_Y = 12.0f - PaddingY;
+	}
+	else
+	{
+		RawRect.m_X = Layout.m_X;
+		RawRect.m_Y = Layout.m_Y;
+	}
+
+	const auto Rect = HudLayout::ClampRectToScreen(RawRect, m_Width, m_Height);
+	return {Rect.m_X, Rect.m_Y, Rect.m_W, Rect.m_H};
+}
+
+void CHud::RenderFrozenCounterText(const char *pText, bool ForcePreview)
+{
+	const CUIRect Rect = GetFrozenCounterRect(pText, ForcePreview);
+	if(Rect.w <= 0.0f || Rect.h <= 0.0f)
+		return;
+
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_FROZEN_COUNTER, m_Width, m_Height);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float FontSize = 10.0f * Scale;
+	const float PaddingX = 2.0f * Scale;
+	const float PaddingY = 1.0f * Scale;
+	TextRender()->Text(Rect.x + PaddingX, Rect.y + PaddingY, FontSize, pText, -1.0f);
+}
+
 void CHud::OnNewSnapshot()
 {
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
@@ -2333,10 +2377,17 @@ void CHud::OnRender()
 			RenderSpectatorHud();
 		}
 
-		if(g_Config.m_ClShowhudTimer)
+		const CMusicPlayer::SHudReservation MusicPlayerHudReservation = GameClient()->m_MusicPlayer.HudReservation();
+		const bool MusicPlayerReplacesGameTimer = g_Config.m_MaMusicPlayerHideGameTimer != 0 &&
+						     g_Config.m_MaMusicPlayer != 0 &&
+						     !GameClient()->m_Ma.IsComponentDisabled(2) &&
+						     MusicPlayerHudReservation.m_Visible &&
+						     MusicPlayerHudReservation.m_Active;
+		if(g_Config.m_ClShowhudTimer && !MusicPlayerReplacesGameTimer)
 			RenderGameTimer();
 		RenderPauseNotification();
-		RenderSuddenDeath();
+		if(!MusicPlayerReplacesGameTimer)
+			RenderSuddenDeath();
 		if(g_Config.m_ClShowhudScore)
 			RenderScoreHud();
 		RenderDummyActions();
@@ -2680,4 +2731,20 @@ void CHud::RenderFrozenHudPreview()
 	m_Height = HudLayout::CANVAS_HEIGHT;
 	Graphics()->MapScreen(0.0f, 0.0f, m_Width, m_Height);
 	RenderFrozenHud(true);
+}
+
+CUIRect CHud::GetFrozenCounterHudEditorRect(float Width, float Height) const
+{
+	CHud *pThis = const_cast<CHud *>(this);
+	pThis->m_Width = Width;
+	pThis->m_Height = Height;
+	return GetFrozenCounterRect("0 / 1", true);
+}
+
+void CHud::RenderFrozenCounterPreview()
+{
+	m_Width = HudLayout::CANVAS_HEIGHT * Graphics()->ScreenAspect();
+	m_Height = HudLayout::CANVAS_HEIGHT;
+	Graphics()->MapScreen(0.0f, 0.0f, m_Width, m_Height);
+	RenderFrozenCounterText("0 / 1", true);
 }

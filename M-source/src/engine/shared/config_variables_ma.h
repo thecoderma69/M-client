@@ -91,6 +91,7 @@ MACRO_CONFIG_STR(MaMusicVideoEffectImagePath, ma_music_video_effect_image_path, 
 // ===== MUSIC PLAYER =====
 MACRO_CONFIG_INT(MaMusicPlayer, ma_music_player, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Music Player HUD element")
 MACRO_CONFIG_INT(MaMusicPlayerShowWhenPaused, ma_music_player_show_when_paused, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep Music Player visible while playback is paused")
+MACRO_CONFIG_INT(MaMusicPlayerHideGameTimer, ma_music_player_hide_game_timer, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide the original game timer while the music player timer is visible")
 MACRO_CONFIG_INT(MaMusicPlayerVisualizer, ma_music_player_visualizer, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable music player visualizer")
 MACRO_CONFIG_INT(MaMusicPlayerVisualizerMode, ma_music_player_visualizer_mode, 1, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer mode (0=bottom, 1=center, 2=up)")
 MACRO_CONFIG_INT(MaMusicPlayerVisualizerSensitivity, ma_music_player_visualizer_sensitivity, 300, 50, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer sensitivity in percent")
