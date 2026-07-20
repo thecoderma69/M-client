@@ -60,8 +60,11 @@ MACRO_CONFIG_INT(Ma3dParticlesGlowOffset, ma_3d_particles_glow_offset, 2, 1, 20,
 // ===== MEDIA BACKGROUND =====
 MACRO_CONFIG_INT(MaMenuMediaBackground, ma_menu_media_background, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable custom media background in offline menus")
 MACRO_CONFIG_INT(MaGameMediaBackground, ma_game_media_background, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable custom media background in game background rendering")
+MACRO_CONFIG_INT(MaGameMediaBackgroundSeparate, ma_game_media_background_separate, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use a different media background file while playing")
 MACRO_CONFIG_STR(MaMenuMediaBackgroundPath, ma_menu_media_background_path, IO_MAX_PATH_LENGTH, "tclient/backgrounds/thumb-1920-735980.png", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Path to the custom menu media background file")
+MACRO_CONFIG_STR(MaGameMediaBackgroundPath, ma_game_media_background_path, IO_MAX_PATH_LENGTH, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Path to the custom in-game media background file")
 MACRO_CONFIG_INT(MaGameMediaBackgroundOffset, ma_game_media_background_offset, 0, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How much the custom media background is fixed to the map when rendering the in-game background")
+MACRO_CONFIG_INT(MaGameMediaBackgroundOpacity, ma_game_media_background_opacity, 100, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Opacity of the custom media background while playing")
 
 // ===== CHAT MEDIA PREVIEWS =====
 MACRO_CONFIG_INT(MaChatMediaPreview, ma_chat_media_preview, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render media previews from chat links")

@@ -197,6 +197,9 @@ Background color
 Custom Sounds
 == Sonidos personalizados
 
+Open the general audio folder to copy complete packs
+== Abrir la carpeta general de audio para copiar packs completos
+
 Classic
 == Clasico
 
@@ -1401,11 +1404,23 @@ Enable to main menu
 Enable to game background
 == Activar en fondo del juego
 
+Use another background for game
+== Usar otro fondo para juego
+
+Menu background
+== Fondo del menu
+
+Game background
+== Fondo del juego
+
 No media files in backgrounds folder
 == No hay archivos en la carpeta backgrounds
 
 Map offset
 == Desplazamiento del mapa
+
+Game background opacity
+== Opacidad del fondo del juego
 
 0 keeps the image fixed to the screen. 100 fixes it to the map for a full parallax effect.
 == 0 fija la imagen a la pantalla. 100 la fija al mapa con efecto parallax completo.

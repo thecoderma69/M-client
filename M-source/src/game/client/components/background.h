@@ -39,6 +39,7 @@ public:
 	void OnRender() override;
 
 	void LoadBackground();
+	void ReloadMediaBackground();
 	const char *MapName() const { return m_aMapName; }
 };
 

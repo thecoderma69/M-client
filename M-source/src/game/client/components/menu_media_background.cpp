@@ -875,7 +875,7 @@ void CMenuMediaBackground::Update()
 	}
 }
 
-void CMenuMediaBackground::RenderTextureCover(IGraphics::CTextureHandle Texture, int Width, int Height, float TargetCenterX, float TargetCenterY, float TargetWidth, float TargetHeight)
+void CMenuMediaBackground::RenderTextureCover(IGraphics::CTextureHandle Texture, int Width, int Height, float TargetCenterX, float TargetCenterY, float TargetWidth, float TargetHeight, float Alpha)
 {
 	if(TargetWidth <= 1.0f || TargetHeight <= 1.0f ||
 		!std::isfinite(TargetCenterX) || !std::isfinite(TargetCenterY) ||
@@ -905,10 +905,11 @@ void CMenuMediaBackground::RenderTextureCover(IGraphics::CTextureHandle Texture,
 	m_pGraphics->WrapClamp();
 	m_pGraphics->QuadsBegin();
 	m_pGraphics->QuadsSetSubset(0.0f, 0.0f, 1.0f, 1.0f);
-	m_pGraphics->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+	m_pGraphics->SetColor(1.0f, 1.0f, 1.0f, std::clamp(Alpha, 0.0f, 1.0f));
 	const IGraphics::CQuadItem Quad(DrawX, DrawY, DrawW, DrawH);
 	m_pGraphics->QuadsDrawTL(&Quad, 1);
 	m_pGraphics->QuadsEnd();
+	m_pGraphics->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 	m_pGraphics->WrapNormal();
 }
 
@@ -942,6 +943,8 @@ bool CMenuMediaBackground::Render(float ScreenWidth, float ScreenHeight, const S
 				    std::isfinite(pRenderContext->m_ViewHeight) &&
 				    std::isfinite(pRenderContext->m_MapWidth) &&
 				    std::isfinite(pRenderContext->m_MapHeight);
+	const float Alpha = pRenderContext != nullptr ? std::clamp(pRenderContext->m_Alpha, 0.0f, 1.0f) : 1.0f;
+
 	if(UseWorldOffset)
 	{
 		const float WorldOffset = std::clamp(pRenderContext->m_WorldOffset, 0.0f, 1.0f);
@@ -961,12 +964,12 @@ bool CMenuMediaBackground::Render(float ScreenWidth, float ScreenHeight, const S
 			pRenderContext->m_CameraCenterY - ViewHeight * 0.5f,
 			pRenderContext->m_CameraCenterX + ViewWidth * 0.5f,
 			pRenderContext->m_CameraCenterY + ViewHeight * 0.5f);
-		RenderTextureCover(Texture, m_Width, m_Height, TargetCenterX, TargetCenterY, TargetWidth, TargetHeight);
+		RenderTextureCover(Texture, m_Width, m_Height, TargetCenterX, TargetCenterY, TargetWidth, TargetHeight, Alpha);
 	}
 	else
 	{
 		m_pGraphics->MapScreen(0.0f, 0.0f, ScreenWidth, ScreenHeight);
-		RenderTextureCover(Texture, m_Width, m_Height, ScreenWidth * 0.5f, ScreenHeight * 0.5f, ScreenWidth, ScreenHeight);
+		RenderTextureCover(Texture, m_Width, m_Height, ScreenWidth * 0.5f, ScreenHeight * 0.5f, ScreenWidth, ScreenHeight, Alpha);
 	}
 
 	m_pGraphics->TextureClear();

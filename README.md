@@ -1,4 +1,4 @@
-# MΛ ツ Client 2.0
+# MΛ ツ Client 2.1
 
 Cliente personalizado basado en DDNet/TClient para Windows x64, preparado para descargar, extraer y jugar.
 
@@ -8,7 +8,7 @@ Repositorio oficial: [thecoderma69/M-client](https://github.com/thecoderma69/M-c
 
 MΛ ツ Client es una version modificada del cliente DDNet con mejoras visuales, opciones de personalizacion, herramientas de comodidad y recursos propios.
 
-La version 2.0 reorganiza el cliente para que las opciones principales esten mejor distribuidas entre `MΛ ツ`, `Visual` y `Recursos`, evitando duplicados y dejando la configuracion mas limpia para jugar.
+La version 2.1 mejora el fondo multimedia, agrega controles nuevos para audio y mantiene las opciones principales mejor distribuidas entre `MΛ ツ`, `Visual` y `Recursos`.
 
 ## Descargar
 
@@ -19,7 +19,7 @@ El juego listo para usar esta en:
 Descarga:
 
 ```txt
-M-Client-v2.0-win64.zip
+M-Client-v2.1-win64.zip
 ```
 
 Luego extrae el `.zip` y abre:
@@ -35,6 +35,14 @@ El codigo fuente esta en:
 ```txt
 M-source/
 ```
+
+## Novedades De La Version 2.1
+
+- Fondo multimedia con opcion `Usar otro fondo para juego`.
+- Selector separado para `Fondo del menu` y `Fondo del juego`.
+- Control de `Opacidad del fondo del juego`.
+- Boton `General` en `Recursos > Audio` para abrir la carpeta principal de packs.
+- Build actualizado para compartir como release nueva.
 
 ## Novedades De La Version 2.0
 
@@ -124,6 +132,14 @@ assets/audio/mi_pack
 
 Coloca ahi los sonidos con los nombres que muestra el cliente. Se aceptan archivos `.wv` y `.wav`.
 
+Tambien puedes usar `General` para abrir directamente:
+
+```txt
+assets/audio
+```
+
+Desde ahi puedes copiar una carpeta completa de pack de audio.
+
 ### Cursor Y Flecha
 
 Los cursores y flechas se cambian desde:
@@ -153,7 +169,7 @@ Desde `MΛ ツ > Visual` puedes recargar la lista, elegir la imagen y ajustar ta
 ## Estructura De La Descarga
 
 ```txt
-M-Client-v2.0-win64/
+M-Client-v2.1-win64/
 |-- data/                 # Archivos de datos y recursos del cliente
 |-- DDNet.exe             # Ejecutable principal
 |-- DDNet-Server.exe      # Ejecutable del servidor

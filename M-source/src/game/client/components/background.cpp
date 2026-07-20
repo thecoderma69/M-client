@@ -102,6 +102,11 @@ void CBackground::OnWindowResize()
 	m_MediaBackground.OnWindowResize();
 }
 
+void CBackground::ReloadMediaBackground()
+{
+	m_MediaBackground.Unload();
+}
+
 void CBackground::OnRender()
 {
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
@@ -125,7 +130,10 @@ void CBackground::OnRender()
 		return;
 	}
 
-	m_MediaBackground.SyncFromConfig(g_Config.m_MaGameMediaBackground, g_Config.m_MaMenuMediaBackgroundPath);
+	const char *pGameMediaBackgroundPath = g_Config.m_MaMenuMediaBackgroundPath;
+	if(g_Config.m_MaGameMediaBackgroundSeparate && g_Config.m_MaGameMediaBackgroundPath[0] != '\0')
+		pGameMediaBackgroundPath = g_Config.m_MaGameMediaBackgroundPath;
+	m_MediaBackground.SyncFromConfig(g_Config.m_MaGameMediaBackground, pGameMediaBackgroundPath);
 	m_MediaBackground.Update();
 
 	float ViewWidth = 0.0f;
@@ -138,6 +146,7 @@ void CBackground::OnRender()
 	RenderContext.m_ViewWidth = ViewWidth;
 	RenderContext.m_ViewHeight = ViewHeight;
 	RenderContext.m_WorldOffset = (float)g_Config.m_MaGameMediaBackgroundOffset / 100.0f;
+	RenderContext.m_Alpha = (float)g_Config.m_MaGameMediaBackgroundOpacity / 100.0f;
 	if(GameClient()->Layers() != nullptr && GameClient()->Layers()->GameLayer() != nullptr)
 	{
 		RenderContext.m_MapWidth = GameClient()->Layers()->GameLayer()->m_Width * 32.0f;

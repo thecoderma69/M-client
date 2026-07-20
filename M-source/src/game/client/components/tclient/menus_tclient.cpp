@@ -3673,6 +3673,7 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 
 	const bool MenuMediaChanged = DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaMenuMediaBackground, TCLocalize("Enable to main menu"), &g_Config.m_MaMenuMediaBackground, &Column, LineSize);
 	const bool GameMediaChanged = DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaGameMediaBackground, TCLocalize("Enable to game background"), &g_Config.m_MaGameMediaBackground, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaGameMediaBackgroundSeparate, TCLocalize("Use another background for game"), &g_Config.m_MaGameMediaBackgroundSeparate, &Column, LineSize);
 	if(MenuMediaChanged || GameMediaChanged)
 		m_MenuMediaBackground.ReloadFromConfig();
 
@@ -3725,62 +3726,91 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 	for(const std::string &LabelString : s_vMenuMediaDropDownLabels)
 		s_vMenuMediaDropDownLabelPtrs.push_back(LabelString.c_str());
 
-	int SelectedMediaFile = -1;
-	for(size_t i = 0; i < vSortedIndices.size(); ++i)
-	{
-		const int SortedIndex = vSortedIndices[i];
-		if(str_comp(g_Config.m_MaMenuMediaBackgroundPath, s_vMenuMediaFilePaths[SortedIndex].c_str()) == 0)
+	auto FindSelectedMediaFile = [&](const char *pPath) {
+		for(size_t i = 0; i < vSortedIndices.size(); ++i)
 		{
-			SelectedMediaFile = (int)i;
-			break;
+			const int SortedIndex = vSortedIndices[i];
+			if(str_comp(pPath, s_vMenuMediaFilePaths[SortedIndex].c_str()) == 0)
+				return (int)i;
 		}
-	}
+		return -1;
+	};
+
+	auto RenderMediaSelector = [&](CUIRect *pColumn, const char *pLabel, char *pPath, size_t PathSize, bool ReloadMenuBackground, CUi::SDropDownState &DropDownState, CScrollRegion &DropDownScrollRegion, CButtonContainer *pEmptyButton) {
+		CUIRect SelectorLabel, MediaPathRow, MediaFileDropDown, MediaReloadButton, MediaFolderButton;
+		pColumn->HSplitTop(15.0f, &SelectorLabel, pColumn);
+		Ui()->DoLabel(&SelectorLabel, TCLocalize(pLabel), 11.0f, TEXTALIGN_ML);
+
+		pColumn->HSplitTop(LineSize, &MediaPathRow, pColumn);
+		MediaPathRow.VSplitRight(20.0f, &MediaPathRow, &MediaFolderButton);
+		MediaPathRow.VSplitRight(MarginSmall, &MediaPathRow, nullptr);
+		MediaPathRow.VSplitRight(20.0f, &MediaPathRow, &MediaReloadButton);
+		MediaPathRow.VSplitRight(MarginSmall, &MediaPathRow, nullptr);
+		MediaFileDropDown = MediaPathRow;
+
+		const int SelectedMediaFile = FindSelectedMediaFile(pPath);
+		if(s_vMenuMediaDropDownLabelPtrs.empty())
+		{
+			DoButton_Menu(pEmptyButton, TCLocalize("No media files in backgrounds folder"), -1, &MediaFileDropDown);
+		}
+		else
+		{
+			DropDownState.m_SelectionPopupContext.m_pScrollRegion = &DropDownScrollRegion;
+			const int NewSelectedMediaFile = Ui()->DoDropDown(&MediaFileDropDown, SelectedMediaFile, s_vMenuMediaDropDownLabelPtrs.data(), s_vMenuMediaDropDownLabelPtrs.size(), DropDownState);
+			if(NewSelectedMediaFile != SelectedMediaFile && NewSelectedMediaFile >= 0 && NewSelectedMediaFile < (int)vSortedIndices.size())
+			{
+				const int SortedIndex = vSortedIndices[NewSelectedMediaFile];
+				str_copy(pPath, s_vMenuMediaFilePaths[SortedIndex].c_str(), PathSize);
+				if(ReloadMenuBackground)
+					m_MenuMediaBackground.ReloadFromConfig();
+			}
+		}
+
+		static CButtonContainer s_MenuMediaReloadButton;
+		static CButtonContainer s_GameMediaReloadButton;
+		CButtonContainer *pReloadButton = ReloadMenuBackground ? &s_MenuMediaReloadButton : &s_GameMediaReloadButton;
+		if(Ui()->DoButton_FontIcon(pReloadButton, FontIcon::ARROW_ROTATE_RIGHT, 0, &MediaReloadButton, BUTTONFLAG_LEFT))
+		{
+			if(ReloadMenuBackground)
+				m_MenuMediaBackground.ReloadFromConfig();
+			else
+				GameClient()->m_Background.ReloadMediaBackground();
+		}
+
+		static CButtonContainer s_MenuMediaFolderButton;
+		static CButtonContainer s_GameMediaFolderButton;
+		CButtonContainer *pFolderButton = ReloadMenuBackground ? &s_MenuMediaFolderButton : &s_GameMediaFolderButton;
+		if(Ui()->DoButton_FontIcon(pFolderButton, FontIcon::FOLDER, 0, &MediaFolderButton, BUTTONFLAG_LEFT))
+		{
+			Storage()->CreateFolder("tclient", IStorage::TYPE_SAVE);
+			Storage()->CreateFolder("tclient/backgrounds", IStorage::TYPE_SAVE);
+			char aBuf[IO_MAX_PATH_LENGTH];
+			Storage()->GetCompletePath(IStorage::TYPE_SAVE, "tclient/backgrounds", aBuf, sizeof(aBuf));
+			Client()->ViewFile(aBuf);
+		}
+	};
 
 	Column.HSplitTop(MarginSmall, nullptr, &Column);
-	CUIRect MediaPathRow, MediaFileDropDown, MediaReloadButton, MediaFolderButton;
-	Column.HSplitTop(LineSize, &MediaPathRow, &Column);
-	MediaPathRow.VSplitRight(20.0f, &MediaPathRow, &MediaFolderButton);
-	MediaPathRow.VSplitRight(MarginSmall, &MediaPathRow, nullptr);
-	MediaPathRow.VSplitRight(20.0f, &MediaPathRow, &MediaReloadButton);
-	MediaPathRow.VSplitRight(MarginSmall, &MediaPathRow, nullptr);
-	MediaFileDropDown = MediaPathRow;
+	static CUi::SDropDownState s_MenuMediaFileDropDownState;
+	static CScrollRegion s_MenuMediaFileDropDownScrollRegion;
+	static CButtonContainer s_MenuMediaEmptyButton;
+	RenderMediaSelector(&Column, "Menu background", g_Config.m_MaMenuMediaBackgroundPath, sizeof(g_Config.m_MaMenuMediaBackgroundPath), true, s_MenuMediaFileDropDownState, s_MenuMediaFileDropDownScrollRegion, &s_MenuMediaEmptyButton);
 
-	if(s_vMenuMediaDropDownLabelPtrs.empty())
+	if(g_Config.m_MaGameMediaBackgroundSeparate)
 	{
-		static CButtonContainer s_MenuMediaEmptyButton;
-		DoButton_Menu(&s_MenuMediaEmptyButton, TCLocalize("No media files in backgrounds folder"), -1, &MediaFileDropDown);
-	}
-	else
-	{
-		static CUi::SDropDownState s_MenuMediaFileDropDownState;
-		static CScrollRegion s_MenuMediaFileDropDownScrollRegion;
-		s_MenuMediaFileDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_MenuMediaFileDropDownScrollRegion;
-		const int NewSelectedMediaFile = Ui()->DoDropDown(&MediaFileDropDown, SelectedMediaFile, s_vMenuMediaDropDownLabelPtrs.data(), s_vMenuMediaDropDownLabelPtrs.size(), s_MenuMediaFileDropDownState);
-		if(NewSelectedMediaFile != SelectedMediaFile && NewSelectedMediaFile >= 0 && NewSelectedMediaFile < (int)vSortedIndices.size())
-		{
-			const int SortedIndex = vSortedIndices[NewSelectedMediaFile];
-			str_copy(g_Config.m_MaMenuMediaBackgroundPath, s_vMenuMediaFilePaths[SortedIndex].c_str(), sizeof(g_Config.m_MaMenuMediaBackgroundPath));
-			m_MenuMediaBackground.ReloadFromConfig();
-		}
-	}
-
-	static CButtonContainer s_MenuMediaReloadButton;
-	if(Ui()->DoButton_FontIcon(&s_MenuMediaReloadButton, FontIcon::ARROW_ROTATE_RIGHT, 0, &MediaReloadButton, BUTTONFLAG_LEFT))
-		m_MenuMediaBackground.ReloadFromConfig();
-
-	static CButtonContainer s_MenuMediaFolderButton;
-	if(Ui()->DoButton_FontIcon(&s_MenuMediaFolderButton, FontIcon::FOLDER, 0, &MediaFolderButton, BUTTONFLAG_LEFT))
-	{
-		Storage()->CreateFolder("tclient", IStorage::TYPE_SAVE);
-		Storage()->CreateFolder("tclient/backgrounds", IStorage::TYPE_SAVE);
-		char aBuf[IO_MAX_PATH_LENGTH];
-		Storage()->GetCompletePath(IStorage::TYPE_SAVE, "tclient/backgrounds", aBuf, sizeof(aBuf));
-		Client()->ViewFile(aBuf);
+		Column.HSplitTop(MarginSmall, nullptr, &Column);
+		static CUi::SDropDownState s_GameMediaFileDropDownState;
+		static CScrollRegion s_GameMediaFileDropDownScrollRegion;
+		static CButtonContainer s_GameMediaEmptyButton;
+		RenderMediaSelector(&Column, "Game background", g_Config.m_MaGameMediaBackgroundPath, sizeof(g_Config.m_MaGameMediaBackgroundPath), false, s_GameMediaFileDropDownState, s_GameMediaFileDropDownScrollRegion, &s_GameMediaEmptyButton);
 	}
 
 	Column.HSplitTop(LineSize, &Row, &Column);
 	Ui()->DoScrollbarOption(&g_Config.m_MaGameMediaBackgroundOffset, &g_Config.m_MaGameMediaBackgroundOffset, &Row, TCLocalize("Map offset"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
 	GameClient()->m_Tooltips.DoToolTip(&g_Config.m_MaGameMediaBackgroundOffset, &Row, TCLocalize("0 keeps the image fixed to the screen. 100 fixes it to the map for a full parallax effect."));
+
+	Column.HSplitTop(LineSize, &Row, &Column);
+	Ui()->DoScrollbarOption(&g_Config.m_MaGameMediaBackgroundOpacity, &g_Config.m_MaGameMediaBackgroundOpacity, &Row, TCLocalize("Game background opacity"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
 
 	Column.HSplitTop(LineSize, &Row, &Column);
 	if(m_MenuMediaBackground.HasError())
@@ -5062,7 +5092,7 @@ void CMenus::RenderMaKeystroke(CUIRect MainView)
 
 void CMenus::RenderMaAudio(CUIRect MainView)
 {
-	CUIRect LeftView, RightView, Label, List, BottomBar, SearchRow, ButtonRow, SearchBox, DirectoryButton, ReloadButton, PackFolderButton, TestButton, Row;
+	CUIRect LeftView, RightView, Label, List, BottomBar, SearchRow, ButtonRow, SearchBox, DirectoryButton, GeneralFolderButton, ReloadButton, PackFolderButton, TestButton, Row;
 
 	static std::vector<SMaAudioPack> s_vAudioPacks;
 	static std::vector<const SMaAudioPack *> s_vFilteredAudioPacks;
@@ -5119,12 +5149,15 @@ void CMenus::RenderMaAudio(CUIRect MainView)
 	SearchBox = SearchRow;
 	Ui()->DoEditBox_Search(&s_FilterInput, &SearchBox, 14.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive());
 
-	const float ButtonW = ButtonRow.w / 4.0f;
+	const float ButtonW = ButtonRow.w / 5.0f;
 	ButtonRow.VSplitLeft(ButtonW, &DirectoryButton, &ButtonRow);
 	DirectoryButton.VSplitRight(4.0f, &DirectoryButton, nullptr);
 	ButtonRow.VSplitLeft(ButtonW, &PackFolderButton, &ButtonRow);
 	PackFolderButton.VSplitLeft(4.0f, nullptr, &PackFolderButton);
 	PackFolderButton.VSplitRight(4.0f, &PackFolderButton, nullptr);
+	ButtonRow.VSplitLeft(ButtonW, &GeneralFolderButton, &ButtonRow);
+	GeneralFolderButton.VSplitLeft(4.0f, nullptr, &GeneralFolderButton);
+	GeneralFolderButton.VSplitRight(4.0f, &GeneralFolderButton, nullptr);
 	ButtonRow.VSplitLeft(ButtonW, &ReloadButton, &TestButton);
 	ReloadButton.VSplitLeft(4.0f, nullptr, &ReloadButton);
 	ReloadButton.VSplitRight(4.0f, &ReloadButton, nullptr);
@@ -5159,6 +5192,17 @@ void CMenus::RenderMaAudio(CUIRect MainView)
 		Client()->ViewFile(aBuf);
 	}
 	GameClient()->m_Tooltips.DoToolTip(&s_AudioPackFolderButton, &PackFolderButton, TCLocalize("Open selected audio pack folder"));
+
+	static CButtonContainer s_AudioGeneralFolderButton;
+	if(DoButton_Menu(&s_AudioGeneralFolderButton, TCLocalize("General"), 0, &GeneralFolderButton))
+	{
+		Storage()->CreateFolder("assets", IStorage::TYPE_SAVE);
+		Storage()->CreateFolder("assets/audio", IStorage::TYPE_SAVE);
+		char aBuf[IO_MAX_PATH_LENGTH];
+		Storage()->GetCompletePath(IStorage::TYPE_SAVE, "assets/audio", aBuf, sizeof(aBuf));
+		Client()->ViewFile(aBuf);
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_AudioGeneralFolderButton, &GeneralFolderButton, TCLocalize("Open the general audio folder to copy complete packs"));
 
 	static CButtonContainer s_AudioReloadButton;
 	if(DoButton_Menu(&s_AudioReloadButton, TCLocalize("Recargar"), 0, &ReloadButton) || Input()->KeyPress(KEY_F5) || (Input()->KeyPress(KEY_R) && Input()->ModifierIsPressed()))

@@ -65,6 +65,7 @@ public:
 		float m_MapWidth = 0.0f;
 		float m_MapHeight = 0.0f;
 		float m_WorldOffset = 0.0f;
+		float m_Alpha = 1.0f;
 	};
 
 private:
@@ -75,7 +76,7 @@ private:
 	bool LoadVideo(const char *pPath, int StorageType);
 	bool DecodeNextVideoFrame(bool LoopOnEof);
 	bool UploadCurrentVideoFrame(const char *pContextName, int DurationMs);
-	void RenderTextureCover(IGraphics::CTextureHandle Texture, int Width, int Height, float TargetCenterX, float TargetCenterY, float TargetWidth, float TargetHeight);
+	void RenderTextureCover(IGraphics::CTextureHandle Texture, int Width, int Height, float TargetCenterX, float TargetCenterY, float TargetWidth, float TargetHeight, float Alpha);
 
 public:
 	~CMenuMediaBackground();
