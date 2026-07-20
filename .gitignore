@@ -1,7 +1,28 @@
-user/
-dumps/
-screenshots/
-videos/
+# Local playable client files kept only for packaging releases.
+/data/
+/user/
+/dumps/
+/screenshots/
+/videos/
+/DDNet.exe
+/DDNet-Server.exe
+/*.dll
+/config_directory.bat
+/LEEME_CONFIGS.txt
+/storage.cfg
+/steam_appid.dll
+/steam_appid.txt
+
+# Release archives generated locally.
+/*.zip
+
+# Local temporary files.
 *.log
 *.tmp
 *.bak
+
+# Source build outputs.
+/M-source/build*/
+/M-source/tmp/
+/M-source/.vs/
+/M-source/.cache/

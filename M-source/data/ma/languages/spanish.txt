@@ -1,0 +1,87 @@
+##### authors #####
+
+# ZrNoxb
+
+##### /authors #####
+
+##### translated strings #####
+MΛ ツ
+== MΛ ツ
+
+Enable MΛ ツ features
+== Activar funciones MΛ ツ
+
+Optimizer
+== Optimizador
+
+Enable optimizer
+== Activar optimizador
+
+FPS Fog
+== Niebla FPS
+
+FPS fog radius (tiles)
+== Radio niebla FPS (tiles)
+
+Disable all particles
+== Desactivar todas las particulas
+
+High priority process
+== Proceso alta prioridad
+
+Gores Mode
+== Modo Gores
+
+Enable Gores Mode
+== Activar Modo Gores
+
+Auto-detect gores servers
+== Auto-detectar servidores gores
+
+3D Particles
+== Particulas 3D
+
+Enable 3D particles
+== Activar particulas 3D
+
+Particle count
+== Cantidad particulas
+
+Speed
+== Velocidad
+
+Alpha
+== Opacidad
+
+Music Player
+== Reproductor de Musica
+
+Enable music player
+== Activar reproductor de musica
+
+Volume
+== Volumen
+
+Shuffle
+== Aleatorio
+
+Loop playlist
+== Repetir lista
+
+HUD position
+== Posicion HUD
+
+Paused
+== Pausado
+
+Component Editor
+== Editor de Componentes
+
+Toggle individual MΛ ツ features on/off. Changes take effect immediately.
+== Activa/desactiva funciones MΛ ツ. Los cambios se aplican al instante.
+
+Friend HUD
+== HUD de Amigos
+
+Chat History
+== Historial de Chat
