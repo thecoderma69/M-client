@@ -2691,7 +2691,7 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 		Button.w = LineSize, Button.h = LineSize, Button.y = Label.y + (Label.h / 2.0f - Button.h / 2.0f);
 		Ui()->DoLabel(&Label, "MΛ ツ", LineSize, TEXTALIGN_ML);
 		if(Ui()->DoButton_FontIcon(&s_LinkButton6, FontIcon::ARROW_UP_RIGHT_FROM_SQUARE, 0, &Button, IGraphics::CORNER_ALL))
-			Client()->ViewLink("https://github.com/chinichileno");
+			Client()->ViewLink("https://github.com/thecoderma69");
 		RenderDevSkin(TeeRect.Center(), TeeSize, "ahl_blackbop", "default", false, 0, 0, 0, false, true);
 	}
 
@@ -4808,18 +4808,21 @@ void CMenus::RenderMaConfiguracion(CUIRect MainView)
 	{
 		// Mode selector
 		RightView.HSplitTop(LineSize, &Button, &RightView);
-		static CButtonContainer s_FastInputModeFast, s_FastInputModeBest, s_FastInputModeSaikoPlus;
+		static CButtonContainer s_FastInputModeFast, s_FastInputModeBest, s_FastInputModeSaikoPlus, s_FastInputModeMa;
 		const int UiFastInputMode = g_Config.m_MaFastInputMode == 2 ? 3 : g_Config.m_MaFastInputMode;
 		CUIRect ModeBtn;
-		const float BtnW = Button.w / 3.0f;
+		const float BtnW = Button.w / 4.0f;
 		Button.VSplitLeft(BtnW, &ModeBtn, &Button);
 		if(DoButton_Menu(&s_FastInputModeFast, TCLocalize("Fast input"), UiFastInputMode == 0, &ModeBtn, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
 			g_Config.m_MaFastInputMode = 0;
 		Button.VSplitLeft(BtnW, &ModeBtn, &Button);
 		if(DoButton_Menu(&s_FastInputModeBest, TCLocalize("Best input"), UiFastInputMode == 3, &ModeBtn, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
 			g_Config.m_MaFastInputMode = 3;
-		if(DoButton_Menu(&s_FastInputModeSaikoPlus, "Saiko+", UiFastInputMode == 4, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+		Button.VSplitLeft(BtnW, &ModeBtn, &Button);
+		if(DoButton_Menu(&s_FastInputModeSaikoPlus, "Saiko+", UiFastInputMode == 4, &ModeBtn, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
 			g_Config.m_MaFastInputMode = 4;
+		if(DoButton_Menu(&s_FastInputModeMa, "MA", UiFastInputMode == 5, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+			g_Config.m_MaFastInputMode = 5;
 
 		// Per-mode settings
 		if(g_Config.m_MaFastInputMode == 0)
@@ -4831,6 +4834,29 @@ void CMenus::RenderMaConfiguracion(CUIRect MainView)
 		{
 			RightView.HSplitTop(LineSize, &Button, &RightView);
 			Ui()->DoScrollbarOption(&g_Config.m_MaSaikoPlusAmount, &g_Config.m_MaSaikoPlusAmount, &Button, "Saiko+ amount", 0, 500, &CUi::ms_LinearScrollbarScale, 0, " (0.01 ticks)");
+		}
+		else if(g_Config.m_MaFastInputMode == 5)
+		{
+			RightView.HSplitTop(LineSize, &Button, &RightView);
+			static CButtonContainer s_MaInputProfileAuto, s_MaInputProfileSmooth, s_MaInputProfileBalanced, s_MaInputProfileAggressive;
+			CUIRect ProfileBtn;
+			const float ProfileBtnW = Button.w / 4.0f;
+			Button.VSplitLeft(ProfileBtnW, &ProfileBtn, &Button);
+			if(DoButton_Menu(&s_MaInputProfileAuto, "Auto", g_Config.m_MaInputProfile == 0, &ProfileBtn, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
+				g_Config.m_MaInputProfile = 0;
+			Button.VSplitLeft(ProfileBtnW, &ProfileBtn, &Button);
+			if(DoButton_Menu(&s_MaInputProfileSmooth, TCLocalize("Suave"), g_Config.m_MaInputProfile == 1, &ProfileBtn, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
+				g_Config.m_MaInputProfile = 1;
+			Button.VSplitLeft(ProfileBtnW, &ProfileBtn, &Button);
+			if(DoButton_Menu(&s_MaInputProfileBalanced, TCLocalize("Medio"), g_Config.m_MaInputProfile == 2, &ProfileBtn, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
+				g_Config.m_MaInputProfile = 2;
+			if(DoButton_Menu(&s_MaInputProfileAggressive, TCLocalize("Fuerte"), g_Config.m_MaInputProfile == 3, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+				g_Config.m_MaInputProfile = 3;
+
+			RightView.HSplitTop(LineSize, &Button, &RightView);
+			Ui()->DoScrollbarOption(&g_Config.m_MaInputStrength, &g_Config.m_MaInputStrength, &Button, TCLocalize("Intensidad MA"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
+			RightView.HSplitTop(LineSize, &Button, &RightView);
+			Ui()->DoScrollbarOption(&g_Config.m_MaInputStability, &g_Config.m_MaInputStability, &Button, TCLocalize("Estabilidad MA"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
 		}
 		else
 		{
@@ -4851,6 +4877,8 @@ void CMenus::RenderMaConfiguracion(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaBestInputOthers, TCLocalize("Best input others"), &g_Config.m_MaBestInputOthers, &RightView, LineSize);
 		else if(g_Config.m_MaFastInputMode == 4)
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaSaikoPlusOthers, "Saiko+ others", &g_Config.m_MaSaikoPlusOthers, &RightView, LineSize);
+		else if(g_Config.m_MaFastInputMode == 5)
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaInputOthers, "MA others", &g_Config.m_MaInputOthers, &RightView, LineSize);
 	}
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClSubTickAiming, TCLocalize("Sub-Tick aiming"), &g_Config.m_ClSubTickAiming, &RightView, LineSize);
 

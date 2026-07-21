@@ -667,6 +667,7 @@ void CGameClient::OnReset()
 
 	m_PredictedTick = -1;
 	std::fill(std::begin(m_aLastNewPredictedTick), std::end(m_aLastNewPredictedTick), -1);
+	ResetMaInputSmoother();
 
 	m_LastRoundStartTick = -1;
 	m_LastRaceTick = -1;
@@ -2619,11 +2620,28 @@ struct SMaBestInputSettings
 	int m_LatencyComp;
 };
 
+struct SMaInputProfileSettings
+{
+	float m_BaseOffset;
+	float m_MinOffset;
+	float m_MaxOffset;
+	float m_PingOffsetScale;
+	float m_StabilityTrim;
+	float m_StrengthRange;
+};
+
 static int MaFastInputNormalizedMode()
 {
 	if(g_Config.m_MaFastInputMode == 2)
 		return 3;
 	return g_Config.m_MaFastInputMode;
+}
+
+static int MaCurrentPing(const CGameClient *pGameClient)
+{
+	if(!pGameClient || !pGameClient->m_Snap.m_pLocalInfo)
+		return 0;
+	return std::clamp(pGameClient->m_Snap.m_pLocalInfo->m_Latency, 0, 999);
 }
 
 static SMaBestInputSettings MaBestInputSettings()
@@ -2635,7 +2653,96 @@ static SMaBestInputSettings MaBestInputSettings()
 	};
 }
 
-static float EffectiveFastInputOffsetTicks()
+static SMaInputProfileSettings MaInputProfileSettings(int Profile, int Ping)
+{
+	if(Profile == 1)
+		return {1.20f, 0.80f, 1.90f, 0.0026f, 0.22f, 0.45f};
+	if(Profile == 2)
+		return {1.45f, 0.95f, 2.45f, 0.0036f, 0.18f, 0.60f};
+	if(Profile == 3)
+		return {1.70f, 1.10f, 2.95f, 0.0048f, 0.12f, 0.75f};
+
+	if(Ping < 35)
+		return {1.20f, 0.80f, 1.85f, 0.0025f, 0.22f, 0.45f};
+	if(Ping < 85)
+		return {1.40f, 0.95f, 2.35f, 0.0035f, 0.18f, 0.60f};
+	return {1.60f, 1.10f, 2.75f, 0.0045f, 0.14f, 0.72f};
+}
+
+void CGameClient::ResetMaInputSmoother()
+{
+	m_MaInputSmoothedOffsetTicks = 0.0f;
+	m_MaInputLastUpdateTick = -1;
+	m_MaInputLastMode = -1;
+	m_MaInputLastProfile = -1;
+	m_MaInputLastStrength = -1;
+	m_MaInputLastStability = -1;
+}
+
+float CGameClient::MaInputTargetOffsetTicks() const
+{
+	const int Ping = std::clamp(MaCurrentPing(this), 0, 160);
+	const int Profile = std::clamp(g_Config.m_MaInputProfile, 0, 3);
+	const SMaInputProfileSettings Settings = MaInputProfileSettings(Profile, Ping);
+	const float Strength = std::clamp(g_Config.m_MaInputStrength, 0, 100) / 100.0f;
+	const float Stability = std::clamp(g_Config.m_MaInputStability, 0, 100) / 100.0f;
+
+	const float StrengthCenter = (Strength - 0.50f) * 2.0f;
+	const float Offset = Settings.m_BaseOffset + Ping * Settings.m_PingOffsetScale + StrengthCenter * Settings.m_StrengthRange - Stability * Settings.m_StabilityTrim;
+	return std::clamp(Offset, Settings.m_MinOffset, Settings.m_MaxOffset);
+}
+
+float CGameClient::MaInputSmoothedOffsetTicks()
+{
+	const float TargetOffset = MaInputTargetOffsetTicks();
+	const int CurrentMode = MaFastInputNormalizedMode();
+	const int CurrentProfile = std::clamp(g_Config.m_MaInputProfile, 0, 3);
+	const int CurrentStrength = std::clamp(g_Config.m_MaInputStrength, 0, 100);
+	const int CurrentStability = std::clamp(g_Config.m_MaInputStability, 0, 100);
+	const int CurrentTick = Client()->PredGameTick(g_Config.m_ClDummy);
+	const bool Reset =
+		m_MaInputLastMode != CurrentMode ||
+		m_MaInputLastProfile != CurrentProfile ||
+		m_MaInputLastStrength != CurrentStrength ||
+		m_MaInputLastStability != CurrentStability ||
+		m_MaInputLastUpdateTick < 0 ||
+		absolute(CurrentTick - m_MaInputLastUpdateTick) > Client()->GameTickSpeed();
+
+	m_MaInputLastMode = CurrentMode;
+	m_MaInputLastProfile = CurrentProfile;
+	m_MaInputLastStrength = CurrentStrength;
+	m_MaInputLastStability = CurrentStability;
+
+	if(Reset)
+	{
+		m_MaInputSmoothedOffsetTicks = TargetOffset;
+		m_MaInputLastUpdateTick = CurrentTick;
+		return m_MaInputSmoothedOffsetTicks;
+	}
+
+	if(CurrentTick != m_MaInputLastUpdateTick)
+	{
+		const int TickDelta = std::clamp(absolute(CurrentTick - m_MaInputLastUpdateTick), 1, 5);
+		const float Stability = CurrentStability / 100.0f;
+		const float Response = 0.42f - Stability * 0.22f;
+		const float MaxStepUp = (0.16f - Stability * 0.08f) * TickDelta;
+		const float MaxStepDown = (0.24f - Stability * 0.10f) * TickDelta;
+		const float Delta = TargetOffset - m_MaInputSmoothedOffsetTicks;
+		const float Step = std::clamp(Delta * Response, -MaxStepDown, MaxStepUp);
+
+		if(absolute(Delta) <= 0.01f)
+			m_MaInputSmoothedOffsetTicks = TargetOffset;
+		else
+			m_MaInputSmoothedOffsetTicks += Step;
+
+		m_MaInputSmoothedOffsetTicks = std::clamp(m_MaInputSmoothedOffsetTicks, 0.0f, 2.95f);
+		m_MaInputLastUpdateTick = CurrentTick;
+	}
+
+	return m_MaInputSmoothedOffsetTicks;
+}
+
+float CGameClient::EffectiveFastInputOffsetTicks()
 {
 	if(!g_Config.m_TcFastInput)
 		return 0.0f;
@@ -2653,6 +2760,8 @@ static float EffectiveFastInputOffsetTicks()
 			return 0.0f;
 		return g_Config.m_MaSaikoPlusAmount / 100.0f;
 	}
+	if(FastInputMode == 5)
+		return MaInputSmoothedOffsetTicks();
 	if(FastInputMode != 3)
 		return 0.0f;
 
@@ -2672,11 +2781,15 @@ static int FastInputPredictionTicks(float OffsetTicks)
 {
 	if(OffsetTicks <= 0.0f)
 		return 0;
+	if(MaFastInputNormalizedMode() == 5)
+		return std::clamp((int)std::ceil(OffsetTicks), 0, 3);
 	return (int)std::ceil(OffsetTicks);
 }
 
 static int FastInputPredictionTicksOthers(float OffsetTicks)
 {
+	if(MaFastInputNormalizedMode() == 5)
+		return std::clamp((int)std::ceil(OffsetTicks * 0.65f), 0, 2);
 	return FastInputPredictionTicks(OffsetTicks);
 }
 
@@ -2689,6 +2802,8 @@ static bool EffectiveAnyFastInputOthers()
 		return g_Config.m_MaSaikoPlusOthers != 0;
 	if(FastInputMode == 3)
 		return g_Config.m_MaBestInputOthers != 0;
+	if(FastInputMode == 5)
+		return g_Config.m_MaInputOthers != 0;
 	return false;
 }
 
@@ -2714,7 +2829,15 @@ static float BestInputInterpolationAmount(float Fraction, float DeltaLength, boo
 	const float T = std::clamp(Fraction, 0.0f, 1.0f);
 	const float T2 = T * T;
 	const float CubicT = 3.0f * T2 - 2.0f * T2 * T;
-	switch(std::clamp(g_Config.m_MaBestInputInterpolation, 1, 3))
+	if(MaFastInputNormalizedMode() == 5)
+	{
+		const float Stability = std::clamp(g_Config.m_MaInputStability, 0, 100) / 100.0f;
+		const float SmoothBlend = std::clamp(0.10f + Stability * 0.25f + DeltaLength / 2200.0f, 0.10f, 0.55f);
+		return mix(T, CubicT, SmoothBlend);
+	}
+
+	const int InterpolationMode = std::clamp(g_Config.m_MaBestInputInterpolation, 1, 3);
+	switch(InterpolationMode)
 	{
 	case 2:
 		return CubicT;
@@ -4501,7 +4624,7 @@ vec2 CGameClient::GetSmoothPos(int ClientId)
 	const bool FastInputOthers = EffectiveAnyFastInputOthers();
 	const bool IsLocalFastInputClient = ClientId == m_Snap.m_LocalClientId || (PredictDummy() && ClientId == m_aLocalIds[!g_Config.m_ClDummy]);
 	const int FastInputTicksClient = IsLocalFastInputClient ? FastInputTicks : (FastInputOthers ? FastInputPredictionTicksOthers(FastInputOffsetTicks) : 0);
-	const bool BestInputInterpolationEnabled = MaFastInputNormalizedMode() == 3 && FastInputTicksClient > 0 && (IsLocalFastInputClient || FastInputOthers);
+	const bool BestInputInterpolationEnabled = (MaFastInputNormalizedMode() == 3 || MaFastInputNormalizedMode() == 5) && FastInputTicksClient > 0 && (IsLocalFastInputClient || FastInputOthers);
 	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 	int64_t Now = time_get();
 	for(int i = 0; i < 2; i++)
@@ -4538,7 +4661,7 @@ vec2 CGameClient::GetFastInputPos(int ClientId)
 	const bool FastInputOthers = EffectiveAnyFastInputOthers();
 	const bool IsLocalFastInputClient = ClientId == m_Snap.m_LocalClientId || (PredictDummy() && ClientId == m_aLocalIds[!g_Config.m_ClDummy]);
 	const int FastInputTicksClient = IsLocalFastInputClient ? FastInputTicks : (FastInputOthers ? FastInputPredictionTicksOthers(FastInputOffsetTicks) : 0);
-	const bool BestInputInterpolationEnabled = MaFastInputNormalizedMode() == 3 && FastInputTicksClient > 0;
+	const bool BestInputInterpolationEnabled = (MaFastInputNormalizedMode() == 3 || MaFastInputNormalizedMode() == 5) && FastInputTicksClient > 0;
 	ApplyFastInputOffset(FastInputOffsetTicks, PredTick, PredIntraTick);
 
 	if(PredTick > 0 &&
@@ -4596,7 +4719,7 @@ vec2 CGameClient::GetFreezePos(int ClientId)
 
 	const bool ApplyFastInputLocal = IsLocalFastInputClient && FastInputTicks > 0;
 	const bool ApplyFastInputOthers = !IsLocalFastInputClient && FastInputTicksClient > 0;
-	const bool BestInputInterpolationEnabled = MaFastInputNormalizedMode() == 3 && (ApplyFastInputLocal || ApplyFastInputOthers);
+	const bool BestInputInterpolationEnabled = (MaFastInputNormalizedMode() == 3 || MaFastInputNormalizedMode() == 5) && (ApplyFastInputLocal || ApplyFastInputOthers);
 	if(ApplyFastInputLocal || ApplyFastInputOthers)
 	{
 		ApplyFastInputOffset(FastInputOffsetTicks, SmoothTick, SmoothIntra);

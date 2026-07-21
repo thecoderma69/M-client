@@ -284,6 +284,12 @@ private:
 
 	int m_PredictedTick;
 	int m_aLastNewPredictedTick[NUM_DUMMIES];
+	float m_MaInputSmoothedOffsetTicks = 0.0f;
+	int m_MaInputLastUpdateTick = -1;
+	int m_MaInputLastMode = -1;
+	int m_MaInputLastProfile = -1;
+	int m_MaInputLastStrength = -1;
+	int m_MaInputLastStability = -1;
 
 	int m_LastRoundStartTick;
 	int m_LastRaceTick;
@@ -1018,6 +1024,10 @@ private:
 	void UpdateSpectatorCursor();
 	void UpdateRenderedCharacters();
 	void HandlePredictedEvents(int Tick);
+	void ResetMaInputSmoother();
+	float MaInputTargetOffsetTicks() const;
+	float MaInputSmoothedOffsetTicks();
+	float EffectiveFastInputOffsetTicks();
 
 	int m_aLastUpdateTick[MAX_CLIENTS] = {0};
 	void DetectStrongHook();

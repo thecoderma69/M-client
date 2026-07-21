@@ -123,8 +123,8 @@ MACRO_CONFIG_COL(MaMusicPlayerColorBg, ma_music_player_color_bg, 0xCC0A0A14, CFG
 MACRO_CONFIG_COL(MaMusicPlayerColorAccent, ma_music_player_color_accent, 0xFF3B82F6, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player accent color")
 MACRO_CONFIG_COL(MaMusicPlayerColorText, ma_music_player_color_text, 0xFFFFFFFF, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player text color")
 
-// ===== FAST INPUT / BEST INPUT / SAIKO+ =====
-MACRO_CONFIG_INT(MaFastInputMode, ma_fast_input_mode, 0, 0, 4, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fast input mode (0=fast input, 3=best input, 4=saiko+)")
+// ===== FAST INPUT / BEST INPUT / SAIKO+ / MA INPUT =====
+MACRO_CONFIG_INT(MaFastInputMode, ma_fast_input_mode, 0, 0, 5, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fast input mode (0=fast input, 3=best input, 4=saiko+, 5=MA input)")
 MACRO_CONFIG_INT(MaBestInputOffset, ma_best_input_offset, 0, 0, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input prediction offset in 0.01 ticks (0-10.00 ticks)")
 MACRO_CONFIG_INT(MaBestInputSmoothing, ma_best_input_smoothing, 0, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input smoothing amount (0-100%)")
 MACRO_CONFIG_INT(MaBestInputLatencyComp, ma_best_input_latency_comp, 0, 0, 50, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input latency compensation (0-50%)")
@@ -132,6 +132,10 @@ MACRO_CONFIG_INT(MaBestInputInterpolation, ma_best_input_interpolation, 1, 1, 3,
 MACRO_CONFIG_INT(MaSaikoPlusAmount, ma_saiko_plus_amount, 0, 0, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Saiko+ input amount in 0.01 ticks")
 MACRO_CONFIG_INT(MaSaikoPlusOthers, ma_saiko_plus_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply Saiko+ input to other tees")
 MACRO_CONFIG_INT(MaBestInputOthers, ma_best_input_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply best input to other tees")
+MACRO_CONFIG_INT(MaInputProfile, ma_input_profile, 0, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MA input profile (0=auto, 1=smooth, 2=balanced, 3=aggressive)")
+MACRO_CONFIG_INT(MaInputStrength, ma_input_strength, 55, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MA input strength")
+MACRO_CONFIG_INT(MaInputStability, ma_input_stability, 75, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MA input stability")
+MACRO_CONFIG_INT(MaInputOthers, ma_input_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply MA input to other tees")
 
 // ===== SNAP TAP =====
 MACRO_CONFIG_INT(MaSnapTap, ma_snap_tap, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Snap Tap for opposite left/right inputs")
