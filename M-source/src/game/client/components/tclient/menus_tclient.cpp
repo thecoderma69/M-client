@@ -4256,6 +4256,158 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 		RightView.HSplitTop(LineSize * 2.0f, nullptr, &RightView);
 	s_SectionBoxes.back().h = RightView.y - s_SectionBoxes.back().y;
 
+	// ***** Startup Music ***** //
+	RightView.HSplitTop(MarginBetweenSections, nullptr, &RightView);
+	s_SectionBoxes.push_back(RightView);
+	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
+	Ui()->DoLabel(&Label, TCLocalize("Musica de inicio"), HeadlineFontSize, TEXTALIGN_ML);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaStartupMusic, TCLocalize("Activar musica de inicio"), &g_Config.m_MaStartupMusic, &RightView, LineSize);
+	if(g_Config.m_MaStartupMusic)
+	{
+		RightView.HSplitTop(LineSize, &Button, &RightView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaStartupMusicVolume, &g_Config.m_MaStartupMusicVolume, &Button, TCLocalize("Volumen"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
+
+		const char *pStartupMusicDefaultPath = "ma/startup_music/ma_welcome_ddnet_client.mp3";
+		const char *pStartupMusicLegacyPath = "ma/startup_music/MONTAGEM CEINTA (Slowed).mp3";
+		const char *pStartupMusicLegacyWavPath = "ma/startup_music/ma_welcome_ddnet_client.wav";
+		if(str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicLegacyPath) == 0 || str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicLegacyWavPath) == 0)
+			str_copy(g_Config.m_MaStartupMusicPath, pStartupMusicDefaultPath, sizeof(g_Config.m_MaStartupMusicPath));
+
+		struct SStartupMusicFileListContext
+		{
+			std::vector<std::string> *m_pLabels;
+			std::vector<std::string> *m_pPaths;
+			const char *m_pDefaultPath;
+		};
+
+		auto StartupMusicFileListScan = [](const char *pName, int IsDir, int StorageType, void *pUser) {
+			(void)StorageType;
+			if(IsDir)
+				return 0;
+
+			auto *pContext = static_cast<SStartupMusicFileListContext *>(pUser);
+			const std::string Ext = MediaDecoder::ExtractExtensionLower(pName);
+			const bool SupportedSong = Ext == "mp3" || Ext == "wav" || Ext == "wma" || Ext == "opus" || Ext == "ogg" || Ext == "wv";
+			if(!SupportedSong)
+				return 0;
+
+			std::string Path = "ma/startup_music/";
+			Path += pName;
+			if(str_comp(Path.c_str(), pContext->m_pDefaultPath) == 0)
+				return 0;
+
+			pContext->m_pLabels->emplace_back(pName);
+			pContext->m_pPaths->push_back(Path);
+			return 0;
+		};
+
+		Storage()->CreateFolder("ma", IStorage::TYPE_SAVE);
+		Storage()->CreateFolder("ma/startup_music", IStorage::TYPE_SAVE);
+
+		static std::vector<std::string> s_vStartupMusicFileLabels;
+		static std::vector<std::string> s_vStartupMusicFilePaths;
+		s_vStartupMusicFileLabels.clear();
+		s_vStartupMusicFilePaths.clear();
+		SStartupMusicFileListContext StartupMusicContext{&s_vStartupMusicFileLabels, &s_vStartupMusicFilePaths, pStartupMusicDefaultPath};
+		Storage()->ListDirectory(IStorage::TYPE_ALL, "ma/startup_music", StartupMusicFileListScan, &StartupMusicContext);
+
+		std::vector<int> vStartupMusicSortedIndices(s_vStartupMusicFileLabels.size());
+		for(size_t i = 0; i < vStartupMusicSortedIndices.size(); ++i)
+			vStartupMusicSortedIndices[i] = (int)i;
+		std::sort(vStartupMusicSortedIndices.begin(), vStartupMusicSortedIndices.end(), [&](int Left, int Right) {
+			return str_comp_nocase(s_vStartupMusicFileLabels[Left].c_str(), s_vStartupMusicFileLabels[Right].c_str()) < 0;
+		});
+
+		static std::vector<std::string> s_vStartupMusicDropDownLabels;
+		static std::vector<std::string> s_vStartupMusicDropDownPaths;
+		static std::vector<const char *> s_vStartupMusicDropDownLabelPtrs;
+		s_vStartupMusicDropDownLabels.clear();
+		s_vStartupMusicDropDownPaths.clear();
+		s_vStartupMusicDropDownLabelPtrs.clear();
+		s_vStartupMusicDropDownLabels.emplace_back(TCLocalize("Predeterminada"));
+		s_vStartupMusicDropDownPaths.emplace_back(pStartupMusicDefaultPath);
+		for(int SortedIndex : vStartupMusicSortedIndices)
+		{
+			s_vStartupMusicDropDownLabels.push_back(s_vStartupMusicFileLabels[SortedIndex]);
+			s_vStartupMusicDropDownPaths.push_back(s_vStartupMusicFilePaths[SortedIndex]);
+		}
+
+		int SelectedStartupMusicFile = 0;
+		bool CurrentStartupMusicListed = g_Config.m_MaStartupMusicPath[0] == '\0' || str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicDefaultPath) == 0;
+		if(!CurrentStartupMusicListed)
+		{
+			for(size_t i = 1; i < s_vStartupMusicDropDownPaths.size(); ++i)
+			{
+				if(str_comp(g_Config.m_MaStartupMusicPath, s_vStartupMusicDropDownPaths[i].c_str()) == 0)
+				{
+					SelectedStartupMusicFile = (int)i;
+					CurrentStartupMusicListed = true;
+					break;
+				}
+			}
+		}
+		if(!CurrentStartupMusicListed)
+		{
+			const char *pMissingLabel = g_Config.m_MaStartupMusicPath;
+			if(const char *pSlash = str_rchr(pMissingLabel, '/'))
+				pMissingLabel = pSlash + 1;
+			s_vStartupMusicDropDownLabels.emplace_back(pMissingLabel);
+			s_vStartupMusicDropDownPaths.emplace_back(g_Config.m_MaStartupMusicPath);
+			SelectedStartupMusicFile = (int)s_vStartupMusicDropDownLabels.size() - 1;
+		}
+
+		for(const std::string &LabelString : s_vStartupMusicDropDownLabels)
+			s_vStartupMusicDropDownLabelPtrs.push_back(LabelString.c_str());
+
+		CUIRect StartupMusicRow, StartupMusicLabel, StartupMusicDropDown, StartupMusicPlayButton, StartupMusicFolderButton;
+		RightView.HSplitTop(LineSize, &StartupMusicRow, &RightView);
+		StartupMusicRow.VSplitLeft(105.0f, &StartupMusicLabel, &StartupMusicRow);
+		Ui()->DoLabel(&StartupMusicLabel, TCLocalize("Cancion"), FontSize, TEXTALIGN_ML);
+		StartupMusicRow.VSplitRight(20.0f, &StartupMusicRow, &StartupMusicFolderButton);
+		StartupMusicRow.VSplitRight(MarginSmall, &StartupMusicRow, nullptr);
+		StartupMusicRow.VSplitRight(20.0f, &StartupMusicRow, &StartupMusicPlayButton);
+		StartupMusicRow.VSplitRight(MarginSmall, &StartupMusicRow, nullptr);
+		StartupMusicDropDown = StartupMusicRow;
+
+		static CUi::SDropDownState s_StartupMusicDropDownState;
+		static CScrollRegion s_StartupMusicDropDownScrollRegion;
+		s_StartupMusicDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_StartupMusicDropDownScrollRegion;
+		const int NewSelectedStartupMusicFile = Ui()->DoDropDown(&StartupMusicDropDown, SelectedStartupMusicFile, s_vStartupMusicDropDownLabelPtrs.data(), s_vStartupMusicDropDownLabelPtrs.size(), s_StartupMusicDropDownState);
+		if(NewSelectedStartupMusicFile != SelectedStartupMusicFile && NewSelectedStartupMusicFile >= 0 && NewSelectedStartupMusicFile < (int)s_vStartupMusicDropDownPaths.size())
+		{
+			str_copy(g_Config.m_MaStartupMusicPath, s_vStartupMusicDropDownPaths[NewSelectedStartupMusicFile].c_str(), sizeof(g_Config.m_MaStartupMusicPath));
+			GameClient()->m_Ma.RestartStartupMusic();
+		}
+
+		static CButtonContainer s_StartupMusicPlayButton;
+		if(Ui()->DoButton_FontIcon(&s_StartupMusicPlayButton, FontIcon::PLAY, 0, &StartupMusicPlayButton, BUTTONFLAG_LEFT))
+			GameClient()->m_Ma.RestartStartupMusic();
+
+		static CButtonContainer s_StartupMusicFolderButton;
+		if(Ui()->DoButton_FontIcon(&s_StartupMusicFolderButton, FontIcon::FOLDER, 0, &StartupMusicFolderButton, BUTTONFLAG_LEFT))
+		{
+			Storage()->CreateFolder("ma", IStorage::TYPE_SAVE);
+			Storage()->CreateFolder("ma/startup_music", IStorage::TYPE_SAVE);
+			char aBuf[IO_MAX_PATH_LENGTH];
+			Storage()->GetCompletePath(IStorage::TYPE_SAVE, "ma/startup_music", aBuf, sizeof(aBuf));
+			Client()->ViewFile(aBuf);
+		}
+
+		RightView.HSplitTop(LineSize, &Row, &RightView);
+		const char *pStartupMusicStatus = GameClient()->m_Ma.StartupMusicStatusText();
+		if(str_startswith(pStartupMusicStatus, "No se"))
+			TextRender()->TextColor(ColorRGBA(1.0f, 0.45f, 0.45f, 1.0f));
+		else if(str_comp(pStartupMusicStatus, TCLocalize("Sonando.")) == 0)
+			TextRender()->TextColor(ColorRGBA(0.55f, 1.0f, 0.55f, 1.0f));
+		Ui()->DoLabel(&Row, pStartupMusicStatus, 11.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+	else
+		RightView.HSplitTop(LineSize * 2.0f, nullptr, &RightView);
+	s_SectionBoxes.back().h = RightView.y - s_SectionBoxes.back().y;
+
 	// ***** Tee Trails ***** //
 	RightView.HSplitTop(MarginBetweenSections, nullptr, &RightView);
 	s_SectionBoxes.push_back(RightView);

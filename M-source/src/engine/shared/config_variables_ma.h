@@ -88,6 +88,11 @@ MACRO_CONFIG_INT(MaMusicVideoEffectImageSize, ma_music_video_effect_image_size, 
 MACRO_CONFIG_COL(MaMusicVideoEffectColor, ma_music_video_effect_color, 255, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music video effect color")
 MACRO_CONFIG_STR(MaMusicVideoEffectImagePath, ma_music_video_effect_image_path, IO_MAX_PATH_LENGTH, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Path to the music video effect center image")
 
+// ===== STARTUP MUSIC =====
+MACRO_CONFIG_INT(MaStartupMusic, ma_startup_music, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Play a custom song once when opening the client")
+MACRO_CONFIG_INT(MaStartupMusicVolume, ma_startup_music_volume, 55, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Startup music volume")
+MACRO_CONFIG_STR(MaStartupMusicPath, ma_startup_music_path, IO_MAX_PATH_LENGTH, "ma/startup_music/ma_welcome_ddnet_client.mp3", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Path to the custom startup music file")
+
 // ===== MUSIC PLAYER =====
 MACRO_CONFIG_INT(MaMusicPlayer, ma_music_player, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Music Player HUD element")
 MACRO_CONFIG_INT(MaMusicPlayerShowWhenPaused, ma_music_player_show_when_paused, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep Music Player visible while playback is paused")

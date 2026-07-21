@@ -8,6 +8,7 @@
 
 #include <engine/client/enums.h>
 #include <engine/graphics.h>
+#include <engine/sound.h>
 #include <engine/shared/config.h>
 #include <engine/shared/protocol.h>
 
@@ -29,6 +30,11 @@ class CMa : public CComponent
 {
 	void RenderMusicPlayer();
 	void UpdateMusicPlayer();
+	void UpdateStartupMusic();
+	bool StartStartupMusic(bool ForceRestart);
+	bool StartStartupMusicWithEngine(const char *pPath, const std::string &Ext);
+	bool StartStartupMusicWithMci(const char *pAbsolutePath);
+	void UpdateStartupMusicVolume();
 	void ResetMusicVideoEffect();
 	void UnloadMusicVideoCenterImage();
 	bool LoadMusicVideoCenterImage(const char *pPath);
@@ -45,6 +51,16 @@ class CMa : public CComponent
 	int m_CurrentTrack = 0;
 	bool m_MusicPlaying = false;
 	bool m_MusicInitialized = false;
+
+	// Startup music state
+	int m_StartupMusicSampleId = -1;
+	ISound::CVoiceHandle m_StartupMusicVoice;
+	bool m_StartupMusicTried = false;
+	bool m_StartupMusicPlaying = false;
+	bool m_StartupMusicUsingMci = false;
+	int m_StartupMusicAppliedVolume = -1;
+	char m_aStartupMusicLoadedPath[IO_MAX_PATH_LENGTH] = "";
+	char m_aStartupMusicStatus[128] = "Lista.";
 
 	// Music video effect state
 	std::unique_ptr<BestClientVisualizer::CRealtimeMusicVisualizer> m_pMusicVideoVisualizer;
@@ -80,6 +96,9 @@ public:
 	void ApplyMusicVideoEffectHudEditorRect(const CUIRect &EditorRect, float HudWidth, float HudHeight);
 	void RenderMusicVideoEffectHudEditor(bool ForcePreview);
 	void RenderMusicVideoEffectBackground();
+	void RestartStartupMusic();
+	void StopStartupMusic();
+	const char *StartupMusicStatusText() const { return m_aStartupMusicStatus; }
 	void ReloadMusicVideoCenterImage();
 	const char *MusicVideoCenterImageStatusText() const { return m_aMusicVideoCenterImageStatus; }
 	bool MusicVideoCenterImageHasError() const { return m_MusicVideoCenterImageHasError; }

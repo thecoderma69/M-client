@@ -964,7 +964,8 @@ void CMenus::ConchainSndPack(IConsole::IResult *pResult, void *pUserData, IConso
 
 void CMenus::UpdateMusicState()
 {
-	const bool ShouldPlay = Client()->State() == IClient::STATE_OFFLINE && g_Config.m_SndEnable && g_Config.m_SndMusic;
+	const bool StartupMusicActive = g_Config.m_MaEnabled && g_Config.m_MaStartupMusic;
+	const bool ShouldPlay = Client()->State() == IClient::STATE_OFFLINE && g_Config.m_SndEnable && g_Config.m_SndMusic && !StartupMusicActive;
 	if(ShouldPlay && !GameClient()->m_Sounds.IsPlaying(SOUND_MENU))
 		GameClient()->m_Sounds.Enqueue(CSounds::CHN_MUSIC, SOUND_MENU);
 	else if(!ShouldPlay && GameClient()->m_Sounds.IsPlaying(SOUND_MENU))

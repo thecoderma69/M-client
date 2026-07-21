@@ -40,6 +40,9 @@ namespace
 constexpr float MAX_EFFECT_DELTA = 0.1f;
 constexpr int MAX_MUSIC_VIDEO_POINTS = 192;
 constexpr float MUSIC_VIDEO_EDITOR_RECT_SCALE = 0.70f;
+constexpr const char *STARTUP_MUSIC_DEFAULT_PATH = "ma/startup_music/ma_welcome_ddnet_client.mp3";
+constexpr const char *STARTUP_MUSIC_LEGACY_MP3_PATH = "ma/startup_music/MONTAGEM CEINTA (Slowed).mp3";
+constexpr const char *STARTUP_MUSIC_LEGACY_WAV_PATH = "ma/startup_music/ma_welcome_ddnet_client.wav";
 
 static float ApproachEffectValue(float Current, float Target, float Delta, float Speed)
 {
@@ -100,6 +103,26 @@ static float RoundedInset(float LocalX, float Width, float Radius)
 	}
 	return 0.0f;
 }
+
+#if defined(CONF_FAMILY_WINDOWS)
+static bool SendMciCommand(const std::wstring &Command)
+{
+	using TMciSendStringW = DWORD(WINAPI *)(LPCWSTR, LPWSTR, UINT, HWND);
+	static HMODULE s_hWinmm = LoadLibraryW(L"winmm.dll");
+	if(!s_hWinmm)
+		return false;
+	static TMciSendStringW s_pMciSendStringW = reinterpret_cast<TMciSendStringW>(GetProcAddress(s_hWinmm, "mciSendStringW"));
+	if(!s_pMciSendStringW)
+		return false;
+	return s_pMciSendStringW(Command.c_str(), nullptr, 0, nullptr) == 0;
+}
+
+static void CloseStartupMusicMciAlias()
+{
+	SendMciCommand(L"stop ma_startup_music");
+	SendMciCommand(L"close ma_startup_music");
+}
+#endif
 
 static void DrawRoundedTextureCover(IGraphics *pGraphics, IGraphics::CTextureHandle Texture, const CUIRect &Rect, int TextureWidth, int TextureHeight, float Alpha)
 {
@@ -334,6 +357,7 @@ void CMa::OnReset()
 
 void CMa::OnShutdown()
 {
+	StopStartupMusic();
 	ResetMusicVideoEffect();
 	UnloadMusicVideoCenterImage();
 }
@@ -465,6 +489,178 @@ void CMa::RenderMusicPlayer()
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.9f);
 	TextRender()->Text(X + 10.0f, Y + 4.0f, FontSz, aBuf);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
+}
+
+// ===== STARTUP MUSIC =====
+
+void CMa::UpdateStartupMusic()
+{
+	if(!g_Config.m_MaStartupMusic || !g_Config.m_SndEnable || Client()->State() != IClient::STATE_OFFLINE)
+	{
+		if(m_StartupMusicPlaying)
+			StopStartupMusic();
+		return;
+	}
+
+	if(!m_StartupMusicTried)
+		StartStartupMusic(false);
+	else
+		UpdateStartupMusicVolume();
+}
+
+bool CMa::StartStartupMusic(bool ForceRestart)
+{
+	if(!g_Config.m_MaStartupMusic || !g_Config.m_SndEnable || Client()->State() != IClient::STATE_OFFLINE)
+	{
+		StopStartupMusic();
+		return false;
+	}
+
+	if(!ForceRestart && m_StartupMusicTried)
+		return m_StartupMusicPlaying;
+
+	m_StartupMusicTried = true;
+	StopStartupMusic();
+
+	const char *pPath = g_Config.m_MaStartupMusicPath;
+	if(pPath == nullptr || pPath[0] == '\0' || str_comp(pPath, STARTUP_MUSIC_LEGACY_MP3_PATH) == 0 || str_comp(pPath, STARTUP_MUSIC_LEGACY_WAV_PATH) == 0)
+	{
+		str_copy(g_Config.m_MaStartupMusicPath, STARTUP_MUSIC_DEFAULT_PATH, sizeof(g_Config.m_MaStartupMusicPath));
+		pPath = STARTUP_MUSIC_DEFAULT_PATH;
+	}
+
+	char aAbsolutePath[IO_MAX_PATH_LENGTH];
+	if(!ResolveMusicVideoReadablePath(Storage(), pPath, IStorage::TYPE_ALL, aAbsolutePath, sizeof(aAbsolutePath)))
+	{
+		str_copy(m_aStartupMusicStatus, TCLocalize("No se encontro la cancion."), sizeof(m_aStartupMusicStatus));
+		return false;
+	}
+
+	const std::string Ext = MediaDecoder::ExtractExtensionLower(pPath);
+	if((Ext == "opus" || Ext == "ogg" || Ext == "wv") && StartStartupMusicWithEngine(pPath, Ext))
+		return true;
+
+	if(StartStartupMusicWithMci(aAbsolutePath))
+		return true;
+
+	str_copy(m_aStartupMusicStatus, TCLocalize("No se pudo reproducir la cancion."), sizeof(m_aStartupMusicStatus));
+	return false;
+}
+
+bool CMa::StartStartupMusicWithEngine(const char *pPath, const std::string &Ext)
+{
+	if(!Sound()->IsSoundEnabled())
+	{
+		str_copy(m_aStartupMusicStatus, TCLocalize("El sonido esta desactivado."), sizeof(m_aStartupMusicStatus));
+		return false;
+	}
+
+	const int SampleId = Ext == "wv" ? Sound()->LoadWV(pPath, IStorage::TYPE_ALL) : Sound()->LoadOpus(pPath, IStorage::TYPE_ALL);
+	if(SampleId < 0)
+		return false;
+
+	const float Volume = std::clamp(g_Config.m_MaStartupMusicVolume / 100.0f, 0.0f, 1.0f);
+	m_StartupMusicVoice = Sound()->Play(CSounds::CHN_MUSIC, SampleId, ISound::FLAG_NO_PANNING, Volume);
+	if(!m_StartupMusicVoice.IsValid())
+	{
+		Sound()->UnloadSample(SampleId);
+		return false;
+	}
+
+	m_StartupMusicSampleId = SampleId;
+	m_StartupMusicPlaying = true;
+	m_StartupMusicUsingMci = false;
+	m_StartupMusicAppliedVolume = g_Config.m_MaStartupMusicVolume;
+	str_copy(m_aStartupMusicLoadedPath, pPath, sizeof(m_aStartupMusicLoadedPath));
+	str_copy(m_aStartupMusicStatus, TCLocalize("Sonando."), sizeof(m_aStartupMusicStatus));
+	return true;
+}
+
+bool CMa::StartStartupMusicWithMci(const char *pAbsolutePath)
+{
+#if defined(CONF_FAMILY_WINDOWS)
+	if(pAbsolutePath == nullptr || pAbsolutePath[0] == '\0')
+		return false;
+
+	CloseStartupMusicMciAlias();
+
+	const std::wstring WidePath = windows_utf8_to_wide(pAbsolutePath);
+	const std::wstring OpenCommand = L"open \"" + WidePath + L"\" alias ma_startup_music";
+	if(!SendMciCommand(OpenCommand))
+	{
+		const std::wstring OpenMpegCommand = L"open \"" + WidePath + L"\" type mpegvideo alias ma_startup_music";
+		if(!SendMciCommand(OpenMpegCommand))
+			return false;
+	}
+
+	m_StartupMusicUsingMci = true;
+	m_StartupMusicPlaying = true;
+	UpdateStartupMusicVolume();
+
+	if(!SendMciCommand(L"play ma_startup_music"))
+	{
+		StopStartupMusic();
+		return false;
+	}
+
+	str_copy(m_aStartupMusicLoadedPath, pAbsolutePath, sizeof(m_aStartupMusicLoadedPath));
+	str_copy(m_aStartupMusicStatus, TCLocalize("Sonando."), sizeof(m_aStartupMusicStatus));
+	return true;
+#else
+	(void)pAbsolutePath;
+	return false;
+#endif
+}
+
+void CMa::UpdateStartupMusicVolume()
+{
+	if(!m_StartupMusicPlaying || m_StartupMusicAppliedVolume == g_Config.m_MaStartupMusicVolume)
+		return;
+
+	const int VolumePercent = std::clamp(g_Config.m_MaStartupMusicVolume, 0, 100);
+	if(m_StartupMusicUsingMci)
+	{
+#if defined(CONF_FAMILY_WINDOWS)
+		const int MciVolume = std::clamp(VolumePercent * 10, 0, 1000);
+		SendMciCommand(L"setaudio ma_startup_music volume to " + std::to_wstring(MciVolume));
+#endif
+	}
+	else if(m_StartupMusicVoice.IsValid())
+	{
+		Sound()->SetVoiceVolume(m_StartupMusicVoice, VolumePercent / 100.0f);
+	}
+	m_StartupMusicAppliedVolume = VolumePercent;
+}
+
+void CMa::RestartStartupMusic()
+{
+	m_StartupMusicTried = false;
+	StartStartupMusic(true);
+}
+
+void CMa::StopStartupMusic()
+{
+	if(m_StartupMusicUsingMci)
+	{
+#if defined(CONF_FAMILY_WINDOWS)
+		CloseStartupMusicMciAlias();
+#endif
+	}
+
+	if(m_StartupMusicVoice.IsValid())
+		Sound()->StopVoice(m_StartupMusicVoice);
+	m_StartupMusicVoice = ISound::CVoiceHandle();
+
+	if(m_StartupMusicSampleId >= 0)
+	{
+		Sound()->UnloadSample(m_StartupMusicSampleId);
+		m_StartupMusicSampleId = -1;
+	}
+
+	m_StartupMusicPlaying = false;
+	m_StartupMusicUsingMci = false;
+	m_StartupMusicAppliedVolume = -1;
+	m_aStartupMusicLoadedPath[0] = '\0';
 }
 
 // ===== MUSIC VIDEO EFFECT =====
@@ -926,6 +1122,7 @@ void CMa::OnRender()
 {
 	if(!g_Config.m_MaEnabled)
 		return;
+	UpdateStartupMusic();
 	if(g_Config.m_MaMusicVideoEffectBehind)
 		return;
 	RenderMusicVideoEffect(false);
