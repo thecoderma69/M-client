@@ -160,7 +160,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	MainView.HSplitTop(15.0f, &TClientVersion, &MainView);
 	TClientVersion.VSplitRight(40.0f, &TClientVersion, nullptr);
 	char aTBuf[64];
-	str_copy(aTBuf, "M\316\233 \343\203\204 2.1.5");
+	str_copy(aTBuf, "M\316\233 \343\203\204 2.1.6");
 	Ui()->DoLabel(&TClientVersion, aTBuf, 14.0f, TEXTALIGN_MR);
 #if defined(CONF_AUTOUPDATE)
 	CUIRect UpdateToDateText;

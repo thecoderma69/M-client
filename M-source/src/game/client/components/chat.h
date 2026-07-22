@@ -115,6 +115,7 @@ class CChat : public CComponent
 		std::vector<std::string> m_vMediaCandidates;
 		int m_MediaCandidateIndex;
 		int m_MediaResolveDepth;
+		int64_t m_MediaRequestStart;
 		std::shared_ptr<CHttpRequest> m_pMediaRequest;
 		std::shared_ptr<CMediaDecodeJob> m_pMediaDecodeJob;
 		std::optional<SMediaDecodedFrames> m_OptMediaDecodedFrames;

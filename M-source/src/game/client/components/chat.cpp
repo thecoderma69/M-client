@@ -44,18 +44,20 @@ static constexpr int CHAT_MEDIA_MAX_COMPLETED_PER_FRAME = 1;
 static constexpr int CHAT_MEDIA_MAX_TEXTURE_UPLOADS_PER_FRAME = 3;
 static constexpr int64_t CHAT_MEDIA_TEXTURE_UPLOAD_BUDGET_US = 2500;
 static constexpr int64_t CHAT_MEDIA_MAX_RESPONSE_SIZE = 64 * 1024 * 1024;
-static constexpr int CHAT_MEDIA_MAX_GIF_FRAMES = 180;
+static constexpr int CHAT_MEDIA_MAX_GIF_FRAMES = 360;
 static constexpr int CHAT_MEDIA_MAX_DIMENSION = 960;
 static constexpr int CHAT_MEDIA_MAX_RESOLVE_DEPTH = 2;
 static constexpr int CHAT_MEDIA_MAX_VIDEO_ANIMATION_MS = 15000;
-static constexpr int CHAT_MEDIA_MAX_URL_LENGTH = 240;
+static constexpr int CHAT_MEDIA_MAX_URL_LENGTH = 480;
 static constexpr int CHAT_MEDIA_MAX_HTML_CANDIDATES = 32;
+static constexpr int CHAT_MEDIA_DOWNLOAD_WATCHDOG_MS = 15000;
 static constexpr size_t CHAT_MEDIA_MAX_ANIMATED_MEMORY_BYTES = 48ull * 1024ull * 1024ull;
 static constexpr float CHAT_MEDIA_MAX_PREVIEW_HEIGHT = 70.0f;
 static constexpr float CHAT_MEDIA_MAX_PREVIEW_HEIGHT_SCOREBOARD = 56.0f;
 static constexpr float CHAT_MEDIA_PREVIEW_SIZE_SCALE = 0.9f;
 static constexpr float CHAT_MEDIA_MIN_PREVIEW_SIDE = 28.0f;
 static constexpr float CHAT_MEDIA_COMPACT_EXPANDED_HEIGHT = 150.0f;
+static constexpr bool CHAT_MEDIA_ANIMATE_VIDEOS = true;
 
 CChat::CLine::CLine()
 {
@@ -67,6 +69,7 @@ CChat::CLine::CLine()
 	m_aMediaStatus[0] = '\0';
 	m_MediaCandidateIndex = -1;
 	m_MediaResolveDepth = 0;
+	m_MediaRequestStart = 0;
 	m_MediaUploadIndex = 0;
 	m_MediaTotalDurationMs = 0;
 	m_MediaAnimated = false;
@@ -154,11 +157,11 @@ protected:
 				m_Success = DecodeSingleFrameFallback();
 			break;
 		case EMediaKind::VIDEO:
-			Limits.m_DecodeAllFrames = false;
+			Limits.m_DecodeAllFrames = CHAT_MEDIA_ANIMATE_VIDEOS;
 			m_Success = MediaDecoder::DecodeImageWithFfmpegCpu(m_pGraphics, m_vData.data(), m_vData.size(), m_aContextName, m_DecodedFrames, Limits);
 			if(!m_Success)
 			{
-				Limits.m_DecodeAllFrames = true;
+				Limits.m_DecodeAllFrames = false;
 				m_Success = MediaDecoder::DecodeImageWithFfmpegCpu(m_pGraphics, m_vData.data(), m_vData.size(), m_aContextName, m_DecodedFrames, Limits);
 			}
 			if(!m_Success)
@@ -315,7 +318,7 @@ static std::string NormalizeAllowedMediaDomain(std::string Domain)
 	return Domain;
 }
 
-static constexpr const char *s_pDefaultChatMediaAllowedDomains = "tenor.com; tenor.googleapis.com; imgur.com; giphy.com; discordapp.com; discordapp.net";
+static constexpr const char *s_pDefaultChatMediaAllowedDomains = "tenor.com; imgur.com; giphy.com; discordapp.com; discordapp.net";
 
 static bool IsAllowedChatMediaHostByDomainList(const std::string &HostLower, const char *pList, bool &HasDomains)
 {
@@ -374,7 +377,7 @@ static bool IsAllowedChatMediaUrl(const char *pUrl)
 	if(pUrl == nullptr || pUrl[0] == '\0')
 		return false;
 	const std::string HostLower = ExtractUrlHostLower(pUrl);
-	if(HostLower == "tenor.googleapis.com" || HostIsOrEndsWith(HostLower, "tenor.com"))
+	if(HostIsOrEndsWith(HostLower, "tenor.com"))
 		return true;
 	return IsAllowedChatMediaHost(HostLower);
 }
@@ -498,17 +501,6 @@ static bool ExtractTenorMediaId(const std::string &Url, std::string &OutMediaId)
 	return true;
 }
 
-static void AddDirectTenorCandidates(const std::string &Url, std::vector<std::string> &vOutCandidates)
-{
-	std::string MediaId;
-	if(!ExtractTenorMediaId(Url, MediaId))
-		return;
-
-	const std::string Candidate = "https://tenor.googleapis.com/v2/posts?ids=" + MediaId + "&key=AIzaSyCZt6SSh5VgVPzD9fhyzG1DprdPRhtoaR4&client_key=tenor_web&media_filter=gif,tinygif,mp4,tinymp4";
-	if((int)Candidate.size() <= CHAT_MEDIA_MAX_URL_LENGTH)
-		vOutCandidates.push_back(Candidate);
-}
-
 static bool ExtractImgurMediaId(const std::string &Url, std::string &OutMediaId)
 {
 	OutMediaId.clear();
@@ -555,7 +547,7 @@ static void AddDirectImgurCandidates(const std::string &Url, std::vector<std::st
 	if(!ExtractImgurMediaId(Url, MediaId))
 		return;
 
-	const char *apFormats[] = {"mp4", "gif", "webm", "jpg", "jpeg", "png", "webp"};
+	const char *apFormats[] = {"mp4", "webp", "webm", "gif", "jpg", "jpeg", "png"};
 	for(const char *pFormat : apFormats)
 	{
 		std::string Candidate = "https://i.imgur.com/" + MediaId + "." + pFormat;
@@ -1098,6 +1090,54 @@ static void FindJsonValuesByKey(const std::string &Json, const std::string &Json
 	}
 }
 
+static bool ExtractBalancedJsonObject(const std::string &Text, size_t ObjectStart, size_t MaxLength, std::string &OutObject)
+{
+	OutObject.clear();
+	if(ObjectStart >= Text.size() || Text[ObjectStart] != '{')
+		return false;
+
+	int Depth = 0;
+	bool InString = false;
+	char Quote = '\0';
+	size_t Pos = ObjectStart;
+	while(Pos < Text.size() && Pos - ObjectStart < MaxLength)
+	{
+		const char c = Text[Pos++];
+		if(InString)
+		{
+			if(c == '\\' && Pos < Text.size())
+			{
+				Pos++;
+				continue;
+			}
+			if(c == Quote)
+			{
+				InString = false;
+				Quote = '\0';
+			}
+			continue;
+		}
+		if(c == '"' || c == '\'')
+		{
+			InString = true;
+			Quote = c;
+			continue;
+		}
+		if(c == '{')
+			Depth++;
+		else if(c == '}')
+		{
+			Depth--;
+			if(Depth <= 0)
+			{
+				OutObject = Text.substr(ObjectStart, Pos - ObjectStart);
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 static void CollectJsonLdMediaCandidates(const std::string &Html, const std::string &HtmlLower, std::vector<std::string> &vOutValues)
 {
 	size_t Pos = 0;
@@ -1156,70 +1196,33 @@ static void CollectJsonMediaCandidates(const std::string &Text, const std::strin
 		FindJsonValuesByKey(Text, TextLower, pKey, vOutValues);
 }
 
-static void CollectTenorMediaFormatCandidates(const std::string &Text, const std::string &TextLower, std::vector<std::string> &vOutValues)
+static void CollectTenorMediaFormatCandidates(const std::string &Text, const std::string &TextLower, const std::string &PreferredMediaId, std::vector<std::string> &vOutValues)
 {
-	const auto AddFirstUrlFromFormatObject = [&](const char *pFormat) {
+	const auto AddFirstUrlFromFormatObject = [&](const std::string &Source, const std::string &SourceLower, const char *pFormat) {
 		const std::string KeyPattern = "\"" + ToLowerAscii(pFormat) + "\"";
 		size_t Pos = 0;
-		while((Pos = TextLower.find(KeyPattern, Pos)) != std::string::npos)
+		while((Pos = SourceLower.find(KeyPattern, Pos)) != std::string::npos)
 		{
-			const size_t ColonPos = TextLower.find(':', Pos + KeyPattern.size());
+			const size_t ColonPos = SourceLower.find(':', Pos + KeyPattern.size());
 			if(ColonPos == std::string::npos)
 				break;
 
 			size_t ObjectStart = ColonPos + 1;
-			while(ObjectStart < Text.size() && std::isspace((unsigned char)Text[ObjectStart]))
+			while(ObjectStart < Source.size() && std::isspace((unsigned char)Source[ObjectStart]))
 				ObjectStart++;
-			if(ObjectStart >= Text.size() || Text[ObjectStart] != '{')
+			if(ObjectStart >= Source.size() || Source[ObjectStart] != '{')
 			{
 				Pos = ColonPos + 1;
 				continue;
 			}
 
-			int Depth = 0;
-			size_t ObjectEnd = ObjectStart;
-			bool InString = false;
-			char Quote = '\0';
-			while(ObjectEnd < Text.size() && ObjectEnd - ObjectStart < 8192)
-			{
-				const char c = Text[ObjectEnd++];
-				if(InString)
-				{
-					if(c == '\\' && ObjectEnd < Text.size())
-					{
-						ObjectEnd++;
-						continue;
-					}
-					if(c == Quote)
-					{
-						InString = false;
-						Quote = '\0';
-					}
-					continue;
-				}
-				if(c == '"' || c == '\'')
-				{
-					InString = true;
-					Quote = c;
-					continue;
-				}
-				if(c == '{')
-					Depth++;
-				else if(c == '}')
-				{
-					Depth--;
-					if(Depth <= 0)
-						break;
-				}
-			}
-
-			if(ObjectEnd <= ObjectStart || ObjectEnd > Text.size())
+			std::string Object;
+			if(!ExtractBalancedJsonObject(Source, ObjectStart, 8192, Object))
 			{
 				Pos = ColonPos + 1;
 				continue;
 			}
 
-			const std::string Object = Text.substr(ObjectStart, ObjectEnd - ObjectStart);
 			const std::string ObjectLower = ToLowerAscii(Object);
 			std::vector<std::string> vUrls;
 			FindJsonValuesByKey(Object, ObjectLower, "url", vUrls);
@@ -1233,13 +1236,34 @@ static void CollectTenorMediaFormatCandidates(const std::string &Text, const std
 				}
 			}
 
-			Pos = ObjectEnd;
+			Pos = ObjectStart + Object.size();
 		}
 	};
 
-	const char *apPreferredFormats[] = {"tinygif", "gif", "mp4", "tinymp4", "mediumgif", "webp", "tinywebp"};
+	const char *apPreferredFormats[] = {"tinymp4", "mp4", "webm", "tinygif", "gif", "mediumgif", "webp", "tinywebp"};
+	std::string PreferredText;
+	if(!PreferredMediaId.empty())
+	{
+		const std::string IdPattern = "\"" + PreferredMediaId + "\"";
+		const size_t IdPos = Text.find(IdPattern);
+		const size_t FormatsPos = IdPos == std::string::npos ? std::string::npos : TextLower.find("\"media_formats\"", IdPos);
+		if(FormatsPos != std::string::npos && FormatsPos - IdPos < 65536)
+		{
+			const size_t ObjectStart = Text.find('{', FormatsPos);
+			if(ObjectStart != std::string::npos)
+				ExtractBalancedJsonObject(Text, ObjectStart, 65536, PreferredText);
+		}
+	}
+
+	if(!PreferredText.empty())
+	{
+		const std::string PreferredTextLower = ToLowerAscii(PreferredText);
+		for(const char *pFormat : apPreferredFormats)
+			AddFirstUrlFromFormatObject(PreferredText, PreferredTextLower, pFormat);
+	}
+
 	for(const char *pFormat : apPreferredFormats)
-		AddFirstUrlFromFormatObject(pFormat);
+		AddFirstUrlFromFormatObject(Text, TextLower, pFormat);
 }
 
 static void CollectScriptMediaCandidates(const std::string &Html, const std::string &HtmlLower, std::vector<std::string> &vOutValues)
@@ -1433,7 +1457,7 @@ static void ExtractMediaUrlsFromHtmlDocument(const unsigned char *pData, size_t 
 	const std::string HtmlLower = ToLowerAscii(Html);
 	const bool LikelyHtml = IsLikelyHtmlDocument(pData, DataSize);
 	const std::string BaseHostLower = ExtractUrlHostLower(pBaseUrl);
-	const bool TenorDocument = HostIsOrEndsWith(BaseHostLower, "tenor.com") || BaseHostLower == "tenor.googleapis.com";
+	const bool TenorDocument = HostIsOrEndsWith(BaseHostLower, "tenor.com");
 
 	struct SPrioritizedCandidate
 	{
@@ -1454,7 +1478,9 @@ static void ExtractMediaUrlsFromHtmlDocument(const unsigned char *pData, size_t 
 	if(TenorDocument)
 	{
 		std::vector<std::string> vValues;
-		CollectTenorMediaFormatCandidates(Html, HtmlLower, vValues);
+		std::string PreferredMediaId;
+		ExtractTenorMediaId(pBaseUrl, PreferredMediaId);
+		CollectTenorMediaFormatCandidates(Html, HtmlLower, PreferredMediaId, vValues);
 		AddCandidates(-5, vValues);
 	}
 
@@ -1818,10 +1844,15 @@ void CChat::ExtractMediaUrlsFromText(const char *pText, std::vector<std::string>
 		}
 
 		std::vector<std::string> vExpandedUrls;
-		AddDirectTenorCandidates(Url, vExpandedUrls);
+		const std::string UrlHostLower = ExtractUrlHostLower(Url);
+		const bool IsTenorUrl = HostIsOrEndsWith(UrlHostLower, "tenor.com");
+		if(IsTenorUrl)
+			vExpandedUrls.push_back(Url);
+
 		AddDirectGiphyCandidates(Url, vExpandedUrls);
 		AddDirectImgurCandidates(Url, vExpandedUrls);
-		vExpandedUrls.push_back(Url);
+		if(!IsTenorUrl)
+			vExpandedUrls.push_back(Url);
 
 		for(const std::string &ExpandedUrl : vExpandedUrls)
 		{
@@ -1886,6 +1917,7 @@ void CChat::ResetLineMedia(CLine &Line)
 	Line.m_vMediaCandidates.clear();
 	Line.m_MediaCandidateIndex = -1;
 	Line.m_MediaResolveDepth = 0;
+	Line.m_MediaRequestStart = 0;
 	Line.m_MediaUploadIndex = 0;
 	Line.m_vMediaFrameEndMs.clear();
 	Line.m_MediaTotalDurationMs = 0;
@@ -1930,6 +1962,7 @@ void CChat::SetMediaCandidates(CLine &Line, const std::vector<std::string> &vCan
 	Line.m_MediaKind = EMediaKind::UNKNOWN;
 	Line.m_aMediaUrl[0] = '\0';
 	Line.m_aMediaStatus[0] = '\0';
+	Line.m_MediaRequestStart = 0;
 	if(!Line.m_vMediaCandidates.empty())
 	{
 		Line.m_MediaCandidateIndex = 0;
@@ -1994,12 +2027,13 @@ bool CChat::QueueNextMediaCandidate(CLine &Line, const char *pReason)
 		Line.m_MediaState = EMediaState::QUEUED;
 		Line.m_MediaKind = MediaKindFromUrl(Line.m_aMediaUrl);
 		const std::string HostLower = ExtractUrlHostLower(Line.m_aMediaUrl);
-		if(HostLower == "tenor.googleapis.com" || HostIsOrEndsWith(HostLower, "tenor.com"))
+		if(HostIsOrEndsWith(HostLower, "tenor.com"))
 			str_copy(Line.m_aMediaStatus, "Resolving Tenor...", sizeof(Line.m_aMediaStatus));
 		else
 			str_copy(Line.m_aMediaStatus, "Queued media...", sizeof(Line.m_aMediaStatus));
 		Line.m_pMediaRequest = nullptr;
 		Line.m_pMediaDecodeJob = nullptr;
+		Line.m_MediaRequestStart = 0;
 		Line.m_aYOffset[0] = -1.0f;
 		Line.m_aYOffset[1] = -1.0f;
 		if(g_Config.m_Debug)
@@ -2059,15 +2093,26 @@ void CChat::StartMediaDownload(CLine &Line)
 		}
 	}
 
+	const std::string HostLower = ExtractUrlHostLower(Line.m_aMediaUrl);
+	const EMediaKind UrlKind = MediaKindFromUrl(Line.m_aMediaUrl);
+	const bool DirectMediaUrl = UrlKind == EMediaKind::PHOTO || UrlKind == EMediaKind::ANIMATED || UrlKind == EMediaKind::VIDEO;
 	std::shared_ptr<CHttpRequest> pGet = HttpGet(Line.m_aMediaUrl);
-	pGet->Timeout(CTimeout{8000, 0, 4096, 8});
+	pGet->Timeout(CTimeout{8000, DirectMediaUrl ? 12000 : 10000, 512, 8});
 	pGet->MaxResponseSize(CHAT_MEDIA_MAX_RESPONSE_SIZE);
 	pGet->FailOnErrorStatus(false);
 	pGet->LogProgress(HTTPLOG::NONE);
+	pGet->Header("Accept: image/avif,image/webp,image/apng,image/*,video/mp4,video/webm,video/*,text/html,application/json,*/*;q=0.8");
+	pGet->Header("Connection: close");
+	if(HostIsOrEndsWith(HostLower, "tenor.com"))
+		pGet->Header("Referer: https://tenor.com/");
+	else if(HostIsOrEndsWith(HostLower, "imgur.com"))
+		pGet->Header("Referer: https://imgur.com/");
+	else if(HostIsOrEndsWith(HostLower, "giphy.com"))
+		pGet->Header("Referer: https://giphy.com/");
 	Line.m_pMediaRequest = pGet;
+	Line.m_MediaRequestStart = time_get();
 	Line.m_MediaState = EMediaState::LOADING;
-	const std::string HostLower = ExtractUrlHostLower(Line.m_aMediaUrl);
-	if(HostLower == "tenor.googleapis.com" || HostIsOrEndsWith(HostLower, "tenor.com"))
+	if(HostIsOrEndsWith(HostLower, "tenor.com"))
 		str_copy(Line.m_aMediaStatus, "Resolving Tenor...", sizeof(Line.m_aMediaStatus));
 	else
 		str_copy(Line.m_aMediaStatus, "Downloading media...", sizeof(Line.m_aMediaStatus));
@@ -2187,10 +2232,31 @@ void CChat::UpdateMediaDownloads()
 	}
 
 	int ActiveDownloads = 0;
+	const int64_t Now = time_get();
+	const auto MediaRequestTimedOut = [&](const CLine &Line) {
+		return Line.m_MediaRequestStart > 0 &&
+			((Now - Line.m_MediaRequestStart) * 1000) / time_freq() > CHAT_MEDIA_DOWNLOAD_WATCHDOG_MS;
+	};
 	for(auto &Line : m_aLines)
 	{
 		if(Line.m_MediaState == EMediaState::LOADING && Line.m_pMediaRequest && !Line.m_pMediaRequest->Done())
-			ActiveDownloads++;
+		{
+			if(MediaRequestTimedOut(Line))
+				Line.m_pMediaRequest->Abort();
+			else
+			{
+				const int Progress = Line.m_pMediaRequest->Progress();
+				const double Current = Line.m_pMediaRequest->Current();
+				const double Size = Line.m_pMediaRequest->Size();
+				if(Progress > 0 && Progress < 100)
+					str_format(Line.m_aMediaStatus, sizeof(Line.m_aMediaStatus), "Downloading media... %d%%", Progress);
+				else if(Current > 0.0 && Size > 0.0)
+					str_format(Line.m_aMediaStatus, sizeof(Line.m_aMediaStatus), "Downloading media... %.0f/%.0f KB", Current / 1024.0, Size / 1024.0);
+				else if(Current > 0.0)
+					str_format(Line.m_aMediaStatus, sizeof(Line.m_aMediaStatus), "Downloading media... %.0f KB", Current / 1024.0);
+				ActiveDownloads++;
+			}
+		}
 	}
 
 	const auto FailLine = [this](CLine &Line, bool SuppressedBySettings, const char *pReason) {
@@ -2217,15 +2283,21 @@ void CChat::UpdateMediaDownloads()
 	{
 		if(CompletedRequestsThisFrame >= CHAT_MEDIA_MAX_COMPLETED_PER_FRAME)
 			break;
-		if(Line.m_MediaState != EMediaState::LOADING || !Line.m_pMediaRequest || !Line.m_pMediaRequest->Done())
+		const bool TimedOut = Line.m_MediaState == EMediaState::LOADING && Line.m_pMediaRequest && MediaRequestTimedOut(Line);
+		if(Line.m_MediaState != EMediaState::LOADING || !Line.m_pMediaRequest || (!Line.m_pMediaRequest->Done() && !TimedOut))
 			continue;
 
 		bool StartedDecode = false;
 		bool SuppressedBySettings = false;
 		const char *pFailureReason = "download failed";
-		const bool HttpDone = Line.m_pMediaRequest->State() == EHttpState::DONE;
+		const bool HttpDone = !TimedOut && Line.m_pMediaRequest->State() == EHttpState::DONE;
 		const int StatusCode = HttpDone ? Line.m_pMediaRequest->StatusCode() : -1;
-		if(HttpDone && StatusCode >= 200 && StatusCode < 400)
+		if(TimedOut)
+		{
+			Line.m_pMediaRequest->Abort();
+			pFailureReason = "timeout";
+		}
+		else if(HttpDone && StatusCode >= 200 && StatusCode < 400)
 		{
 			unsigned char *pResult = nullptr;
 			size_t ResultSize = 0;
@@ -2303,6 +2375,7 @@ void CChat::UpdateMediaDownloads()
 		}
 
 		Line.m_pMediaRequest = nullptr;
+		Line.m_MediaRequestStart = 0;
 		ActiveDownloads = maximum(0, ActiveDownloads - 1);
 		CompletedRequestsThisFrame++;
 
