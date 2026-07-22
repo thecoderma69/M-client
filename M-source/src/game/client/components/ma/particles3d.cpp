@@ -56,6 +56,17 @@ static float ApproachValue(float Current, float Target, float Delta, float Speed
 	return mix(Current, Target, Amount);
 }
 
+static float PerformanceGuardLodScale(float Delta)
+{
+	if(!g_Config.m_MaPerformanceGuard || Delta <= 0.0f)
+		return 1.0f;
+	const int TargetFps = std::clamp(g_Config.m_MaPerformanceGuardTargetFps, 60, 1000);
+	const float TargetDelta = 1.0f / (float)TargetFps;
+	if(Delta <= TargetDelta)
+		return 1.0f;
+	return std::clamp(TargetDelta / Delta, 0.35f, 1.0f);
+}
+
 static const std::array<vec3, 8> g_aCubeVertices = { {
 	vec3(-1.0f, -1.0f, -1.0f),
 	vec3(1.0f, -1.0f, -1.0f),
@@ -405,6 +416,7 @@ void CMa3DParticles::OnRender()
 	float Delta = std::clamp(Client()->RenderFrameTime(), 0.0f, MAX_DELTA);
 	if(Delta <= 0.0f)
 		return;
+	const float Lod = PerformanceGuardLodScale(Delta);
 	m_Time += Delta;
 
 	vec2 LocalPos = GameClient()->m_Camera.m_Center;
@@ -421,6 +433,12 @@ void CMa3DParticles::OnRender()
 	float SpawnMinX = SX0, SpawnMaxX = SX1, SpawnMinY = SY0, SpawnMaxY = SY1;
 
 	int TargetCount = std::clamp(g_Config.m_Ma3dParticlesCount, 0, PARTICLE_MAX);
+	if(g_Config.m_MaPerformanceGuard)
+	{
+		const int GuardMax = std::clamp(g_Config.m_MaPerformanceGuardMax3dParticles, 10, PARTICLE_MAX);
+		const int GuardCount = std::clamp(round_to_int((float)GuardMax * Lod), 10, GuardMax);
+		TargetCount = std::min(TargetCount, GuardCount);
+	}
 	if((int)m_vParticles.size() > TargetCount)
 		m_vParticles.resize(TargetCount);
 
@@ -493,7 +511,8 @@ void CMa3DParticles::OnRender()
 	}
 
 	int Missing = TargetCount - (int)m_vParticles.size();
-	int SpawnNow = std::min(Missing, 8);
+	const int SpawnBudget = g_Config.m_MaPerformanceGuard ? std::clamp(round_to_int(8.0f * Lod), 1, 8) : 8;
+	int SpawnNow = std::min(Missing, SpawnBudget);
 	float SizeMin = (float)g_Config.m_Ma3dParticlesSizeMin;
 	float SizeMax = (float)g_Config.m_Ma3dParticlesSizeMax;
 	float Speed = (float)g_Config.m_Ma3dParticlesSpeed;
@@ -533,17 +552,18 @@ void CMa3DParticles::OnRender()
 	m_LastScreenH = SY1 - SY0;
 	m_HasLastScreenSize = true;
 
-	RenderParticles(VMinX, VMaxX, VMinY, VMaxY, BaseAlpha, FadeIn, FadeOut);
+	RenderParticles(VMinX, VMaxX, VMinY, VMaxY, BaseAlpha, FadeIn, FadeOut, Lod);
 }
 
-void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, float VMaxY, float BaseAlpha, float FadeIn, float FadeOut)
+void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, float VMaxY, float BaseAlpha, float FadeIn, float FadeOut, float Lod)
 {
 	if(m_vParticles.empty())
 		return;
 
 	Graphics()->TextureClear();
 
-	const bool GlowEnabled = g_Config.m_Ma3dParticlesGlow != 0;
+	const bool LowDetail = g_Config.m_MaPerformanceGuard && Lod < 0.62f;
+	const bool GlowEnabled = g_Config.m_Ma3dParticlesGlow != 0 && (!g_Config.m_MaPerformanceGuard || Lod >= 0.72f);
 	const float GlowAlpha = std::clamp(g_Config.m_Ma3dParticlesGlowAlpha / 100.0f, 0.0f, 1.0f);
 	const float GlowOffset = (float)g_Config.m_Ma3dParticlesGlowOffset;
 	const vec3 GlowOffsetVec(-GlowOffset, -GlowOffset, 0.0f);
@@ -601,12 +621,13 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 
 		const SRotation Rot = MakeRotation(Part.m_Rot);
 		const float Scale = RenderSize * ScaleMul;
-		const float LayerStep = SHAPE_LAYERS > 1 ? 2.0f / (float)(SHAPE_LAYERS - 1) : 0.0f;
+		const int RenderLayers = LowDetail ? 1 : SHAPE_LAYERS;
+		const float LayerStep = RenderLayers > 1 ? 2.0f / (float)(RenderLayers - 1) : 0.0f;
 		std::array<std::array<vec2, MAX_SHAPE_POINTS>, SHAPE_LAYERS> aProjected;
 		std::array<float, SHAPE_LAYERS> aLayerZ;
-		for(int L = 0; L < SHAPE_LAYERS; L++)
+		for(int L = 0; L < RenderLayers; L++)
 		{
-			const float LayerT = -1.0f + LayerStep * (float)L;
+			const float LayerT = RenderLayers > 1 ? -1.0f + LayerStep * (float)L : 0.0f;
 			const float Z = LayerT * (RenderSize * Thickness);
 			aLayerZ[L] = Z;
 			const float LayerScale = 1.0f - std::abs(LayerT) * 0.08f;
@@ -619,7 +640,7 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 		}
 
 		const int RingLineCount = Closed ? NumPoints : NumPoints - 1;
-		for(int L = 0; L < SHAPE_LAYERS; L++)
+		for(int L = 0; L < RenderLayers; L++)
 		{
 			std::array<IGraphics::CLineItem, MAX_SHAPE_POINTS> aRingLines;
 			for(int i = 0; i < RingLineCount; i++)
@@ -630,7 +651,10 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 			Graphics()->LinesDraw(aRingLines.data(), RingLineCount);
 		}
 
-		for(int L = 0; L < SHAPE_LAYERS - 1; L++)
+		if(RenderLayers <= 1)
+			return;
+
+		for(int L = 0; L < RenderLayers - 1; L++)
 		{
 			std::array<IGraphics::CLineItem, MAX_SHAPE_POINTS> aVertical;
 			for(int i = 0; i < NumPoints; i++)
@@ -649,7 +673,7 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 		if(CenterSpokes && Closed)
 		{
 			const int Front = 0;
-			const int Back = SHAPE_LAYERS - 1;
+			const int Back = RenderLayers - 1;
 			const vec2 CenterFront = ProjectPoint(RotateWith(vec3(0.0f, 0.0f, aLayerZ[Front]), Rot) + RenderPos, Center);
 			const vec2 CenterBack = ProjectPoint(RotateWith(vec3(0.0f, 0.0f, aLayerZ[Back]), Rot) + RenderPos, Center);
 			std::array<IGraphics::CLineItem, MAX_SHAPE_POINTS> aFront;
@@ -691,12 +715,13 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 		const SRotation Rot = MakeRotation(Part.m_Rot);
 		const auto &Verts = HeartLowVertices();
 		const float Scale = RenderSize * 0.055f;
-		const float LayerStep = SHAPE_LAYERS > 1 ? 2.0f / (float)(SHAPE_LAYERS - 1) : 0.0f;
+		const int RenderLayers = LowDetail ? 1 : SHAPE_LAYERS;
+		const float LayerStep = RenderLayers > 1 ? 2.0f / (float)(RenderLayers - 1) : 0.0f;
 		std::array<std::array<vec2, HEART_LOW_POINTS>, SHAPE_LAYERS> aProjected;
 		std::array<float, SHAPE_LAYERS> aLayerZ;
-		for(int L = 0; L < SHAPE_LAYERS; L++)
+		for(int L = 0; L < RenderLayers; L++)
 		{
-			const float LayerT = -1.0f + LayerStep * (float)L;
+			const float LayerT = RenderLayers > 1 ? -1.0f + LayerStep * (float)L : 0.0f;
 			const float Z = LayerT * (RenderSize * HEART_THICKNESS);
 			aLayerZ[L] = Z;
 			const float LayerScale = 1.0f - std::abs(LayerT) * 0.08f;
@@ -708,7 +733,7 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 			}
 		}
 
-		for(int L = 0; L < SHAPE_LAYERS; L++)
+		for(int L = 0; L < RenderLayers; L++)
 		{
 			std::array<IGraphics::CLineItem, HEART_LOW_POINTS> aRingLines;
 			for(int i = 0; i < HEART_LOW_POINTS; i++)
@@ -719,7 +744,10 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 			Graphics()->LinesDraw(aRingLines.data(), aRingLines.size());
 		}
 
-		for(int L = 0; L < SHAPE_LAYERS - 1; L++)
+		if(RenderLayers <= 1)
+			return;
+
+		for(int L = 0; L < RenderLayers - 1; L++)
 		{
 			std::array<IGraphics::CLineItem, HEART_LOW_POINTS> aVertical;
 			std::array<IGraphics::CLineItem, HEART_LOW_POINTS> aDiagonal;
@@ -734,7 +762,7 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 		}
 
 		const int Front = 0;
-		const int Back = SHAPE_LAYERS - 1;
+		const int Back = RenderLayers - 1;
 		const vec2 CenterFront = ProjectPoint(RotateWith(vec3(0.0f, 0.0f, aLayerZ[Front]), Rot) + RenderPos, Center);
 		const vec2 CenterBack = ProjectPoint(RotateWith(vec3(0.0f, 0.0f, aLayerZ[Back]), Rot) + RenderPos, Center);
 		std::array<IGraphics::CLineItem, HEART_LOW_POINTS> aFront;
@@ -753,12 +781,13 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 
 		const SRotation Rot = MakeRotation(Part.m_Rot);
 		const float Scale = RenderSize * 0.98f;
-		const float LayerStep = SHAPE_LAYERS > 1 ? 2.0f / (float)(SHAPE_LAYERS - 1) : 0.0f;
+		const int RenderLayers = LowDetail ? 1 : SHAPE_LAYERS;
+		const float LayerStep = RenderLayers > 1 ? 2.0f / (float)(RenderLayers - 1) : 0.0f;
 		std::array<std::array<vec2, STAR_POINTS>, SHAPE_LAYERS> aProjected;
 		std::array<float, SHAPE_LAYERS> aLayerZ;
-		for(int L = 0; L < SHAPE_LAYERS; L++)
+		for(int L = 0; L < RenderLayers; L++)
 		{
-			const float LayerT = -1.0f + LayerStep * (float)L;
+			const float LayerT = RenderLayers > 1 ? -1.0f + LayerStep * (float)L : 0.0f;
 			const float Z = LayerT * (RenderSize * STAR_THICKNESS);
 			aLayerZ[L] = Z;
 			const float LayerScale = 1.0f - std::abs(LayerT) * 0.08f;
@@ -770,7 +799,7 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 			}
 		}
 
-		for(int L = 0; L < SHAPE_LAYERS; L++)
+		for(int L = 0; L < RenderLayers; L++)
 		{
 			std::array<IGraphics::CLineItem, STAR_POINTS> aRingLines;
 			for(int i = 0; i < STAR_POINTS; i++)
@@ -781,7 +810,10 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 			Graphics()->LinesDraw(aRingLines.data(), aRingLines.size());
 		}
 
-		for(int L = 0; L < SHAPE_LAYERS - 1; L++)
+		if(RenderLayers <= 1)
+			return;
+
+		for(int L = 0; L < RenderLayers - 1; L++)
 		{
 			std::array<IGraphics::CLineItem, STAR_POINTS> aVertical;
 			std::array<IGraphics::CLineItem, STAR_POINTS> aDiagonal;
@@ -796,7 +828,7 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 		}
 
 		const int Front = 0;
-		const int Back = SHAPE_LAYERS - 1;
+		const int Back = RenderLayers - 1;
 		const vec2 CenterFront = ProjectPoint(RotateWith(vec3(0.0f, 0.0f, aLayerZ[Front]), Rot) + RenderPos, Center);
 		const vec2 CenterBack = ProjectPoint(RotateWith(vec3(0.0f, 0.0f, aLayerZ[Back]), Rot) + RenderPos, Center);
 		std::array<IGraphics::CLineItem, STAR_POINTS> aFront;
@@ -932,9 +964,10 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 			return vec2(P.x * C - P.y * S, P.x * S + P.y * C);
 		};
 
-		for(int Arm = 0; Arm < 6; Arm++)
+		const int Arms = LowDetail ? 3 : 6;
+		for(int Arm = 0; Arm < Arms; Arm++)
 		{
-			const float A = (2.0f * pi * (float)Arm) / 6.0f;
+			const float A = (2.0f * pi * (float)Arm) / (float)Arms;
 			const vec2 End = Rotate2D(vec2(0.0f, -1.0f), A);
 			const std::array<vec3, 2> aMain = { {vec3(0.0f, 0.0f, 0.0f), vec3(End.x, End.y, 0.0f)} };
 			DrawExtrudedPolyline(Part, RenderPos, RenderSize, FinalAlpha, aMain.data(), (int)aMain.size(), false, 0.92f, 0.08f, false);

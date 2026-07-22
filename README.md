@@ -1,4 +1,4 @@
-# MΛ ツ Client 2.1.4
+# MΛ ツ Client 2.1.5
 
 Cliente personalizado basado en DDNet/TClient para Windows x64, preparado para descargar, extraer y jugar.
 
@@ -8,7 +8,7 @@ Repositorio oficial: [thecoderma69/M-client](https://github.com/thecoderma69/M-c
 
 MΛ ツ Client es una version modificada del cliente DDNet con mejoras visuales, opciones de personalizacion, herramientas de comodidad y recursos propios.
 
-La version 2.1.4 agrega modelos reales para el HUD de teclas y mantiene las opciones principales distribuidas entre `MΛ ツ`, `Visual` y `Recursos`.
+La version 2.1.5 agrega proteccion automatica de FPS y optimizaciones para que los efectos visuales se adapten mejor a diferentes PCs.
 
 ## Descargar
 
@@ -19,7 +19,7 @@ El juego listo para usar esta en:
 Descarga:
 
 ```txt
-M-Client-v2.1.4-win64.zip
+M-Client-v2.1.5-win64.zip
 ```
 
 Luego extrae el `.zip` y abre:
@@ -35,6 +35,15 @@ El codigo fuente esta en:
 ```txt
 M-source/
 ```
+
+## Novedades De La Version 2.1.5
+
+- Nueva `Proteccion automatica de FPS` en `MΛ ツ > Configuracion > Optimizer`.
+- Ajustes de rendimiento para particulas 3D, estela tee, clima y efecto musica video.
+- Las particulas 3D reducen detalle, glow y cantidad automaticamente cuando el FPS baja.
+- La estela tee baja carga en mapas pesados y limita estelas de otros jugadores si el rendimiento cae.
+- El clima respeta la opcion de desactivar particulas y reduce spawn automaticamente.
+- Texto del menu principal actualizado a `MΛ ツ 2.1.5`.
 
 ## Novedades De La Version 2.1.4
 
@@ -200,7 +209,7 @@ Desde `MΛ ツ > Visual` puedes recargar la lista, elegir la imagen y ajustar ta
 ## Estructura De La Descarga
 
 ```txt
-M-Client-v2.1.4-win64/
+M-Client-v2.1.5-win64/
 |-- data/                 # Archivos de datos y recursos del cliente
 |-- DDNet.exe             # Ejecutable principal
 |-- DDNet-Server.exe      # Ejecutable del servidor

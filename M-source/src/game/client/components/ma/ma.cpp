@@ -87,17 +87,26 @@ static float MusicVideoBaseShape(float Angle)
 
 static float PerformanceLodScale(float Delta)
 {
+	float Lod = 1.0f;
 	if(Delta <= 0.0f)
-		return 1.0f;
+		return Lod;
 	if(Delta > 1.0f / 180.0f)
-		return 0.35f;
-	if(Delta > 1.0f / 300.0f)
-		return 0.50f;
-	if(Delta > 1.0f / 500.0f)
-		return 0.68f;
-	if(Delta > 1.0f / 750.0f)
-		return 0.84f;
-	return 1.0f;
+		Lod = 0.35f;
+	else if(Delta > 1.0f / 300.0f)
+		Lod = 0.50f;
+	else if(Delta > 1.0f / 500.0f)
+		Lod = 0.68f;
+	else if(Delta > 1.0f / 750.0f)
+		Lod = 0.84f;
+
+	if(g_Config.m_MaPerformanceGuard)
+	{
+		const int TargetFps = std::clamp(g_Config.m_MaPerformanceGuardTargetFps, 60, 1000);
+		const float TargetDelta = 1.0f / (float)TargetFps;
+		if(Delta > TargetDelta)
+			Lod = std::min(Lod, std::clamp(TargetDelta / Delta, 0.35f, 1.0f));
+	}
+	return Lod;
 }
 
 static bool IsLocalClientId(CGameClient *pGameClient, int ClientId)

@@ -146,6 +146,8 @@ namespace HudLayout
 			case MODULE_KEYSTROKES_MOUSE:
 				return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
 			case MODULE_MA_SPECTATORS:
+				if(HasRuntimeOverrideInternal(Module))
+					return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
 				return {(float)g_Config.m_MaSpectatorPanelHudX, (float)g_Config.m_MaSpectatorPanelHudY, g_Config.m_MaSpectatorPanelHudScale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
 			default:
 				return Runtime;

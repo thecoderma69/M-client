@@ -22,17 +22,26 @@ static float ApproachTrailValue(float Current, float Target, float Delta, float 
 
 static float TrailPerformanceLodScale(float Delta)
 {
+	float Lod = 1.0f;
 	if(Delta <= 0.0f)
-		return 1.0f;
+		return Lod;
 	if(Delta > 1.0f / 180.0f)
-		return 0.35f;
-	if(Delta > 1.0f / 300.0f)
-		return 0.50f;
-	if(Delta > 1.0f / 500.0f)
-		return 0.68f;
-	if(Delta > 1.0f / 750.0f)
-		return 0.84f;
-	return 1.0f;
+		Lod = 0.35f;
+	else if(Delta > 1.0f / 300.0f)
+		Lod = 0.50f;
+	else if(Delta > 1.0f / 500.0f)
+		Lod = 0.68f;
+	else if(Delta > 1.0f / 750.0f)
+		Lod = 0.84f;
+
+	if(g_Config.m_MaPerformanceGuard)
+	{
+		const int TargetFps = std::clamp(g_Config.m_MaPerformanceGuardTargetFps, 60, 1000);
+		const float TargetDelta = 1.0f / (float)TargetFps;
+		if(Delta > TargetDelta)
+			Lod = std::min(Lod, std::clamp(TargetDelta / Delta, 0.35f, 1.0f));
+	}
+	return Lod;
 }
 
 template<std::size_t NumPoints>
@@ -427,6 +436,11 @@ void CTrails::OnRender()
 		ResetMusicReaction();
 		return;
 	}
+	if(GameClient()->OptimizerDisableParticles())
+	{
+		ResetMusicReaction();
+		return;
+	}
 
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 	{
@@ -468,6 +482,8 @@ void CTrails::OnRender()
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
 	{
 		const bool Local = GameClient()->m_Snap.m_LocalClientId == ClientId;
+		if(!Local && g_Config.m_MaPerformanceGuard && Lod < 0.55f)
+			continue;
 
 		const bool ZoomAllowed = GameClient()->m_Camera.ZoomAllowed();
 		if(!g_Config.m_TcTeeTrailOthers && !Local)
@@ -548,6 +564,11 @@ void CTrails::OnRender()
 			TrailLength = std::clamp(round_to_int(TrailLength * (0.38f + 0.62f * Lod)), 5, TrailLength);
 		else if(Lod < 0.55f)
 			TrailLength = std::min(TrailLength, 120);
+		if(g_Config.m_MaPerformanceGuard)
+		{
+			const int GuardMaxLength = Local ? std::clamp(round_to_int(90.0f * Lod), 18, 110) : std::clamp(round_to_int(45.0f * Lod), 8, 60);
+			TrailLength = std::min(TrailLength, GuardMaxLength);
+		}
 		float Width = g_Config.m_TcTeeTrailWidth;
 
 		static std::vector<CTrailPart> s_Trail;

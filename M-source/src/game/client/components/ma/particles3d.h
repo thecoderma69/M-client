@@ -60,7 +60,7 @@ private:
 	void ResetMusicReaction();
 	float UpdateMusicReaction(float Delta);
 	bool ShouldRender() const;
-	void RenderParticles(float VMinX, float VMaxX, float VMinY, float VMaxY, float BaseAlpha, float FadeIn, float FadeOut);
+	void RenderParticles(float VMinX, float VMaxX, float VMinY, float VMaxY, float BaseAlpha, float FadeIn, float FadeOut, float Lod);
 
 	static vec3 RotateVec3(const vec3 &V, float Cx, float Sx, float Cy, float Sy, float Cz, float Sz);
 	static vec2 ProjectPoint(const vec3 &Pos, const vec2 &Center);

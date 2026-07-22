@@ -22,6 +22,8 @@
 namespace
 {
 	constexpr float SNAP_THRESHOLD = 6.0f;
+	constexpr float CENTER_SNAP_THRESHOLD = 10.0f;
+	constexpr float DRAG_START_THRESHOLD = 0.25f;
 	constexpr float SETTINGS_POPUP_WIDTH = 210.0f;
 	constexpr float SETTINGS_POPUP_HEIGHT = 120.0f;
 	constexpr float MUSIC_PLAYER_SETTINGS_POPUP_EXTRA_HEIGHT = 50.0f;
@@ -297,9 +299,9 @@ bool CHudEditor::IsResizableModule(HudLayout::EModule Module) const
 int CHudEditor::GetModuleScale(HudLayout::EModule Module) const
 {
 	if(Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD)
-		return std::clamp(g_Config.m_TcKeystrokeHudSize, 50, 200);
+		return std::clamp(g_Config.m_TcKeystrokeHudSize, 1, 200);
 	if(Module == HudLayout::MODULE_KEYSTROKES_MOUSE)
-		return std::clamp(g_Config.m_TcKeystrokeHudMouseSize, 50, 200);
+		return std::clamp(g_Config.m_TcKeystrokeHudMouseSize, 1, 200);
 	return HudLayout::Get(Module, HudWidth(), HudHeight()).m_Scale;
 }
 
@@ -307,12 +309,12 @@ void CHudEditor::SetModuleScale(HudLayout::EModule Module, int Scale)
 {
 	if(Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD)
 	{
-		g_Config.m_TcKeystrokeHudSize = std::clamp(Scale, 50, 200);
+		g_Config.m_TcKeystrokeHudSize = std::clamp(Scale, 1, 200);
 		return;
 	}
 	if(Module == HudLayout::MODULE_KEYSTROKES_MOUSE)
 	{
-		g_Config.m_TcKeystrokeHudMouseSize = std::clamp(Scale, 50, 200);
+		g_Config.m_TcKeystrokeHudMouseSize = std::clamp(Scale, 1, 200);
 		return;
 	}
 	HudLayout::SetScale(Module, Scale);
@@ -701,34 +703,53 @@ CUIRect CHudEditor::SnapRect(const CUIRect &Rect, HudLayout::EModule DraggedModu
 	float BestDeltaY = SNAP_THRESHOLD + 1.0f;
 	const float Width = HudWidth();
 	const float Height = HudHeight();
+	const float ScreenCenterDeltaX = Width * 0.5f - (Result.x + Result.w * 0.5f);
+	const float ScreenCenterDeltaY = Height * 0.5f - (Result.y + Result.h * 0.5f);
+	const bool SnapToScreenCenterX = absolute(ScreenCenterDeltaX) <= CENTER_SNAP_THRESHOLD;
+	const bool SnapToScreenCenterY = absolute(ScreenCenterDeltaY) <= CENTER_SNAP_THRESHOLD;
 
-	TrySnap(Result.x, 0.0f, BestDeltaX);
-	TrySnap(Result.x + Result.w, Width, BestDeltaX);
-	TrySnap(Result.x + Result.w * 0.5f, Width * 0.5f, BestDeltaX);
-	TrySnap(Result.y, 0.0f, BestDeltaY);
-	TrySnap(Result.y + Result.h, Height, BestDeltaY);
-	TrySnap(Result.y + Result.h * 0.5f, Height * 0.5f, BestDeltaY);
+	if(SnapToScreenCenterX)
+		BestDeltaX = ScreenCenterDeltaX;
+	else
+	{
+		TrySnap(Result.x, 0.0f, BestDeltaX);
+		TrySnap(Result.x + Result.w, Width, BestDeltaX);
+	}
+
+	if(SnapToScreenCenterY)
+		BestDeltaY = ScreenCenterDeltaY;
+	else
+	{
+		TrySnap(Result.y, 0.0f, BestDeltaY);
+		TrySnap(Result.y + Result.h, Height, BestDeltaY);
+	}
 
 	for(int i = 0; i < Count; ++i)
 	{
 		if(aVisuals[i].m_Module == DraggedModule)
 			continue;
 		const CUIRect &Other = aVisuals[i].m_Rect;
-		TrySnap(Result.x, Other.x, BestDeltaX);
-		TrySnap(Result.x + Result.w, Other.x + Other.w, BestDeltaX);
-		TrySnap(Result.x, Other.x + Other.w, BestDeltaX);
-		TrySnap(Result.x + Result.w, Other.x, BestDeltaX);
-		TrySnap(Result.x + Result.w * 0.5f, Other.x + Other.w * 0.5f, BestDeltaX);
-		TrySnap(Result.y, Other.y, BestDeltaY);
-		TrySnap(Result.y + Result.h, Other.y + Other.h, BestDeltaY);
-		TrySnap(Result.y, Other.y + Other.h, BestDeltaY);
-		TrySnap(Result.y + Result.h, Other.y, BestDeltaY);
-		TrySnap(Result.y + Result.h * 0.5f, Other.y + Other.h * 0.5f, BestDeltaY);
+		if(!SnapToScreenCenterX)
+		{
+			TrySnap(Result.x, Other.x, BestDeltaX);
+			TrySnap(Result.x + Result.w, Other.x + Other.w, BestDeltaX);
+			TrySnap(Result.x, Other.x + Other.w, BestDeltaX);
+			TrySnap(Result.x + Result.w, Other.x, BestDeltaX);
+			TrySnap(Result.x + Result.w * 0.5f, Other.x + Other.w * 0.5f, BestDeltaX);
+		}
+		if(!SnapToScreenCenterY)
+		{
+			TrySnap(Result.y, Other.y, BestDeltaY);
+			TrySnap(Result.y + Result.h, Other.y + Other.h, BestDeltaY);
+			TrySnap(Result.y, Other.y + Other.h, BestDeltaY);
+			TrySnap(Result.y + Result.h, Other.y, BestDeltaY);
+			TrySnap(Result.y + Result.h * 0.5f, Other.y + Other.h * 0.5f, BestDeltaY);
+		}
 	}
 
-	if(absolute(BestDeltaX) <= SNAP_THRESHOLD)
+	if(SnapToScreenCenterX || absolute(BestDeltaX) <= SNAP_THRESHOLD)
 		Result.x += BestDeltaX;
-	if(absolute(BestDeltaY) <= SNAP_THRESHOLD)
+	if(SnapToScreenCenterY || absolute(BestDeltaY) <= SNAP_THRESHOLD)
 		Result.y += BestDeltaY;
 
 	return ClampToBounds(Result, Width, Height);
@@ -742,7 +763,7 @@ void CHudEditor::UpdateDragging(vec2 MousePos)
 	CUIRect NewRect = Visual.m_Rect;
 	NewRect.x = MousePos.x - m_DragMouseOffset.x;
 	NewRect.y = MousePos.y - m_DragMouseOffset.y;
-	if(!Input()->ShiftIsPressed())
+	if(Input()->ShiftIsPressed())
 		NewRect = SnapRect(NewRect, m_PressedModule);
 	else
 		NewRect = ClampToBounds(NewRect, HudWidth(), HudHeight());
@@ -766,7 +787,7 @@ void CHudEditor::UpdateResizing(vec2 MousePos)
 	int MaxScale = 300;
 	if(m_PressedModule == HudLayout::MODULE_KEYSTROKES_KEYBOARD || m_PressedModule == HudLayout::MODULE_KEYSTROKES_MOUSE)
 	{
-		MinScale = 50;
+		MinScale = 1;
 		MaxScale = 200;
 	}
 
@@ -828,7 +849,7 @@ CUi::EPopupMenuFunctionResult CHudEditor::PopupModuleSettings(void *pContext, CU
 		pThis->Ui()->DoLabel(&ScaleLabel, aScale, 8.0f, TEXTALIGN_ML);
 
 		View.HSplitTop(14.0f, &ScaleSlider, &View);
-		const int MinScale = (pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_KEYBOARD || pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_MOUSE) ? 50 : 25;
+		const int MinScale = (pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_KEYBOARD || pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_MOUSE) ? 1 : 25;
 		const int MaxScale = (pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_KEYBOARD || pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_MOUSE) ? 200 : 300;
 		const float Relative = CUi::ms_LinearScrollbarScale.ToRelative(Scale, MinScale, MaxScale);
 		const float NewRelative = pThis->Ui()->DoScrollbarH(&pThis->m_SelectedModule, &ScaleSlider, Relative);
@@ -1321,7 +1342,7 @@ void CHudEditor::OnRender()
 	{
 		if(m_Resizing)
 			UpdateResizing(MousePos);
-		else if(!m_Dragging && distance(m_PressMousePos, MousePos) > 2.0f)
+		else if(!m_Dragging && distance(m_PressMousePos, MousePos) > DRAG_START_THRESHOLD)
 			m_Dragging = true;
 		if(!m_Resizing)
 			UpdateDragging(MousePos);

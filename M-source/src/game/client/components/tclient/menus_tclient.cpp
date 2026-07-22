@@ -4574,7 +4574,13 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 		if(g_Config.m_MaMusicPlayerCustomColors)
 		{
 			static CButtonContainer s_MusicBgColor, s_MusicAccentColor, s_MusicTextColor;
-			DoLine_ColorPicker(&s_MusicBgColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, TCLocalize("Background"), &g_Config.m_MaMusicPlayerColorBg, ColorRGBA(0.05f, 0.05f, 0.08f, 0.8f), false);
+			if(((g_Config.m_MaMusicPlayerColorBg >> 24) & 0xFF) == 0)
+			{
+				ColorHSLA BgColor(g_Config.m_MaMusicPlayerColorBg, false);
+				BgColor.a = 0.80f;
+				g_Config.m_MaMusicPlayerColorBg = BgColor.Pack(true);
+			}
+			DoLine_ColorPicker(&s_MusicBgColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, TCLocalize("Background"), &g_Config.m_MaMusicPlayerColorBg, ColorRGBA(0.05f, 0.05f, 0.08f, 0.8f), false, nullptr, true);
 			DoLine_ColorPicker(&s_MusicAccentColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, TCLocalize("Accent"), &g_Config.m_MaMusicPlayerColorAccent, ColorRGBA(0.23f, 0.51f, 0.96f, 1.0f), false);
 			DoLine_ColorPicker(&s_MusicTextColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, TCLocalize("Text"), &g_Config.m_MaMusicPlayerColorText, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), false);
 		}
@@ -4640,6 +4646,14 @@ void CMenus::RenderMaConfiguracion(CUIRect MainView)
 	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaOptimizer, TCLocalize("Enable optimizer"), &g_Config.m_MaOptimizer, &LeftView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaPerformanceGuard, TCLocalize("Proteccion automatica de FPS"), &g_Config.m_MaPerformanceGuard, &LeftView, LineSize);
+	if(g_Config.m_MaPerformanceGuard)
+	{
+		LeftView.HSplitTop(LineSize, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaPerformanceGuardTargetFps, &g_Config.m_MaPerformanceGuardTargetFps, &Button, TCLocalize("Objetivo FPS"), 60, 1000);
+		LeftView.HSplitTop(LineSize, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaPerformanceGuardMax3dParticles, &g_Config.m_MaPerformanceGuardMax3dParticles, &Button, TCLocalize("Maximo particulas 3D"), 10, 200);
+	}
 	if(g_Config.m_MaOptimizer)
 	{
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaOptimizerFpsFog, TCLocalize("FPS Fog"), &g_Config.m_MaOptimizerFpsFog, &LeftView, LineSize);

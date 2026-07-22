@@ -4038,9 +4038,6 @@ void CChat::OnRender()
 
 		Graphics()->ClipDisable();
 
-		CUIRect TranslateButtonRect = {minimum(ClippingRect.x + ClippingRect.w + TranslateButtonGap, Width - TranslateButtonSize - 5.0f), ClippingRect.y, TranslateButtonSize, TranslateButtonSize};
-		RenderTranslateSettingsButton(TranslateButtonRect);
-
 		// Scroll up or down to keep the caret inside the clipping rect
 		const float CaretPositionY = m_Input.GetCaretPosition().y - ScrollOffsetChange;
 		if(CaretPositionY < ClippingRect.y)
@@ -4071,7 +4068,7 @@ void CChat::OnRender()
 		}
 	}
 
-	if(m_Mode != MODE_NONE && Ui()->IsPopupOpen())
+	if(m_Mode != MODE_NONE && Ui()->IsPopupOpen() && !Ui()->IsPopupOpen(&m_TranslateSettingsPopupId))
 	{
 		Ui()->StartCheck();
 		Ui()->Update();

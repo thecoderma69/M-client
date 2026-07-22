@@ -18,6 +18,9 @@ MACRO_CONFIG_INT(MaCustomAspectRatioDen, ma_custom_aspect_ratio_den, 9, 0, 10000
 
 // ===== OPTIMIZER =====
 MACRO_CONFIG_INT(MaOptimizer, ma_optimizer, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable optimizer for better FPS")
+MACRO_CONFIG_INT(MaPerformanceGuard, ma_performance_guard, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically lower heavy MA visuals when FPS drops")
+MACRO_CONFIG_INT(MaPerformanceGuardTargetFps, ma_performance_guard_target_fps, 240, 60, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Target FPS for the MA automatic performance guard")
+MACRO_CONFIG_INT(MaPerformanceGuardMax3dParticles, ma_performance_guard_max_3d_particles, 80, 10, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum 3D particles while the MA automatic performance guard is enabled")
 MACRO_CONFIG_INT(MaOptimizerFpsFog, ma_optimizer_fps_fog, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cull non-map rendering outside a distance limit around the camera")
 MACRO_CONFIG_INT(MaOptimizerFpsFogMode, ma_optimizer_fps_fog_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "FPS fog mode (0=manual radius tiles, 1=by zoom percent)")
 MACRO_CONFIG_INT(MaOptimizerFpsFogRadiusTiles, ma_optimizer_fps_fog_radius_tiles, 40, 5, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "FPS fog manual radius in tiles (tile=32 units)")

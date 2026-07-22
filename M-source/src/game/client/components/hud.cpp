@@ -2693,8 +2693,19 @@ CUIRect CHud::GetKeystrokesKeyboardHudEditorRect(float Width, float Height) cons
 	float SpaceH = 22.0f * Scale;
 	float KeyTotalW = KeyW * 2.0f + Gap;
 	float KeyTotalH = KeyH + Gap + SpaceH;
-	float KeyPosX = Width * (g_Config.m_TcKeystrokeHudPosX / 100.0f);
-	float KeyPosY = Height * (g_Config.m_TcKeystrokeHudPosY / 100.0f);
+	float KeyPosX;
+	float KeyPosY;
+	if(HudLayout::HasRuntimeOverride(HudLayout::MODULE_KEYSTROKES_KEYBOARD))
+	{
+		const auto Layout = HudLayout::Get(HudLayout::MODULE_KEYSTROKES_KEYBOARD, Width, Height);
+		KeyPosX = Layout.m_X;
+		KeyPosY = Layout.m_Y;
+	}
+	else
+	{
+		KeyPosX = Width * (g_Config.m_TcKeystrokeHudPosX / 100.0f);
+		KeyPosY = Height * (g_Config.m_TcKeystrokeHudPosY / 100.0f);
+	}
 	return {KeyPosX, KeyPosY, KeyTotalW, KeyTotalH};
 }
 
@@ -2706,8 +2717,19 @@ CUIRect CHud::GetKeystrokesMouseHudEditorRect(float Width, float Height) const
 	float MouseGap = 6.0f * Scale;
 	float MouseTotalW = MouseW * 2.0f + MouseGap;
 	float MouseTotalH = MouseH;
-	float MousePosX = Width * (g_Config.m_TcKeystrokeHudMousePosX / 100.0f);
-	float MousePosY = Height * (g_Config.m_TcKeystrokeHudMousePosY / 100.0f);
+	float MousePosX;
+	float MousePosY;
+	if(HudLayout::HasRuntimeOverride(HudLayout::MODULE_KEYSTROKES_MOUSE))
+	{
+		const auto Layout = HudLayout::Get(HudLayout::MODULE_KEYSTROKES_MOUSE, Width, Height);
+		MousePosX = Layout.m_X;
+		MousePosY = Layout.m_Y;
+	}
+	else
+	{
+		MousePosX = Width * (g_Config.m_TcKeystrokeHudMousePosX / 100.0f);
+		MousePosY = Height * (g_Config.m_TcKeystrokeHudMousePosY / 100.0f);
+	}
 	return {MousePosX, MousePosY, MouseTotalW, MouseTotalH};
 }
 
@@ -2737,7 +2759,7 @@ void CHud::RenderKeystrokesKeyboardPreview()
 	CUIRect Rect = GetKeystrokesKeyboardHudEditorRect(ScreenW, ScreenH);
 	Graphics()->MapScreen(0.0f, 0.0f, ScreenW, ScreenH);
 	float Scale = g_Config.m_TcKeystrokeHudSize / 100.0f;
-	ColorRGBA C = ColorRGBA(0.9f, 0.9f, 0.9f, g_Config.m_TcKeystrokeHudAlpha / 100.0f);
+	ColorRGBA C = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_TcKeystrokeHudColorUnpressed)).WithAlpha(g_Config.m_TcKeystrokeHudAlpha / 100.0f);
 	float KeyW = 40.0f * Scale;
 	float KeyH = 40.0f * Scale;
 	float Gap = 6.0f * Scale;
@@ -2756,7 +2778,7 @@ void CHud::RenderKeystrokesMousePreview()
 	CUIRect Rect = GetKeystrokesMouseHudEditorRect(ScreenW, ScreenH);
 	Graphics()->MapScreen(0.0f, 0.0f, ScreenW, ScreenH);
 	float Scale = g_Config.m_TcKeystrokeHudMouseSize / 100.0f;
-	ColorRGBA C = ColorRGBA(0.9f, 0.9f, 0.9f, g_Config.m_TcKeystrokeHudAlpha / 100.0f);
+	ColorRGBA C = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_TcKeystrokeHudColorUnpressed)).WithAlpha(g_Config.m_TcKeystrokeHudAlpha / 100.0f);
 	float MouseW = 40.0f * Scale;
 	float MouseH = 40.0f * Scale;
 	float MouseGap = 6.0f * Scale;

@@ -1576,6 +1576,27 @@ namespace
 		return DefaultPreviewAccentForColorMode(g_Config.m_MaMusicPlayerColorMode);
 	}
 
+	static ColorRGBA MusicPlayerCustomBackgroundColor()
+	{
+		ColorHSLA Color(g_Config.m_MaMusicPlayerColorBg, true);
+		if(((g_Config.m_MaMusicPlayerColorBg >> 24) & 0xFF) == 0)
+		{
+			Color = ColorHSLA(g_Config.m_MaMusicPlayerColorBg, false);
+			Color.a = 0.80f;
+		}
+		return color_cast<ColorRGBA>(Color);
+	}
+
+	static ColorRGBA MusicPlayerCustomAccentColor()
+	{
+		return color_cast<ColorRGBA>(ColorHSLA(g_Config.m_MaMusicPlayerColorAccent));
+	}
+
+	static ColorRGBA MusicPlayerCustomTextColor()
+	{
+		return color_cast<ColorRGBA>(ColorHSLA(g_Config.m_MaMusicPlayerColorText));
+	}
+
 	static SMusicPlayerPalette DefaultMusicPlayerThemePalette()
 	{
 		return BuildPaletteFromAccent(DefaultMusicPlayerAccent());
@@ -1583,6 +1604,9 @@ namespace
 
 	static ColorRGBA MusicPlayerPanelColor(unsigned BackgroundColor, bool BackgroundEnabled, const SMusicPlayerPalette &Palette, float HoverT)
 	{
+		if(g_Config.m_MaMusicPlayerCustomColors)
+			return MusicPlayerCustomBackgroundColor();
+
 		ColorRGBA LayoutColor = color_cast<ColorRGBA>(ColorHSLA(BackgroundColor, true));
 		if(!BackgroundEnabled)
 			LayoutColor = ColorRGBA(0.12f, 0.13f, 0.16f, 0.72f);
@@ -3223,9 +3247,9 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 		const bool Playing = Snapshot.m_PlaybackState == EMusicPlaybackState::PLAYING;
 		const std::string Title = Snapshot.m_Title.empty() ? TCLocalize("No media") : Snapshot.m_Title;
 		const std::string Artist = Snapshot.m_Artist.empty() ? TCLocalize("Unknown artist") : Snapshot.m_Artist;
-		const ColorRGBA BgColor = g_Config.m_MaMusicPlayerCustomColors ? color_cast<ColorRGBA>(ColorHSLA(g_Config.m_MaMusicPlayerColorBg)) : ColorRGBA(0.12f, 0.12f, 0.16f, 0.88f);
-		const ColorRGBA AccentColor = g_Config.m_MaMusicPlayerCustomColors ? color_cast<ColorRGBA>(ColorHSLA(g_Config.m_MaMusicPlayerColorAccent)) : ColorRGBA(0.23f, 0.51f, 0.96f, 1.0f);
-		const ColorRGBA TxtColor = g_Config.m_MaMusicPlayerCustomColors ? color_cast<ColorRGBA>(ColorHSLA(g_Config.m_MaMusicPlayerColorText)) : ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+		const ColorRGBA BgColor = g_Config.m_MaMusicPlayerCustomColors ? MusicPlayerCustomBackgroundColor() : ColorRGBA(0.12f, 0.12f, 0.16f, 0.88f);
+		const ColorRGBA AccentColor = g_Config.m_MaMusicPlayerCustomColors ? MusicPlayerCustomAccentColor() : ColorRGBA(0.23f, 0.51f, 0.96f, 1.0f);
+		const ColorRGBA TxtColor = g_Config.m_MaMusicPlayerCustomColors ? MusicPlayerCustomTextColor() : ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 		const float Scl = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
 		const float TScl = (float)g_Config.m_MaMusicPlayerTextScale / 100.0f;
 		const float SS = Scl * TScl;
@@ -3381,15 +3405,15 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 						    m_pImpl->m_Palette;
 	if(g_Config.m_MaMusicPlayerCustomColors)
 	{
-		ColorRGBA CustomBg = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_MaMusicPlayerColorBg));
-		ColorRGBA CustomAccent = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_MaMusicPlayerColorAccent));
-		ColorRGBA CustomText = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_MaMusicPlayerColorText));
+		ColorRGBA CustomBg = MusicPlayerCustomBackgroundColor();
+		ColorRGBA CustomAccent = MusicPlayerCustomAccentColor();
+		ColorRGBA CustomText = MusicPlayerCustomTextColor();
 		Palette.m_Light = CustomText;
 		Palette.m_Mid = MixColor(CustomBg, CustomAccent, 0.5f);
 		Palette.m_Dark = CustomBg;
 		Palette.m_Glow = CustomAccent;
 	}
-	const bool TranslucentColorMode = g_Config.m_MaMusicPlayerColorMode == 3;
+	const bool TranslucentColorMode = g_Config.m_MaMusicPlayerColorMode == 3 && !g_Config.m_MaMusicPlayerCustomColors;
 	const bool CoverColorMode = g_Config.m_MaMusicPlayerColorMode == 1 || g_Config.m_MaMusicPlayerColorMode == 2;
 	const bool DominantColorMode = g_Config.m_MaMusicPlayerColorMode == 2;
 	ColorRGBA PanelColor = MusicPlayerPanelColor(BackgroundColor, BackgroundEnabled, Palette, HoverT);
@@ -3628,7 +3652,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	Props.m_MaxWidth = UiTextArea.w;
 
 	Ui()->MapScreen();
-	ColorRGBA TitleColor = WithAlpha(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), 0.98f);
+	ColorRGBA TitleColor = WithAlpha(g_Config.m_MaMusicPlayerCustomColors ? MusicPlayerCustomTextColor() : ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), 0.98f);
 	if(ShowGameTimer && GameTimer.m_Warning)
 		TitleColor = ColorRGBA(1.0f, 0.25f, 0.25f, GameTimer.m_Blink ? 0.5f : 1.0f);
 	TextRender()->TextColor(TitleColor);

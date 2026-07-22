@@ -344,7 +344,7 @@ MACRO_CONFIG_INT(TcVisualsZoomLevel, tc_visuals_zoom_level, 10, 1, 20, CFGFLAG_C
 MACRO_CONFIG_INT(TcKeystrokeHud, tc_keystroke_hud, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable keystroke HUD overlay (A, D, Space)")
 MACRO_CONFIG_INT(TcKeystrokeHudPosX, tc_keystroke_hud_pos_x, 5, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keystroke HUD horizontal position (% of screen)")
 MACRO_CONFIG_INT(TcKeystrokeHudPosY, tc_keystroke_hud_pos_y, 70, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keystroke HUD vertical position (% of screen)")
-MACRO_CONFIG_INT(TcKeystrokeHudSize, tc_keystroke_hud_size, 100, 50, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keystroke HUD size scale (50-200)")
+MACRO_CONFIG_INT(TcKeystrokeHudSize, tc_keystroke_hud_size, 100, 1, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keystroke HUD size scale (1-200)")
 MACRO_CONFIG_INT(TcKeystrokeHudAlpha, tc_keystroke_hud_alpha, 80, 10, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keystroke HUD opacity (10-100)")
 MACRO_CONFIG_INT(TcKeystrokeHudStyle, tc_keystroke_hud_style, 0, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keystroke HUD visual model (0=normal, 1=round, 2=diamond, 3=hexagon)")
 MACRO_CONFIG_COL(TcKeystrokeHudColorPressed, tc_keystroke_hud_color_pressed, 4278190335, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Keystroke HUD key pressed color")
@@ -355,7 +355,7 @@ MACRO_CONFIG_INT(TcKeystrokeHudOnlyOnPress, tc_keystroke_hud_only_on_press, 0, 0
 MACRO_CONFIG_INT(TcKeystrokeHudShowMouse, tc_keystroke_hud_show_mouse, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show mouse click indicators on keystroke HUD")
 MACRO_CONFIG_INT(TcKeystrokeHudMousePosX, tc_keystroke_hud_mouse_pos_x, 5, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Mouse click HUD horizontal position (% of screen)")
 MACRO_CONFIG_INT(TcKeystrokeHudMousePosY, tc_keystroke_hud_mouse_pos_y, 80, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Mouse click HUD vertical position (% of screen)")
-MACRO_CONFIG_INT(TcKeystrokeHudMouseSize, tc_keystroke_hud_mouse_size, 100, 50, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Mouse click HUD size scale (50-200)")
+MACRO_CONFIG_INT(TcKeystrokeHudMouseSize, tc_keystroke_hud_mouse_size, 100, 1, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Mouse click HUD size scale (1-200)")
 MACRO_CONFIG_INT(TcKeystrokeHudMouseStyle, tc_keystroke_hud_mouse_style, 0, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Mouse click HUD visual model (0=normal, 1=round, 2=diamond, 3=hexagon)")
 MACRO_CONFIG_INT(TcKeystrokeHudEditMode, tc_keystroke_hud_edit_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable drag-to-move mode for keystroke HUD")
 
