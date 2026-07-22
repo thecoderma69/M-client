@@ -39,6 +39,7 @@ namespace HudLayout
 			{96.0f, 182.0f, 100, 0, true, false, 0x66000000U},
 			{150.0f, 50.0f, 100, 0, true, false, 0x66000000U},
 			{250.0f, 11.0f, 100, 0, true, false, 0x66000000U},
+			{370.0f, 72.0f, 100, 0, true, true, 0xAA050510U},
 		};
 
 		static SModuleLayout gs_aRuntimeModuleLayouts[MODULE_COUNT];
@@ -93,6 +94,7 @@ namespace HudLayout
 			"Mouse",
 			"Efecto Musica Video",
 			"Contador congelados",
+			"Espectadores",
 		};
 
 		SModuleLayout ConfigLayout(EModule Module)
@@ -143,6 +145,8 @@ namespace HudLayout
 				return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
 			case MODULE_KEYSTROKES_MOUSE:
 				return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
+			case MODULE_MA_SPECTATORS:
+				return {(float)g_Config.m_MaSpectatorPanelHudX, (float)g_Config.m_MaSpectatorPanelHudY, g_Config.m_MaSpectatorPanelHudScale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
 			default:
 				return Runtime;
 			}
@@ -170,6 +174,11 @@ namespace HudLayout
 			case MODULE_KEYSTROKES_MOUSE:
 				g_Config.m_TcKeystrokeHudMousePosX = (int)(Layout.m_X / HudLayout::CANVAS_WIDTH * 100.0f);
 				g_Config.m_TcKeystrokeHudMousePosY = (int)(Layout.m_Y / HudLayout::CANVAS_HEIGHT * 100.0f);
+				break;
+			case MODULE_MA_SPECTATORS:
+				g_Config.m_MaSpectatorPanelHudX = round_to_int(Layout.m_X);
+				g_Config.m_MaSpectatorPanelHudY = round_to_int(Layout.m_Y);
+				g_Config.m_MaSpectatorPanelHudScale = Layout.m_Scale;
 				break;
 			default:
 				break;

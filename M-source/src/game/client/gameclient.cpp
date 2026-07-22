@@ -906,6 +906,8 @@ void CGameClient::OnRender()
 	if(UseGameNoHudAspect && HudAspectDisabled)
 		Graphics()->SetScreenAspectOverrideEnabled(true);
 
+	m_Chat.RenderTranslateOverlay();
+
 	// clear all events/input for this frame
 	Input()->Clear();
 
@@ -2009,10 +2011,17 @@ void CGameClient::OnNewSnapshot()
 				m_Snap.m_SpecInfo.m_Zoom = pDDNetSpecInfo->m_Zoom / 1000.0f;
 				m_Snap.m_SpecInfo.m_Deadzone = pDDNetSpecInfo->m_Deadzone;
 				m_Snap.m_SpecInfo.m_FollowFactor = pDDNetSpecInfo->m_FollowFactor;
+				if(pDDNetSpecInfo->m_SpectatorCount > 0)
+				{
+					m_Snap.m_HasSpectatorCount = true;
+					m_Snap.m_SpectatorCount = pDDNetSpecInfo->m_SpectatorCount;
+				}
 			}
 			else if(Item.m_Type == NETOBJTYPE_SPECTATORCOUNT)
 			{
 				m_Snap.m_pSpectatorCount = (const CNetObj_SpectatorCount *)Item.m_pData;
+				m_Snap.m_HasSpectatorCount = true;
+				m_Snap.m_SpectatorCount = m_Snap.m_pSpectatorCount->m_NumSpectators;
 			}
 			else if(Item.m_Type == NETOBJTYPE_GAMEINFO)
 			{
@@ -2330,19 +2339,20 @@ void CGameClient::OnNewSnapshot()
 		m_aShowOthers[g_Config.m_ClDummy] = g_Config.m_ClShowOthers;
 	}
 
-	if(m_aEnableSpectatorCount[0] == -1 || m_aEnableSpectatorCount[0] != g_Config.m_ClShowhudSpectatorCount)
+	const int SpectatorCountEnabled = g_Config.m_MaEnabled && g_Config.m_MaSpectatorPanel;
+	if(m_aEnableSpectatorCount[0] == -1 || m_aEnableSpectatorCount[0] != SpectatorCountEnabled)
 	{
 		CNetMsg_Cl_EnableSpectatorCount Msg;
-		Msg.m_Enable = g_Config.m_ClShowhudSpectatorCount;
+		Msg.m_Enable = SpectatorCountEnabled;
 		Client()->SendPackMsg(0, &Msg, MSGFLAG_VITAL);
-		m_aEnableSpectatorCount[0] = g_Config.m_ClShowhudSpectatorCount;
+		m_aEnableSpectatorCount[0] = SpectatorCountEnabled;
 	}
-	if(Client()->DummyConnected() && (m_aEnableSpectatorCount[1] == -1 || m_aEnableSpectatorCount[1] != g_Config.m_ClShowhudSpectatorCount))
+	if(Client()->DummyConnected() && (m_aEnableSpectatorCount[1] == -1 || m_aEnableSpectatorCount[1] != SpectatorCountEnabled))
 	{
 		CNetMsg_Cl_EnableSpectatorCount Msg;
-		Msg.m_Enable = g_Config.m_ClShowhudSpectatorCount;
+		Msg.m_Enable = SpectatorCountEnabled;
 		Client()->SendPackMsg(1, &Msg, MSGFLAG_VITAL);
-		m_aEnableSpectatorCount[1] = g_Config.m_ClShowhudSpectatorCount;
+		m_aEnableSpectatorCount[1] = SpectatorCountEnabled;
 	}
 
 	float ShowDistanceZoom = m_Camera.m_Zoom;

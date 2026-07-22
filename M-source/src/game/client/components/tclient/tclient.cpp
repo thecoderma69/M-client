@@ -139,6 +139,10 @@ void CTClient::OnInit()
 	m_pGraphics = Kernel()->RequestInterface<IEngineGraphics>();
 	m_AspectConfigReady = true;
 	SetForcedAspect();
+	Graphics()->AddWindowPropChangeListener([this]() {
+		if(m_AspectConfigReady)
+			SetForcedAspect();
+	});
 	m_AnimeLoveTexture = Graphics()->LoadTexture("tclient/anime_love_sheet.png", IStorage::TYPE_ALL);
 	FetchTClientInfo();
 	LoadCustomActionSounds();
@@ -1310,7 +1314,7 @@ void CTClient::SetForcedAspect()
 {
 	if(!m_pGraphics)
 		return;
-	// TODO: Fix flashing on windows
+
 	int State = Client()->State();
 	bool Force = true;
 	if(g_Config.m_TcAllowAnyRes == 0)
@@ -1321,6 +1325,37 @@ void CTClient::SetForcedAspect()
 		Force = false;
 	const bool IsActiveGameplay = State == CClient::EClientState::STATE_ONLINE || State == CClient::EClientState::STATE_DEMOPLAYBACK;
 	const bool ApplyCustomAspect = g_Config.m_MaCustomAspectRatioApplyMode == 1 || IsActiveGameplay;
+
+	if(!m_pGraphics->WindowOpen() || !m_pGraphics->WindowActive())
+	{
+		m_ForcedAspectPending = true;
+		return;
+	}
+
+	const int AspectMode = g_Config.m_MaCustomAspectRatioMode;
+	const int AspectRatio = g_Config.m_MaCustomAspectRatio;
+	const int AspectNum = g_Config.m_MaCustomAspectRatioNum;
+	const int AspectDen = g_Config.m_MaCustomAspectRatioDen;
+	if(!m_ForcedAspectPending &&
+		m_ForcedAspectStateValid &&
+		m_LastForcedAspectForce == Force &&
+		m_LastForcedAspectApply == ApplyCustomAspect &&
+		m_LastForcedAspectMode == AspectMode &&
+		m_LastForcedAspectRatio == AspectRatio &&
+		m_LastForcedAspectNum == AspectNum &&
+		m_LastForcedAspectDen == AspectDen)
+	{
+		return;
+	}
+
+	m_ForcedAspectPending = false;
+	m_ForcedAspectStateValid = true;
+	m_LastForcedAspectForce = Force;
+	m_LastForcedAspectApply = ApplyCustomAspect;
+	m_LastForcedAspectMode = AspectMode;
+	m_LastForcedAspectRatio = AspectRatio;
+	m_LastForcedAspectNum = AspectNum;
+	m_LastForcedAspectDen = AspectDen;
 	Graphics()->SetForcedAspect(Force, ApplyCustomAspect);
 }
 

@@ -402,6 +402,8 @@ public:
 		const CNetObj_SpectatorInfo *m_pSpectatorInfo;
 		const CNetObj_SpectatorInfo *m_pPrevSpectatorInfo;
 		const CNetObj_SpectatorCount *m_pSpectatorCount;
+		bool m_HasSpectatorCount;
+		int m_SpectatorCount;
 		int m_NumFlags;
 		const CNetObj_Flag *m_apFlags[CSnapshot::MAX_ITEMS];
 		const CNetObj_Flag *m_apPrevFlags[CSnapshot::MAX_ITEMS];

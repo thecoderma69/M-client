@@ -4082,9 +4082,6 @@ void CChat::OnRender()
 		Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
 	}
 
-	if(m_Mode != MODE_NONE)
-		RenderTools()->RenderCursor(ChatMousePos(), 12.0f);
-
 #if defined(CONF_VIDEORECORDER)
 	if(!((g_Config.m_ClShowChat && !IVideo::Current()) || (g_Config.m_ClVideoShowChat && IVideo::Current())))
 #else
@@ -4442,6 +4439,66 @@ void CChat::SendChatQueued(const char *pLine)
 void CChat::SendTranslatedChatQueued(int Team, const char *pLine)
 {
 	SendChatPayloadQueued(Team, pLine);
+}
+
+void CChat::RenderTranslateOverlay()
+{
+	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+		return;
+
+	const bool TranslatePopupOpen = Ui()->IsPopupOpen(&m_TranslateSettingsPopupId);
+	if(m_Mode == MODE_NONE && !TranslatePopupOpen)
+		return;
+
+	const float Height = 300.0f;
+	const float Width = Height * Graphics()->ScreenAspect();
+	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+
+	if(m_Mode != MODE_NONE && HudLayout::IsEnabled(HudLayout::MODULE_CHAT))
+	{
+		const auto ChatLayout = HudLayout::Get(HudLayout::MODULE_CHAT, Width, Height);
+		const float ChatScale = std::clamp(ChatLayout.m_Scale / 100.0f, 0.25f, 3.0f);
+		float y = ChatLayout.m_Y;
+		float x = ChatLayout.m_X;
+		if(!HudLayout::HasRuntimeOverride(HudLayout::MODULE_CHAT))
+			y = 300.0f - (20.0f * FontSize() / 6.0f + (g_Config.m_TcStatusBar ? g_Config.m_TcStatusBarHeight : 0.0f));
+
+		CTextCursor InputCursor;
+		InputCursor.SetPosition(vec2(x, y));
+		InputCursor.m_FontSize = FontSize() * (8.0f / 6.0f);
+		const float AvailableChatWidth = maximum(80.0f, Width - x - 5.0f);
+		const float DesiredChatWidth = maximum(80.0f, g_Config.m_ClChatWidth * ChatScale);
+		InputCursor.m_LineWidth = minimum(DesiredChatWidth, AvailableChatWidth);
+
+		if(m_Mode == MODE_ALL)
+			TextRender()->TextEx(&InputCursor, Localize("All"));
+		else if(m_Mode == MODE_TEAM)
+			TextRender()->TextEx(&InputCursor, Localize("Team"));
+		else
+			TextRender()->TextEx(&InputCursor, Localize("Chat"));
+		TextRender()->TextEx(&InputCursor, ": ");
+
+		const float TranslateButtonSize = maximum(10.0f, InputCursor.m_FontSize * 0.72f);
+		const float TranslateButtonGap = 2.0f;
+		const float MessageMaxWidth = maximum(40.0f, InputCursor.m_LineWidth - (InputCursor.m_X - InputCursor.m_StartX) - TranslateButtonSize - TranslateButtonGap);
+		const CUIRect ClippingRect = {InputCursor.m_X, InputCursor.m_Y, MessageMaxWidth, 2.25f * InputCursor.m_FontSize};
+		const CUIRect TranslateButtonRect = {minimum(ClippingRect.x + ClippingRect.w + TranslateButtonGap, Width - TranslateButtonSize - 5.0f), ClippingRect.y, TranslateButtonSize, TranslateButtonSize};
+		RenderTranslateSettingsButton(TranslateButtonRect);
+	}
+
+	if(TranslatePopupOpen)
+	{
+		Ui()->StartCheck();
+		Ui()->Update();
+		Ui()->MapScreen();
+		Ui()->RenderPopupMenus();
+		Ui()->FinishCheck();
+		Ui()->ClearHotkeys();
+		Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+	}
+
+	if(m_Mode != MODE_NONE && HudLayout::IsEnabled(HudLayout::MODULE_CHAT))
+		RenderTools()->RenderCursor(ChatMousePos(), 12.0f);
 }
 
 CUIRect CChat::GetHudRect(float Width, float Height, bool ForcePreview) const

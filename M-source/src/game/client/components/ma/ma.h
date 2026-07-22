@@ -41,7 +41,9 @@ class CMa : public CComponent
 	void EnsureMusicVideoCenterImageLoaded();
 	float UpdateMusicVideoEffect(float Delta, bool ForcePreview, bool MusicPlaying, const char *pTitle, const char *pArtist);
 	CUIRect GetMusicVideoEffectRect(float Width, float Height, bool ForcePreview) const;
+	CUIRect GetSpectatorPanelRect(float Width, float Height, bool ForcePreview) const;
 	void RenderMusicVideoEffect(bool ForcePreview);
+	void RenderSpectatorPanel(bool ForcePreview);
 
 	class IEngineGraphics *m_pGraphics = nullptr;
 
@@ -95,6 +97,8 @@ public:
 	CUIRect GetMusicVideoEffectHudEditorRect(bool ForcePreview) const;
 	void ApplyMusicVideoEffectHudEditorRect(const CUIRect &EditorRect, float HudWidth, float HudHeight);
 	void RenderMusicVideoEffectHudEditor(bool ForcePreview);
+	CUIRect GetSpectatorPanelHudEditorRect(bool ForcePreview) const;
+	void RenderSpectatorPanelHudEditor(bool ForcePreview);
 	void RenderMusicVideoEffectBackground();
 	void RestartStartupMusic();
 	void StopStartupMusic();

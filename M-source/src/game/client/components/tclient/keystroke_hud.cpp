@@ -7,6 +7,106 @@
 #include <game/client/render.h>
 #include <game/client/components/hud_layout.h>
 
+#include <algorithm>
+
+namespace
+{
+ColorRGBA AlphaScale(ColorRGBA Color, float Factor)
+{
+	Color.a = std::clamp(Color.a * Factor, 0.0f, 1.0f);
+	return Color;
+}
+
+ColorRGBA Brighten(ColorRGBA Color, float Amount)
+{
+	Color.r = std::clamp(Color.r + Amount, 0.0f, 1.0f);
+	Color.g = std::clamp(Color.g + Amount, 0.0f, 1.0f);
+	Color.b = std::clamp(Color.b + Amount, 0.0f, 1.0f);
+	return Color;
+}
+
+void DrawKeystrokeModel(IGraphics *pGraphics, float X, float Y, float W, float H, ColorRGBA Color, int Style, float Rounding, float Scale)
+{
+	const int SafeStyle = std::clamp(Style, 0, 3);
+	const float Thin = std::max(1.0f, 1.35f * Scale);
+	const float Glow = std::max(2.0f, 3.0f * Scale);
+
+	if(SafeStyle == 0)
+	{
+		pGraphics->DrawRect(X, Y, W, H, Color, IGraphics::CORNER_ALL, Rounding);
+		return;
+	}
+
+	if(SafeStyle == 1)
+	{
+		auto DrawCircle = [&](float CenterX, float CenterY, float Radius, ColorRGBA DrawColor) {
+			pGraphics->TextureClear();
+			pGraphics->QuadsBegin();
+			pGraphics->SetColor(DrawColor);
+			pGraphics->DrawCircle(CenterX, CenterY, Radius, 32);
+			pGraphics->QuadsEnd();
+		};
+		auto DrawCapsule = [&](float DrawX, float DrawY, float DrawW, float DrawH, ColorRGBA DrawColor) {
+			const float Radius = std::min(DrawW, DrawH) * 0.5f;
+			if(DrawW > DrawH)
+				pGraphics->DrawRect(DrawX + Radius, DrawY, std::max(0.0f, DrawW - Radius * 2.0f), DrawH, DrawColor, IGraphics::CORNER_NONE, 0.0f);
+			DrawCircle(DrawX + Radius, DrawY + DrawH * 0.5f, Radius, DrawColor);
+			DrawCircle(DrawX + DrawW - Radius, DrawY + DrawH * 0.5f, Radius, DrawColor);
+		};
+		DrawCapsule(X - Glow, Y - Glow, W + Glow * 2.0f, H + Glow * 2.0f, AlphaScale(Brighten(Color, 0.32f), 0.22f));
+		DrawCapsule(X, Y, W, H, AlphaScale(Color, 0.92f));
+		DrawCapsule(X + W * 0.25f, Y + H * 0.16f, W * 0.34f, H * 0.16f, ColorRGBA(1.0f, 1.0f, 1.0f, Color.a * 0.26f));
+		return;
+	}
+
+	if(SafeStyle == 2)
+	{
+		auto DrawDiamond = [&](float DrawX, float DrawY, float DrawW, float DrawH, ColorRGBA DrawColor) {
+			const float CenterX = DrawX + DrawW * 0.5f;
+			const float CenterY = DrawY + DrawH * 0.5f;
+			const IGraphics::CFreeformItem Item(
+				CenterX, DrawY,
+				DrawX, CenterY,
+				DrawW + DrawX, CenterY,
+				CenterX, DrawY + DrawH);
+			pGraphics->TextureClear();
+			pGraphics->QuadsBegin();
+			pGraphics->SetColor(DrawColor);
+			pGraphics->QuadsDrawFreeform(&Item, 1);
+			pGraphics->QuadsEnd();
+		};
+		DrawDiamond(X + Thin, Y + Thin, W, H, ColorRGBA(0.0f, 0.0f, 0.0f, Color.a * 0.26f));
+		DrawDiamond(X, Y, W, H, AlphaScale(Brighten(Color, 0.10f), 0.84f));
+		DrawDiamond(X + W * 0.28f, Y + H * 0.13f, W * 0.44f, H * 0.30f, ColorRGBA(1.0f, 1.0f, 1.0f, Color.a * 0.18f));
+		return;
+	}
+
+	auto DrawHexagon = [&](float DrawX, float DrawY, float DrawW, float DrawH, ColorRGBA DrawColor) {
+		const float Cut = std::min(DrawW, DrawH) * 0.28f;
+		const vec2 aPoints[] = {
+			vec2(DrawX + Cut, DrawY),
+			vec2(DrawX + DrawW - Cut, DrawY),
+			vec2(DrawX + DrawW, DrawY + DrawH * 0.5f),
+			vec2(DrawX + DrawW - Cut, DrawY + DrawH),
+			vec2(DrawX + Cut, DrawY + DrawH),
+			vec2(DrawX, DrawY + DrawH * 0.5f),
+		};
+		IGraphics::CFreeformItem aItems[6];
+		const vec2 Center(DrawX + DrawW * 0.5f, DrawY + DrawH * 0.5f);
+		for(int i = 0; i < 6; ++i)
+			aItems[i] = IGraphics::CFreeformItem(Center, aPoints[i], aPoints[(i + 1) % 6], aPoints[(i + 1) % 6]);
+		pGraphics->TextureClear();
+		pGraphics->QuadsBegin();
+		pGraphics->SetColor(DrawColor);
+		pGraphics->QuadsDrawFreeform(aItems, 6);
+		pGraphics->QuadsEnd();
+	};
+	DrawHexagon(X, Y, W, H, AlphaScale(Brighten(Color, 0.45f), 0.92f));
+	DrawHexagon(X + Thin, Y + Thin, W - Thin * 2.0f, H - Thin * 2.0f, AlphaScale(Color, 0.42f));
+	pGraphics->DrawRect(X + W * 0.22f, Y + H * 0.46f, W * 0.56f, std::max(1.0f, Thin * 0.75f), AlphaScale(Brighten(Color, 0.6f), 0.65f), IGraphics::CORNER_NONE, 0.0f);
+}
+} // namespace
+
 void CKeystrokeHud::OnInit()
 {
 }
@@ -32,18 +132,19 @@ void CKeystrokeHud::OnRender()
 	if(!ShowKeys && !ShowMouse)
 		return;
 
-	float Scale = g_Config.m_TcKeystrokeHudSize / 100.0f;
-	float KeyW = 40.0f * Scale;
-	float KeyH = 40.0f * Scale;
-	float Gap = 6.0f * Scale;
-	float SpaceH = 22.0f * Scale;
+	float KeyScale = g_Config.m_TcKeystrokeHudSize / 100.0f;
+	float MouseScale = g_Config.m_TcKeystrokeHudMouseSize / 100.0f;
+	float KeyW = 40.0f * KeyScale;
+	float KeyH = 40.0f * KeyScale;
+	float Gap = 6.0f * KeyScale;
+	float SpaceH = 22.0f * KeyScale;
 
 	float KeyTotalW = KeyW * 2.0f + Gap;
 	float KeyTotalH = KeyH + Gap + SpaceH;
 
-	float MouseW = KeyW;
-	float MouseH = KeyH;
-	float MouseGap = Gap;
+	float MouseW = 40.0f * MouseScale;
+	float MouseH = 40.0f * MouseScale;
+	float MouseGap = 6.0f * MouseScale;
 	float MouseTotalW = MouseW * 2.0f + MouseGap;
 	float MouseTotalH = MouseH;
 
@@ -83,10 +184,12 @@ void CKeystrokeHud::OnRender()
 	ColorRGBA ColorUnpressed = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_TcKeystrokeHudColorUnpressed))
 					   .WithAlpha(g_Config.m_TcKeystrokeHudAlpha / 100.0f);
 
-	float Rounding = 4.0f * Scale;
-	int Corners = IGraphics::CORNER_ALL;
+	float KeyRounding = 4.0f * KeyScale;
+	float MouseRounding = 4.0f * MouseScale;
 
-	bool EditMode = g_Config.m_TcKeystrokeHudEditMode;
+	const bool EditMode = g_Config.m_TcKeystrokeHudEditMode && !GameClient()->m_HudEditor.IsActive();
+	if(!EditMode)
+		m_EditDragging = false;
 	if(EditMode)
 	{
 		vec2 NativeMouse = Input()->NativeMousePos();
@@ -158,9 +261,9 @@ void CKeystrokeHud::OnRender()
 
 	if(ShowKeys)
 	{
-		Graphics()->DrawRect(KeyPosX, KeyPosY, KeyW, KeyH, PressedA ? ColorPressed : ColorUnpressed, Corners, Rounding);
-		Graphics()->DrawRect(KeyPosX + KeyW + Gap, KeyPosY, KeyW, KeyH, PressedD ? ColorPressed : ColorUnpressed, Corners, Rounding);
-		Graphics()->DrawRect(KeyPosX, KeyPosY + KeyH + Gap, KeyTotalW, SpaceH, PressedSpace ? ColorPressed : ColorUnpressed, Corners, Rounding);
+		DrawKeystrokeModel(Graphics(), KeyPosX, KeyPosY, KeyW, KeyH, PressedA ? ColorPressed : ColorUnpressed, g_Config.m_TcKeystrokeHudStyle, KeyRounding, KeyScale);
+		DrawKeystrokeModel(Graphics(), KeyPosX + KeyW + Gap, KeyPosY, KeyW, KeyH, PressedD ? ColorPressed : ColorUnpressed, g_Config.m_TcKeystrokeHudStyle, KeyRounding, KeyScale);
+		DrawKeystrokeModel(Graphics(), KeyPosX, KeyPosY + KeyH + Gap, KeyTotalW, SpaceH, PressedSpace ? ColorPressed : ColorUnpressed, g_Config.m_TcKeystrokeHudStyle, KeyRounding, KeyScale);
 
 		if(g_Config.m_TcKeystrokeHudShowText)
 		{
@@ -173,9 +276,9 @@ void CKeystrokeHud::OnRender()
 			static float s_TextWidthSpace = 0.0f;
 			static float s_CachedSpaceTextSize = 0.0f;
 
-			if(Scale != s_CachedScale)
+			if(KeyScale != s_CachedScale)
 			{
-				s_CachedScale = Scale;
+				s_CachedScale = KeyScale;
 				s_TextWidthA = TextRender()->TextWidth(TextSize, "A");
 				s_TextWidthD = TextRender()->TextWidth(TextSize, "D");
 				float SpaceTextSize = SpaceH * 0.5f;
@@ -193,8 +296,8 @@ void CKeystrokeHud::OnRender()
 
 	if(ShowMouse)
 	{
-		Graphics()->DrawRect(MousePosX, MousePosY, MouseW, MouseH, PressedMouse1 ? ColorPressed : ColorUnpressed, Corners, Rounding);
-		Graphics()->DrawRect(MousePosX + MouseW + MouseGap, MousePosY, MouseW, MouseH, PressedMouse2 ? ColorPressed : ColorUnpressed, Corners, Rounding);
+		DrawKeystrokeModel(Graphics(), MousePosX, MousePosY, MouseW, MouseH, PressedMouse1 ? ColorPressed : ColorUnpressed, g_Config.m_TcKeystrokeHudMouseStyle, MouseRounding, MouseScale);
+		DrawKeystrokeModel(Graphics(), MousePosX + MouseW + MouseGap, MousePosY, MouseW, MouseH, PressedMouse2 ? ColorPressed : ColorUnpressed, g_Config.m_TcKeystrokeHudMouseStyle, MouseRounding, MouseScale);
 
 		if(g_Config.m_TcKeystrokeHudShowText)
 		{
@@ -205,9 +308,9 @@ void CKeystrokeHud::OnRender()
 
 			float MouseTextSize = MouseH * 0.45f;
 
-			if(Scale != s_CachedScaleM)
+			if(MouseScale != s_CachedScaleM)
 			{
-				s_CachedScaleM = Scale;
+				s_CachedScaleM = MouseScale;
 				s_TextWidthM1 = TextRender()->TextWidth(MouseTextSize, "LMB");
 				s_TextWidthM2 = TextRender()->TextWidth(MouseTextSize, "RMB");
 				s_CachedMouseTextSize = MouseTextSize;
@@ -220,32 +323,32 @@ void CKeystrokeHud::OnRender()
 
 	if(EditMode)
 	{
-		float BorderW = 2.5f * Scale;
-
 		if(ShowKeys)
 		{
+			float BorderW = 2.5f * KeyScale;
 			vec2 NM = Input()->NativeMousePos();
 			float VX = NM.x / (float)Graphics()->ScreenWidth() * ScreenW;
 			float VY = NM.y / (float)Graphics()->ScreenHeight() * ScreenH;
 			bool Over = VX >= KeyPosX && VX <= KeyPosX + KeyTotalW && VY >= KeyPosY && VY <= KeyPosY + KeyTotalH;
 			ColorRGBA Col = Over ? ColorRGBA(1.0f, 0.84f, 0.0f, 0.9f) : ColorRGBA(1.0f, 0.84f, 0.0f, 0.4f);
 
-			Graphics()->DrawRect(KeyPosX - BorderW, KeyPosY - BorderW, KeyTotalW + BorderW * 2.0f, BorderW, Col, IGraphics::CORNER_T, Rounding);
-			Graphics()->DrawRect(KeyPosX - BorderW, KeyPosY + KeyTotalH, KeyTotalW + BorderW * 2.0f, BorderW, Col, IGraphics::CORNER_B, Rounding);
+			Graphics()->DrawRect(KeyPosX - BorderW, KeyPosY - BorderW, KeyTotalW + BorderW * 2.0f, BorderW, Col, IGraphics::CORNER_T, KeyRounding);
+			Graphics()->DrawRect(KeyPosX - BorderW, KeyPosY + KeyTotalH, KeyTotalW + BorderW * 2.0f, BorderW, Col, IGraphics::CORNER_B, KeyRounding);
 			Graphics()->DrawRect(KeyPosX - BorderW, KeyPosY, BorderW, KeyTotalH, Col, IGraphics::CORNER_L, 0.0f);
 			Graphics()->DrawRect(KeyPosX + KeyTotalW, KeyPosY, BorderW, KeyTotalH, Col, IGraphics::CORNER_R, 0.0f);
 		}
 
 		if(ShowMouse)
 		{
+			float BorderW = 2.5f * MouseScale;
 			vec2 NM = Input()->NativeMousePos();
 			float VX = NM.x / (float)Graphics()->ScreenWidth() * ScreenW;
 			float VY = NM.y / (float)Graphics()->ScreenHeight() * ScreenH;
 			bool Over = VX >= MousePosX && VX <= MousePosX + MouseTotalW && VY >= MousePosY && VY <= MousePosY + MouseTotalH;
 			ColorRGBA Col = Over ? ColorRGBA(1.0f, 0.84f, 0.0f, 0.9f) : ColorRGBA(1.0f, 0.84f, 0.0f, 0.4f);
 
-			Graphics()->DrawRect(MousePosX - BorderW, MousePosY - BorderW, MouseTotalW + BorderW * 2.0f, BorderW, Col, IGraphics::CORNER_T, Rounding);
-			Graphics()->DrawRect(MousePosX - BorderW, MousePosY + MouseTotalH, MouseTotalW + BorderW * 2.0f, BorderW, Col, IGraphics::CORNER_B, Rounding);
+			Graphics()->DrawRect(MousePosX - BorderW, MousePosY - BorderW, MouseTotalW + BorderW * 2.0f, BorderW, Col, IGraphics::CORNER_T, MouseRounding);
+			Graphics()->DrawRect(MousePosX - BorderW, MousePosY + MouseTotalH, MouseTotalW + BorderW * 2.0f, BorderW, Col, IGraphics::CORNER_B, MouseRounding);
 			Graphics()->DrawRect(MousePosX - BorderW, MousePosY, BorderW, MouseTotalH, Col, IGraphics::CORNER_L, 0.0f);
 			Graphics()->DrawRect(MousePosX + MouseTotalW, MousePosY, BorderW, MouseTotalH, Col, IGraphics::CORNER_R, 0.0f);
 		}

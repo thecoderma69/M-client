@@ -8,6 +8,7 @@
 #include <base/system.h>
 
 #include <engine/client.h>
+#include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/keys.h>
 #include <engine/sound.h>
@@ -40,9 +41,21 @@ namespace
 constexpr float MAX_EFFECT_DELTA = 0.1f;
 constexpr int MAX_MUSIC_VIDEO_POINTS = 192;
 constexpr float MUSIC_VIDEO_EDITOR_RECT_SCALE = 0.70f;
-constexpr const char *STARTUP_MUSIC_DEFAULT_PATH = "ma/startup_music/ma_welcome_ddnet_client.mp3";
+constexpr const char *STARTUP_MUSIC_DEFAULT_PATH = "ma/startup_music/welcome to ddnet.mp3";
+constexpr const char *STARTUP_MUSIC_OLD_DEFAULT_MP3_PATH = "ma/startup_music/ma_welcome_ddnet_client.mp3";
 constexpr const char *STARTUP_MUSIC_LEGACY_MP3_PATH = "ma/startup_music/MONTAGEM CEINTA (Slowed).mp3";
 constexpr const char *STARTUP_MUSIC_LEGACY_WAV_PATH = "ma/startup_music/ma_welcome_ddnet_client.wav";
+constexpr int MAX_SPECTATOR_PANEL_LINES = 18;
+constexpr int SPECTATOR_PANEL_LINE_LENGTH = MAX_NAME_LENGTH + 32;
+
+struct SSpectatorPanelState
+{
+	int m_Count = 0;
+	int m_NameCount = 0;
+	bool m_HasData = true;
+	bool m_NamesExact = false;
+	char m_aaNames[MAX_CLIENTS][MAX_NAME_LENGTH] = {};
+};
 
 static float ApproachEffectValue(float Current, float Target, float Delta, float Speed)
 {
@@ -85,6 +98,153 @@ static float PerformanceLodScale(float Delta)
 	if(Delta > 1.0f / 750.0f)
 		return 0.84f;
 	return 1.0f;
+}
+
+static bool IsLocalClientId(CGameClient *pGameClient, int ClientId)
+{
+	if(ClientId < 0)
+		return false;
+	return ClientId == pGameClient->m_aLocalIds[0] ||
+	       (pGameClient->Client()->DummyConnected() && ClientId == pGameClient->m_aLocalIds[1]);
+}
+
+static void AddSpectatorPanelName(SSpectatorPanelState &State, const char *pName, int ClientId)
+{
+	if(State.m_NameCount >= MAX_CLIENTS)
+		return;
+	if(pName && pName[0] != '\0')
+		str_copy(State.m_aaNames[State.m_NameCount], pName, sizeof(State.m_aaNames[State.m_NameCount]));
+	else
+		str_format(State.m_aaNames[State.m_NameCount], sizeof(State.m_aaNames[State.m_NameCount]), "#%d", ClientId);
+	State.m_NameCount++;
+}
+
+static bool IsPotentialSpectator(CGameClient *pGameClient, const CNetObj_PlayerInfo *pInfo)
+{
+	if(!pInfo || IsLocalClientId(pGameClient, pInfo->m_ClientId))
+		return false;
+
+	const CGameClient::CClientData &Client = pGameClient->m_aClients[pInfo->m_ClientId];
+	if(Client.m_Afk)
+		return false;
+
+	return pInfo->m_Team == TEAM_SPECTATORS || Client.m_Paused || Client.m_Spec;
+}
+
+static bool BuildSpectatorPanelState(CGameClient *pGameClient, bool Sixup, bool ForcePreview, SSpectatorPanelState &State)
+{
+	State = SSpectatorPanelState{};
+
+	if(ForcePreview)
+	{
+		State.m_Count = 3;
+		State.m_NameCount = 3;
+		State.m_NamesExact = true;
+		str_copy(State.m_aaNames[0], "Eimy", sizeof(State.m_aaNames[0]));
+		str_copy(State.m_aaNames[1], "Leo", sizeof(State.m_aaNames[1]));
+		str_copy(State.m_aaNames[2], "JoSzX", sizeof(State.m_aaNames[2]));
+		return true;
+	}
+
+	if(!g_Config.m_MaSpectatorPanel || !pGameClient->m_Snap.m_pLocalInfo)
+		return false;
+
+	if(Sixup)
+	{
+		State.m_NamesExact = true;
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if(IsLocalClientId(pGameClient, i))
+				continue;
+			if(pGameClient->Client()->m_TranslationContext.m_aClients[i].m_PlayerFlags7 & protocol7::PLAYERFLAG_WATCHING)
+			{
+				State.m_Count++;
+				AddSpectatorPanelName(State, pGameClient->m_aClients[i].m_aName, i);
+			}
+		}
+	}
+	else
+	{
+		if(!pGameClient->m_Snap.m_HasSpectatorCount)
+		{
+			State.m_HasData = false;
+		}
+		else
+		{
+			State.m_Count = pGameClient->m_Snap.m_SpectatorCount;
+
+			int aCandidateIds[MAX_CLIENTS] = {};
+			int CandidateCount = 0;
+			for(const CNetObj_PlayerInfo *pInfo : pGameClient->m_Snap.m_apInfoByName)
+			{
+				if(!IsPotentialSpectator(pGameClient, pInfo))
+					continue;
+
+				aCandidateIds[CandidateCount] = pInfo->m_ClientId;
+				CandidateCount++;
+			}
+
+			if(CandidateCount > 0 && CandidateCount <= State.m_Count)
+			{
+				for(int i = 0; i < CandidateCount; i++)
+					AddSpectatorPanelName(State, pGameClient->m_aClients[aCandidateIds[i]].m_aName, aCandidateIds[i]);
+				State.m_NamesExact = CandidateCount == State.m_Count;
+			}
+		}
+	}
+
+	if(State.m_Count <= 0 && !g_Config.m_MaSpectatorPanelShowEmpty)
+		return false;
+	return true;
+}
+
+static int BuildSpectatorPanelLines(const SSpectatorPanelState &State, bool ForcePreview, char aaLines[MAX_SPECTATOR_PANEL_LINES][SPECTATOR_PANEL_LINE_LENGTH])
+{
+	int LineCount = 0;
+	auto AddLine = [&](const char *pText) {
+		if(LineCount >= MAX_SPECTATOR_PANEL_LINES)
+			return;
+		str_copy(aaLines[LineCount], pText, SPECTATOR_PANEL_LINE_LENGTH);
+		LineCount++;
+	};
+
+	if(!State.m_HasData)
+	{
+		AddLine(TCLocalize("Servidor sin datos"));
+		return LineCount;
+	}
+
+	if(!g_Config.m_MaSpectatorPanelShowNames && !ForcePreview)
+		return LineCount;
+
+	if(State.m_NamesExact)
+	{
+		const int MaxNames = ForcePreview ? 3 : std::clamp(g_Config.m_MaSpectatorPanelMaxNames, 1, 16);
+		const int VisibleNames = minimum(State.m_NameCount, MaxNames);
+		for(int i = 0; i < VisibleNames; i++)
+			AddLine(State.m_aaNames[i]);
+		if(State.m_NameCount > VisibleNames)
+		{
+			char aMore[32];
+			str_format(aMore, sizeof(aMore), "+%d mas", State.m_NameCount - VisibleNames);
+			AddLine(aMore);
+		}
+	}
+	else if(State.m_Count > 0)
+	{
+		const int MaxNames = ForcePreview ? 3 : std::clamp(g_Config.m_MaSpectatorPanelMaxNames, 1, 16);
+		const int VisibleNames = minimum(State.m_NameCount, MaxNames);
+		for(int i = 0; i < VisibleNames; i++)
+			AddLine(State.m_aaNames[i]);
+		if(State.m_NameCount > VisibleNames)
+		{
+			char aMore[32];
+			str_format(aMore, sizeof(aMore), "+%d mas", State.m_NameCount - VisibleNames);
+			AddLine(aMore);
+		}
+	}
+
+	return LineCount;
 }
 
 static float RoundedInset(float LocalX, float Width, float Radius)
@@ -523,7 +683,7 @@ bool CMa::StartStartupMusic(bool ForceRestart)
 	StopStartupMusic();
 
 	const char *pPath = g_Config.m_MaStartupMusicPath;
-	if(pPath == nullptr || pPath[0] == '\0' || str_comp(pPath, STARTUP_MUSIC_LEGACY_MP3_PATH) == 0 || str_comp(pPath, STARTUP_MUSIC_LEGACY_WAV_PATH) == 0)
+	if(pPath == nullptr || pPath[0] == '\0' || str_comp(pPath, STARTUP_MUSIC_OLD_DEFAULT_MP3_PATH) == 0 || str_comp(pPath, STARTUP_MUSIC_LEGACY_MP3_PATH) == 0 || str_comp(pPath, STARTUP_MUSIC_LEGACY_WAV_PATH) == 0)
 	{
 		str_copy(g_Config.m_MaStartupMusicPath, STARTUP_MUSIC_DEFAULT_PATH, sizeof(g_Config.m_MaStartupMusicPath));
 		pPath = STARTUP_MUSIC_DEFAULT_PATH;
@@ -861,6 +1021,117 @@ void CMa::RenderMusicVideoEffectHudEditor(bool ForcePreview)
 	RenderMusicVideoEffect(ForcePreview);
 }
 
+CUIRect CMa::GetSpectatorPanelRect(float Width, float Height, bool ForcePreview) const
+{
+	if(!ForcePreview && (!g_Config.m_MaSpectatorPanel || !HudLayout::IsEnabled(HudLayout::MODULE_MA_SPECTATORS)))
+		return CUIRect{};
+
+	SSpectatorPanelState State;
+	if(!BuildSpectatorPanelState(GameClient(), Client()->IsSixup(), ForcePreview, State))
+		return CUIRect{};
+
+	char aaLines[MAX_SPECTATOR_PANEL_LINES][SPECTATOR_PANEL_LINE_LENGTH] = {};
+	const int LineCount = BuildSpectatorPanelLines(State, ForcePreview, aaLines);
+
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_MA_SPECTATORS, Width, Height);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float Padding = 5.0f * Scale;
+	const float HeaderFont = 6.8f * Scale;
+	const float LineFont = 5.6f * Scale;
+	const float LineGap = 1.4f * Scale;
+
+	char aTitle[64];
+	str_format(aTitle, sizeof(aTitle), "%s: %d", TCLocalize("Espectadores"), State.m_Count);
+	float BoxWidth = maximum(82.0f * Scale, TextRender()->TextWidth(HeaderFont, aTitle, -1, -1.0f) + Padding * 2.0f);
+	for(int i = 0; i < LineCount; i++)
+		BoxWidth = maximum(BoxWidth, TextRender()->TextWidth(LineFont, aaLines[i], -1, -1.0f) + Padding * 2.0f);
+
+	const float BoxHeight = Padding * 2.0f + HeaderFont + (LineCount > 0 ? 2.5f * Scale + LineCount * LineFont + maximum(0, LineCount - 1) * LineGap : 0.0f);
+	HudLayout::SModuleRect RawRect{Layout.m_X, Layout.m_Y, BoxWidth, BoxHeight, 5.0f * Scale};
+	const HudLayout::SModuleRect Clamped = HudLayout::ClampRectToScreen(RawRect, Width, Height);
+	return {Clamped.m_X, Clamped.m_Y, Clamped.m_W, Clamped.m_H};
+}
+
+CUIRect CMa::GetSpectatorPanelHudEditorRect(bool ForcePreview) const
+{
+	const float Height = HudLayout::CANVAS_HEIGHT;
+	const float Width = Height * (m_pGraphics ? m_pGraphics->ScreenAspect() : 1.0f);
+	return GetSpectatorPanelRect(Width, Height, ForcePreview);
+}
+
+void CMa::RenderSpectatorPanel(bool ForcePreview)
+{
+	if(!ForcePreview && (!g_Config.m_MaSpectatorPanel || !HudLayout::IsEnabled(HudLayout::MODULE_MA_SPECTATORS)))
+		return;
+
+	SSpectatorPanelState State;
+	if(!BuildSpectatorPanelState(GameClient(), Client()->IsSixup(), ForcePreview, State))
+		return;
+
+	float PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1;
+	Graphics()->GetScreen(&PrevScreenX0, &PrevScreenY0, &PrevScreenX1, &PrevScreenY1);
+
+	const float Width = HudLayout::CANVAS_HEIGHT * Graphics()->ScreenAspect();
+	const float Height = HudLayout::CANVAS_HEIGHT;
+	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+
+	const CUIRect Rect = GetSpectatorPanelRect(Width, Height, ForcePreview);
+	if(Rect.w <= 0.0f || Rect.h <= 0.0f)
+	{
+		Graphics()->MapScreen(PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1);
+		return;
+	}
+
+	char aaLines[MAX_SPECTATOR_PANEL_LINES][SPECTATOR_PANEL_LINE_LENGTH] = {};
+	const int LineCount = BuildSpectatorPanelLines(State, ForcePreview, aaLines);
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_MA_SPECTATORS, Width, Height);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float Alpha = ForcePreview ? 0.82f : std::clamp(g_Config.m_MaSpectatorPanelOpacity / 100.0f, 0.0f, 1.0f);
+	if(Alpha <= 0.0f)
+	{
+		Graphics()->MapScreen(PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1);
+		return;
+	}
+
+	const float Padding = 5.0f * Scale;
+	const float HeaderFont = 6.8f * Scale;
+	const float LineFont = 5.6f * Scale;
+	const float LineGap = 1.4f * Scale;
+	const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, Rect.x, Rect.y, Rect.w, Rect.h, Width, Height);
+
+	Graphics()->TextureClear();
+	if(Layout.m_BackgroundEnabled)
+		Graphics()->DrawRect(Rect.x, Rect.y, Rect.w, Rect.h, ColorRGBA(0.02f, 0.02f, 0.06f, 0.78f * Alpha), Corners, 5.0f * Scale);
+
+	char aTitle[64];
+	str_format(aTitle, sizeof(aTitle), "%s: %d", TCLocalize("Espectadores"), State.m_Count);
+	float x = Rect.x + Padding;
+	float y = Rect.y + Padding;
+
+	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+	TextRender()->TextColor(ColorRGBA(0.55f, 0.85f, 1.0f, Alpha));
+	TextRender()->Text(x, y + 0.2f * Scale, HeaderFont, FontIcon::EYE, -1.0f);
+	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+	TextRender()->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, Alpha));
+	TextRender()->Text(x + HeaderFont + 3.0f * Scale, y, HeaderFont, aTitle, -1.0f);
+
+	y += HeaderFont + 3.0f * Scale;
+	for(int i = 0; i < LineCount; i++)
+	{
+		TextRender()->TextColor(i == 0 && (!State.m_HasData || !State.m_NamesExact) ? ColorRGBA(1.0f, 0.78f, 0.46f, Alpha * 0.95f) : ColorRGBA(0.88f, 0.90f, 0.96f, Alpha * 0.92f));
+		TextRender()->Text(x, y, LineFont, aaLines[i], -1.0f);
+		y += LineFont + LineGap;
+	}
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	Graphics()->MapScreen(PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1);
+}
+
+void CMa::RenderSpectatorPanelHudEditor(bool ForcePreview)
+{
+	RenderSpectatorPanel(ForcePreview);
+}
+
 void CMa::RenderMusicVideoEffectBackground()
 {
 	if(!g_Config.m_MaEnabled || !g_Config.m_MaMusicVideoEffectBehind)
@@ -1123,9 +1394,9 @@ void CMa::OnRender()
 	if(!g_Config.m_MaEnabled)
 		return;
 	UpdateStartupMusic();
-	if(g_Config.m_MaMusicVideoEffectBehind)
-		return;
-	RenderMusicVideoEffect(false);
+	if(!g_Config.m_MaMusicVideoEffectBehind)
+		RenderMusicVideoEffect(false);
+	RenderSpectatorPanel(false);
 	// Music Player is now handled by the separate CMusicPlayer component
 }
 

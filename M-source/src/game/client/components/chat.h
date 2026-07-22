@@ -289,6 +289,7 @@ public:
 
 	CUIRect GetHudRect(float Width, float Height, bool ForcePreview = false) const;
 	void RenderHud(bool ForcePreview = false);
+	void RenderTranslateOverlay();
 
 	static constexpr float MESSAGE_TEE_PADDING_RIGHT = 0.5f;
 

@@ -40,12 +40,12 @@ namespace
 		       Module == HudLayout::MODULE_SCORE ||
 		       Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD ||
 		       Module == HudLayout::MODULE_KEYSTROKES_MOUSE ||
-		       Module == HudLayout::MODULE_SPECTATOR_COUNT ||
 		       Module == HudLayout::MODULE_MOVEMENT_INFO ||
 		       Module == HudLayout::MODULE_VOTES ||
 		       Module == HudLayout::MODULE_LOCAL_TIME ||
 		       Module == HudLayout::MODULE_FROZEN_HUD ||
-		       Module == HudLayout::MODULE_FROZEN_COUNTER;
+		       Module == HudLayout::MODULE_FROZEN_COUNTER ||
+		       Module == HudLayout::MODULE_MA_SPECTATORS;
 	}
 
 	bool IsEditorPreviewModule(HudLayout::EModule Module)
@@ -56,12 +56,12 @@ namespace
 		       Module == HudLayout::MODULE_SCORE ||
 		       Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD ||
 		       Module == HudLayout::MODULE_KEYSTROKES_MOUSE ||
-		       Module == HudLayout::MODULE_SPECTATOR_COUNT ||
 		       Module == HudLayout::MODULE_MOVEMENT_INFO ||
 		       Module == HudLayout::MODULE_VOTES ||
 		       Module == HudLayout::MODULE_LOCAL_TIME ||
 		       Module == HudLayout::MODULE_FROZEN_HUD ||
-		       Module == HudLayout::MODULE_FROZEN_COUNTER;
+		       Module == HudLayout::MODULE_FROZEN_COUNTER ||
+		       Module == HudLayout::MODULE_MA_SPECTATORS;
 	}
 
 	bool IsLivePreviewModule(HudLayout::EModule Module)
@@ -71,13 +71,13 @@ namespace
 		       Module == HudLayout::MODULE_SCORE ||
 		       Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD ||
 		       Module == HudLayout::MODULE_KEYSTROKES_MOUSE ||
-		       Module == HudLayout::MODULE_SPECTATOR_COUNT ||
 		       Module == HudLayout::MODULE_MOVEMENT_INFO ||
 		       Module == HudLayout::MODULE_CHAT ||
 		       Module == HudLayout::MODULE_VOTES ||
 		       Module == HudLayout::MODULE_LOCAL_TIME ||
 		       Module == HudLayout::MODULE_FROZEN_HUD ||
-		       Module == HudLayout::MODULE_FROZEN_COUNTER;
+		       Module == HudLayout::MODULE_FROZEN_COUNTER ||
+		       Module == HudLayout::MODULE_MA_SPECTATORS;
 	}
 
 	bool PointInRect(vec2 Point, const CUIRect &Rect)
@@ -101,9 +101,13 @@ namespace
 			g_Config.m_MaMusicPlayerUseColorForHud = 0;
 			g_Config.m_MaMusicPlayerHudColorAlpha = 100;
 		}
-		else if(Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD || Module == HudLayout::MODULE_KEYSTROKES_MOUSE)
+		else if(Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD)
 		{
 			g_Config.m_TcKeystrokeHudSize = 100;
+		}
+		else if(Module == HudLayout::MODULE_KEYSTROKES_MOUSE)
+		{
+			g_Config.m_TcKeystrokeHudMouseSize = 100;
 		}
 	}
 
@@ -207,6 +211,7 @@ void CHudEditor::Activate()
 {
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
+	g_Config.m_TcKeystrokeHudEditMode = 0;
 	m_Active = true;
 	m_MouseDownLast = false;
 	m_RightMouseDownLast = false;
@@ -291,16 +296,23 @@ bool CHudEditor::IsResizableModule(HudLayout::EModule Module) const
 
 int CHudEditor::GetModuleScale(HudLayout::EModule Module) const
 {
-	if(Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD || Module == HudLayout::MODULE_KEYSTROKES_MOUSE)
+	if(Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD)
 		return std::clamp(g_Config.m_TcKeystrokeHudSize, 50, 200);
+	if(Module == HudLayout::MODULE_KEYSTROKES_MOUSE)
+		return std::clamp(g_Config.m_TcKeystrokeHudMouseSize, 50, 200);
 	return HudLayout::Get(Module, HudWidth(), HudHeight()).m_Scale;
 }
 
 void CHudEditor::SetModuleScale(HudLayout::EModule Module, int Scale)
 {
-	if(Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD || Module == HudLayout::MODULE_KEYSTROKES_MOUSE)
+	if(Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD)
 	{
 		g_Config.m_TcKeystrokeHudSize = std::clamp(Scale, 50, 200);
+		return;
+	}
+	if(Module == HudLayout::MODULE_KEYSTROKES_MOUSE)
+	{
+		g_Config.m_TcKeystrokeHudMouseSize = std::clamp(Scale, 50, 200);
 		return;
 	}
 	HudLayout::SetScale(Module, Scale);
@@ -397,6 +409,9 @@ CUIRect CHudEditor::GetFallbackModuleRect(HudLayout::EModule Module) const
 		Rect = {Layout.m_X, Layout.m_Y, TextRender()->TextWidth(FontSize, "0 / 1", -1, -1.0f) + PaddingX * 2.0f, FontSize + PaddingY * 2.0f};
 		break;
 	}
+	case HudLayout::MODULE_MA_SPECTATORS:
+		Rect = GameClient()->m_Ma.GetSpectatorPanelHudEditorRect(true);
+		break;
 	case HudLayout::MODULE_NOTIFY_LAST:
 		Rect = {Layout.m_X, Layout.m_Y, 185.0f, 16.0f};
 		break;
@@ -498,6 +513,12 @@ CHudEditor::SModuleVisual CHudEditor::GetModuleVisual(HudLayout::EModule Module)
 		Visual.m_Rect = GameClient()->m_Hud.GetFrozenCounterHudEditorRect(Width, Height);
 		Visual.m_Rounding = 3.0f * std::clamp(HudLayout::Get(HudLayout::MODULE_FROZEN_COUNTER, Width, Height).m_Scale / 100.0f, 0.25f, 3.0f);
 		break;
+	case HudLayout::MODULE_MA_SPECTATORS:
+		Visual.m_Rect = GameClient()->m_Ma.GetSpectatorPanelHudEditorRect(false);
+		if(Visual.m_Rect.w <= 0.0f || Visual.m_Rect.h <= 0.0f)
+			Visual.m_Rect = GameClient()->m_Ma.GetSpectatorPanelHudEditorRect(true);
+		Visual.m_Rounding = 5.0f * std::clamp(HudLayout::Get(HudLayout::MODULE_MA_SPECTATORS, Width, Height).m_Scale / 100.0f, 0.25f, 3.0f);
+		break;
 	default:
 		Visual.m_Editable = false;
 		Visual.m_Rect = GetFallbackModuleRect(Module);
@@ -538,12 +559,12 @@ void CHudEditor::CollectModuleVisuals(SModuleVisual *pOut, int &Count) const
 	AddModule(HudLayout::MODULE_SCORE);
 	AddModule(HudLayout::MODULE_KEYSTROKES_KEYBOARD);
 	AddModule(HudLayout::MODULE_KEYSTROKES_MOUSE);
-	AddModule(HudLayout::MODULE_SPECTATOR_COUNT);
 	AddModule(HudLayout::MODULE_MOVEMENT_INFO);
 	AddModule(HudLayout::MODULE_VOTES);
 	AddModule(HudLayout::MODULE_LOCAL_TIME);
 	AddModule(HudLayout::MODULE_FROZEN_HUD);
 	AddModule(HudLayout::MODULE_FROZEN_COUNTER);
+	AddModule(HudLayout::MODULE_MA_SPECTATORS);
 }
 
 HudLayout::EModule CHudEditor::HitTestModule(vec2 MousePos) const
@@ -1150,12 +1171,12 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 	GameClient()->m_Hud.RenderScoreHudPreview();
 	GameClient()->m_Hud.RenderKeystrokesKeyboardPreview();
 	GameClient()->m_Hud.RenderKeystrokesMousePreview();
-	GameClient()->m_Hud.RenderSpectatorCountPreview();
 	GameClient()->m_Hud.RenderMovementInformationPreview();
 	GameClient()->m_Voting.RenderHud(true);
 	GameClient()->m_Hud.RenderLocalTimePreview();
 	GameClient()->m_Hud.RenderFrozenHudPreview();
 	GameClient()->m_Hud.RenderFrozenCounterPreview();
+	GameClient()->m_Ma.RenderSpectatorPanelHudEditor(true);
 	// Voice chat not available in TClient
 	// GameClient()->m_VoiceChat.RenderHudTalkingIndicator(Width, Height, true);
 	// GameClient()->m_VoiceChat.RenderHudMuteStatusIndicator(Width, Height, true);

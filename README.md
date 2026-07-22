@@ -1,4 +1,4 @@
-# MΛ ツ Client 2.1.3
+# MΛ ツ Client 2.1.4
 
 Cliente personalizado basado en DDNet/TClient para Windows x64, preparado para descargar, extraer y jugar.
 
@@ -8,7 +8,7 @@ Repositorio oficial: [thecoderma69/M-client](https://github.com/thecoderma69/M-c
 
 MΛ ツ Client es una version modificada del cliente DDNet con mejoras visuales, opciones de personalizacion, herramientas de comodidad y recursos propios.
 
-La version 2.1.3 mejora el input MA, actualiza la version visible del cliente y mantiene las opciones principales distribuidas entre `MΛ ツ`, `Visual` y `Recursos`.
+La version 2.1.4 agrega modelos reales para el HUD de teclas y mantiene las opciones principales distribuidas entre `MΛ ツ`, `Visual` y `Recursos`.
 
 ## Descargar
 
@@ -19,7 +19,7 @@ El juego listo para usar esta en:
 Descarga:
 
 ```txt
-M-Client-v2.1.3-win64.zip
+M-Client-v2.1.4-win64.zip
 ```
 
 Luego extrae el `.zip` y abre:
@@ -35,6 +35,13 @@ El codigo fuente esta en:
 ```txt
 M-source/
 ```
+
+## Novedades De La Version 2.1.4
+
+- Nuevos modelos reales para el HUD de teclas: `Redondo`, `Diamante` y `Hexagonal`.
+- Selector separado para `Modelo teclado` y `Modelo mouse`.
+- Vista previa del editor de HUD actualizada para mostrar los mismos modelos que se ven en partida.
+- Texto del menu principal actualizado a `MΛ ツ 2.1.4`.
 
 ## Novedades De La Version 2.1.3
 
@@ -193,7 +200,7 @@ Desde `MΛ ツ > Visual` puedes recargar la lista, elegir la imagen y ajustar ta
 ## Estructura De La Descarga
 
 ```txt
-M-Client-v2.1.3-win64/
+M-Client-v2.1.4-win64/
 |-- data/                 # Archivos de datos y recursos del cliente
 |-- DDNet.exe             # Ejecutable principal
 |-- DDNet-Server.exe      # Ejecutable del servidor

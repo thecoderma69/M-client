@@ -2767,23 +2767,19 @@ void CMenus::RenderSettingsTClientKeystroke(CUIRect MainView)
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHud, TCLocalize("Enable keystroke overlay"), &g_Config.m_TcKeystrokeHud, &LeftView, LineSize);
 
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("Position"), HeadlineFontSize, TEXTALIGN_ML);
 	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcKeystrokeHudPosX, &g_Config.m_TcKeystrokeHudPosX, &Button, TCLocalize("Horizontal position %"), 0, 100);
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcKeystrokeHudPosY, &g_Config.m_TcKeystrokeHudPosY, &Button, TCLocalize("Vertical position %"), 0, 100);
-
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("Appearance"), HeadlineFontSize, TEXTALIGN_ML);
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcKeystrokeHudSize, &g_Config.m_TcKeystrokeHudSize, &Button, TCLocalize("Size"), 50, 200);
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcKeystrokeHudAlpha, &g_Config.m_TcKeystrokeHudAlpha, &Button, TCLocalize("Opacity"), 10, 100);
+	{
+		static std::vector<const char *> s_KeyModelDropDownNames;
+		s_KeyModelDropDownNames = {TCLocalize("Normal"), TCLocalize("Redondo"), TCLocalize("Diamante"), TCLocalize("Hexagonal")};
+		static CUi::SDropDownState s_KeyModelDropDownState;
+		static CScrollRegion s_KeyModelDropDownScrollRegion;
+		s_KeyModelDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_KeyModelDropDownScrollRegion;
+		CUIRect ModelDropDown;
+		LeftView.HSplitTop(LineSize, &ModelDropDown, &LeftView);
+		ModelDropDown.VSplitLeft(120.0f, &Label, &ModelDropDown);
+		Ui()->DoLabel(&Label, TCLocalize("Modelo teclado"), FontSize, TEXTALIGN_ML);
+		g_Config.m_TcKeystrokeHudStyle = Ui()->DoDropDown(&ModelDropDown, std::clamp(g_Config.m_TcKeystrokeHudStyle, 0, 3), s_KeyModelDropDownNames.data(), s_KeyModelDropDownNames.size(), s_KeyModelDropDownState);
+	}
 
 	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
 	Ui()->DoLabel(&Label, TCLocalize("Colors"), HeadlineFontSize, TEXTALIGN_ML);
@@ -2812,10 +2808,19 @@ void CMenus::RenderSettingsTClientKeystroke(CUIRect MainView)
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudShowMouse, TCLocalize("Show mouse clicks (LMB/RMB)"), &g_Config.m_TcKeystrokeHudShowMouse, &RightView, LineSize);
 
-	RightView.HSplitTop(LineSize, &Button, &RightView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcKeystrokeHudMousePosX, &g_Config.m_TcKeystrokeHudMousePosX, &Button, TCLocalize("Mouse HUD horizontal %"), 0, 100);
-	RightView.HSplitTop(LineSize, &Button, &RightView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcKeystrokeHudMousePosY, &g_Config.m_TcKeystrokeHudMousePosY, &Button, TCLocalize("Mouse HUD vertical %"), 0, 100);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	{
+		static std::vector<const char *> s_MouseModelDropDownNames;
+		s_MouseModelDropDownNames = {TCLocalize("Normal"), TCLocalize("Redondo"), TCLocalize("Diamante"), TCLocalize("Hexagonal")};
+		static CUi::SDropDownState s_MouseModelDropDownState;
+		static CScrollRegion s_MouseModelDropDownScrollRegion;
+		s_MouseModelDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_MouseModelDropDownScrollRegion;
+		CUIRect ModelDropDown;
+		RightView.HSplitTop(LineSize, &ModelDropDown, &RightView);
+		ModelDropDown.VSplitLeft(120.0f, &Label, &ModelDropDown);
+		Ui()->DoLabel(&Label, TCLocalize("Modelo mouse"), FontSize, TEXTALIGN_ML);
+		g_Config.m_TcKeystrokeHudMouseStyle = Ui()->DoDropDown(&ModelDropDown, std::clamp(g_Config.m_TcKeystrokeHudMouseStyle, 0, 3), s_MouseModelDropDownNames.data(), s_MouseModelDropDownNames.size(), s_MouseModelDropDownState);
+	}
 
 	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
@@ -4269,10 +4274,11 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 		RightView.HSplitTop(LineSize, &Button, &RightView);
 		Ui()->DoScrollbarOption(&g_Config.m_MaStartupMusicVolume, &g_Config.m_MaStartupMusicVolume, &Button, TCLocalize("Volumen"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
 
-		const char *pStartupMusicDefaultPath = "ma/startup_music/ma_welcome_ddnet_client.mp3";
+		const char *pStartupMusicDefaultPath = "ma/startup_music/welcome to ddnet.mp3";
+		const char *pStartupMusicOldDefaultPath = "ma/startup_music/ma_welcome_ddnet_client.mp3";
 		const char *pStartupMusicLegacyPath = "ma/startup_music/MONTAGEM CEINTA (Slowed).mp3";
 		const char *pStartupMusicLegacyWavPath = "ma/startup_music/ma_welcome_ddnet_client.wav";
-		if(str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicLegacyPath) == 0 || str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicLegacyWavPath) == 0)
+		if(str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicOldDefaultPath) == 0 || str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicLegacyPath) == 0 || str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicLegacyWavPath) == 0)
 			str_copy(g_Config.m_MaStartupMusicPath, pStartupMusicDefaultPath, sizeof(g_Config.m_MaStartupMusicPath));
 
 		struct SStartupMusicFileListContext
@@ -4503,12 +4509,6 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaMusicPlayer, TCLocalize("Enable music player"), &g_Config.m_MaMusicPlayer, &RightView, LineSize);
 	if(g_Config.m_MaMusicPlayer)
 	{
-		RightView.HSplitTop(LineSize, &Button, &RightView);
-		Ui()->DoScrollbarOption(&g_Config.m_MaMusicVolume, &g_Config.m_MaMusicVolume, &Button, TCLocalize("Volume"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
-
-		RightView.HSplitTop(LineSize, &Button, &RightView);
-		Ui()->DoScrollbarOption(&g_Config.m_MaMusicPlayerStyle, &g_Config.m_MaMusicPlayerStyle, &Button, TCLocalize("Style"), 0, 4, &CUi::ms_LinearScrollbarScale, 0, " (0=Card/1=Bar/2=Minimal/3=Disc/4=Banner)");
-
 		RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
 		Ui()->DoLabel(&Label, TCLocalize("Presets"), HeadlineFontSize, TEXTALIGN_ML);
 		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
@@ -4518,7 +4518,7 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 		static CUi::SDropDownState s_PresetDropDownState;
 		static CScrollRegion s_PresetScrollRegion;
 		s_PresetDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_PresetScrollRegion;
-		static int s_PresetIndex = 0;
+		static int s_PresetIndex = 2;
 		int PrevPreset = s_PresetIndex;
 		RightView.HSplitTop(LineSize, &Button, &RightView);
 		s_PresetIndex = Ui()->DoDropDown(&Button, s_PresetIndex, s_PresetNames.data(), s_PresetNames.size(), s_PresetDropDownState);
@@ -4535,28 +4535,18 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 			case 1:
 				g_Config.m_MaMusicPlayerSizeMode = 1; g_Config.m_MaMusicPlayerColorMode = 3;
 				g_Config.m_MaMusicPlayerShowCover = 0; g_Config.m_MaMusicPlayerVisualizer = 0;
-				g_Config.m_MaMusicPlayerTextScale = 85;
+				g_Config.m_MaMusicPlayerTextScale = 84;
 				break;
 			}
 		}
+		g_Config.m_MaMusicPlayerSizeMode = 1;
+		g_Config.m_MaMusicPlayerColorMode = 3;
 
 		RightView.HSplitTop(LineSize, &Button, &RightView);
-		static int s_SizeMode = 0;
-		s_SizeMode = g_Config.m_MaMusicPlayerSizeMode;
-		Ui()->DoScrollbarOption(&g_Config.m_MaMusicPlayerSizeMode, &g_Config.m_MaMusicPlayerSizeMode, &Button, TCLocalize("Size"), 0, 1, &CUi::ms_LinearScrollbarScale, 0, " (0=Normal/1=Mini)");
-		if(g_Config.m_MaMusicPlayerSizeMode != s_SizeMode) s_PresetIndex = 2;
-
-		RightView.HSplitTop(LineSize, &Button, &RightView);
-		static int s_TextScale = 100;
+		static int s_TextScale = 84;
 		s_TextScale = g_Config.m_MaMusicPlayerTextScale;
-		Ui()->DoScrollbarOption(&g_Config.m_MaMusicPlayerTextScale, &g_Config.m_MaMusicPlayerTextScale, &Button, TCLocalize("Text scale"), 70, 150, &CUi::ms_LinearScrollbarScale, 0, "%");
+		Ui()->DoScrollbarOption(&g_Config.m_MaMusicPlayerTextScale, &g_Config.m_MaMusicPlayerTextScale, &Button, TCLocalize("Tamano numeros"), 70, 150, &CUi::ms_LinearScrollbarScale, 0, "%");
 		if(g_Config.m_MaMusicPlayerTextScale != s_TextScale) s_PresetIndex = 2;
-
-		RightView.HSplitTop(LineSize, &Button, &RightView);
-		static int s_ColorMode = 3;
-		s_ColorMode = g_Config.m_MaMusicPlayerColorMode;
-		Ui()->DoScrollbarOption(&g_Config.m_MaMusicPlayerColorMode, &g_Config.m_MaMusicPlayerColorMode, &Button, TCLocalize("Color mode"), 0, 3, &CUi::ms_LinearScrollbarScale, 0, " (0=Static/1=Accent/2=Dominant/3=Translucent)");
-		if(g_Config.m_MaMusicPlayerColorMode != s_ColorMode) s_PresetIndex = 2;
 
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaMusicPlayerShowCover, TCLocalize("Show cover art"), &g_Config.m_MaMusicPlayerShowCover, &RightView, LineSize);
 
@@ -4896,6 +4886,37 @@ void CMenus::RenderMaConfiguracion(CUIRect MainView)
 
 	s_SectionBoxes.back().h = RightView.y - s_SectionBoxes.back().y;
 
+	// ***** Spectator Panel ***** //
+	RightView.HSplitTop(MarginBetweenSections, nullptr, &RightView);
+	s_SectionBoxes.push_back(RightView);
+	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
+	Ui()->DoLabel(&Label, TCLocalize("Espectador"), HeadlineFontSize, TEXTALIGN_ML);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaSpectatorPanel, TCLocalize("Ver quien te espectea"), &g_Config.m_MaSpectatorPanel, &RightView, LineSize);
+	if(g_Config.m_MaSpectatorPanel)
+	{
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaSpectatorPanelShowNames, TCLocalize("Mostrar nombres"), &g_Config.m_MaSpectatorPanelShowNames, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaSpectatorPanelShowEmpty, TCLocalize("Mostrar aunque este vacio"), &g_Config.m_MaSpectatorPanelShowEmpty, &RightView, LineSize);
+
+		RightView.HSplitTop(LineSize, &Button, &RightView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaSpectatorPanelMaxNames, &g_Config.m_MaSpectatorPanelMaxNames, &Button, TCLocalize("Max nombres"), 1, 16);
+		RightView.HSplitTop(LineSize, &Button, &RightView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaSpectatorPanelOpacity, &g_Config.m_MaSpectatorPanelOpacity, &Button, TCLocalize("Opacidad"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
+
+		RightView.HSplitTop(LineSize + 6.0f, &Button, &RightView);
+		static CButtonContainer s_MaSpectatorHudEditorButton;
+		if(DoButton_Menu(&s_MaSpectatorHudEditorButton, TCLocalize("Abrir editor HUD"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f) && (Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK))
+		{
+			SetActive(false);
+			GameClient()->m_HudEditor.Activate();
+		}
+	}
+	else
+		RightView.HSplitTop(LineSize * 3.0f, nullptr, &RightView);
+
+	s_SectionBoxes.back().h = RightView.y - s_SectionBoxes.back().y;
+
 	// ***** Custom Sounds ***** //
 	RightView.HSplitTop(MarginBetweenSections, nullptr, &RightView);
 	s_SectionBoxes.push_back(RightView);
@@ -5199,23 +5220,19 @@ void CMenus::RenderMaKeystroke(CUIRect MainView)
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHud, TCLocalize("Enable keystroke overlay"), &g_Config.m_TcKeystrokeHud, &LeftView, LineSize);
 
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("Position"), HeadlineFontSize, TEXTALIGN_ML);
 	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcKeystrokeHudPosX, &g_Config.m_TcKeystrokeHudPosX, &Button, TCLocalize("Horizontal position %"), 0, 100);
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcKeystrokeHudPosY, &g_Config.m_TcKeystrokeHudPosY, &Button, TCLocalize("Vertical position %"), 0, 100);
-
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("Appearance"), HeadlineFontSize, TEXTALIGN_ML);
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcKeystrokeHudSize, &g_Config.m_TcKeystrokeHudSize, &Button, TCLocalize("Size"), 50, 200);
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcKeystrokeHudAlpha, &g_Config.m_TcKeystrokeHudAlpha, &Button, TCLocalize("Opacity"), 10, 100);
+	{
+		static std::vector<const char *> s_KeyModelDropDownNames;
+		s_KeyModelDropDownNames = {TCLocalize("Normal"), TCLocalize("Redondo"), TCLocalize("Diamante"), TCLocalize("Hexagonal")};
+		static CUi::SDropDownState s_KeyModelDropDownState;
+		static CScrollRegion s_KeyModelDropDownScrollRegion;
+		s_KeyModelDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_KeyModelDropDownScrollRegion;
+		CUIRect ModelDropDown;
+		LeftView.HSplitTop(LineSize, &ModelDropDown, &LeftView);
+		ModelDropDown.VSplitLeft(120.0f, &Label, &ModelDropDown);
+		Ui()->DoLabel(&Label, TCLocalize("Modelo teclado"), FontSize, TEXTALIGN_ML);
+		g_Config.m_TcKeystrokeHudStyle = Ui()->DoDropDown(&ModelDropDown, std::clamp(g_Config.m_TcKeystrokeHudStyle, 0, 3), s_KeyModelDropDownNames.data(), s_KeyModelDropDownNames.size(), s_KeyModelDropDownState);
+	}
 
 	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
 	Ui()->DoLabel(&Label, TCLocalize("Colors"), HeadlineFontSize, TEXTALIGN_ML);
@@ -5252,10 +5269,19 @@ void CMenus::RenderMaKeystroke(CUIRect MainView)
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudShowMouse, TCLocalize("Show mouse clicks (LMB/RMB)"), &g_Config.m_TcKeystrokeHudShowMouse, &RightView, LineSize);
 
-	RightView.HSplitTop(LineSize, &Button, &RightView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcKeystrokeHudMousePosX, &g_Config.m_TcKeystrokeHudMousePosX, &Button, TCLocalize("Mouse HUD horizontal %"), 0, 100);
-	RightView.HSplitTop(LineSize, &Button, &RightView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcKeystrokeHudMousePosY, &g_Config.m_TcKeystrokeHudMousePosY, &Button, TCLocalize("Mouse HUD vertical %"), 0, 100);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	{
+		static std::vector<const char *> s_MouseModelDropDownNames;
+		s_MouseModelDropDownNames = {TCLocalize("Normal"), TCLocalize("Redondo"), TCLocalize("Diamante"), TCLocalize("Hexagonal")};
+		static CUi::SDropDownState s_MouseModelDropDownState;
+		static CScrollRegion s_MouseModelDropDownScrollRegion;
+		s_MouseModelDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_MouseModelDropDownScrollRegion;
+		CUIRect ModelDropDown;
+		RightView.HSplitTop(LineSize, &ModelDropDown, &RightView);
+		ModelDropDown.VSplitLeft(120.0f, &Label, &ModelDropDown);
+		Ui()->DoLabel(&Label, TCLocalize("Modelo mouse"), FontSize, TEXTALIGN_ML);
+		g_Config.m_TcKeystrokeHudMouseStyle = Ui()->DoDropDown(&ModelDropDown, std::clamp(g_Config.m_TcKeystrokeHudMouseStyle, 0, 3), s_MouseModelDropDownNames.data(), s_MouseModelDropDownNames.size(), s_MouseModelDropDownState);
+	}
 
 	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);

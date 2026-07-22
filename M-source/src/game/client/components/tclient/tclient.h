@@ -34,6 +34,14 @@ class CTClient : public CComponent
 
 	class IEngineGraphics *m_pGraphics = nullptr;
 	bool m_AspectConfigReady = false;
+	bool m_ForcedAspectPending = false;
+	bool m_ForcedAspectStateValid = false;
+	bool m_LastForcedAspectForce = false;
+	bool m_LastForcedAspectApply = false;
+	int m_LastForcedAspectMode = -1;
+	int m_LastForcedAspectRatio = -1;
+	int m_LastForcedAspectNum = -1;
+	int m_LastForcedAspectDen = -1;
 
 	char m_PreviousOwnMessage[2048] = {};
 

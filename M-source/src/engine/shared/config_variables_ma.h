@@ -91,7 +91,7 @@ MACRO_CONFIG_STR(MaMusicVideoEffectImagePath, ma_music_video_effect_image_path, 
 // ===== STARTUP MUSIC =====
 MACRO_CONFIG_INT(MaStartupMusic, ma_startup_music, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Play a custom song once when opening the client")
 MACRO_CONFIG_INT(MaStartupMusicVolume, ma_startup_music_volume, 55, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Startup music volume")
-MACRO_CONFIG_STR(MaStartupMusicPath, ma_startup_music_path, IO_MAX_PATH_LENGTH, "ma/startup_music/ma_welcome_ddnet_client.mp3", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Path to the custom startup music file")
+MACRO_CONFIG_STR(MaStartupMusicPath, ma_startup_music_path, IO_MAX_PATH_LENGTH, "ma/startup_music/welcome to ddnet.mp3", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Path to the custom startup music file")
 
 // ===== MUSIC PLAYER =====
 MACRO_CONFIG_INT(MaMusicPlayer, ma_music_player, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Music Player HUD element")
@@ -108,7 +108,7 @@ MACRO_CONFIG_INT(MaMusicPlayerVisualizerGap, ma_music_player_visualizer_gap, 100
 MACRO_CONFIG_INT(MaMusicPlayerColorMode, ma_music_player_color_mode, 3, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player color mode (0=static, 1=cover accent, 2=dominant cover, 3=translucent)")
 MACRO_CONFIG_COL(MaMusicPlayerStaticColor, ma_music_player_static_color, 128, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Static color for the music player when static color mode is selected")
 MACRO_CONFIG_INT(MaMusicPlayerSizeMode, ma_music_player_size_mode, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player size mode (0=normal, 1=mini)")
-MACRO_CONFIG_INT(MaMusicPlayerTextScale, ma_music_player_text_scale, 100, 70, 150, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player text scale in percent")
+MACRO_CONFIG_INT(MaMusicPlayerTextScale, ma_music_player_text_scale, 84, 70, 150, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player text scale in percent")
 MACRO_CONFIG_INT(MaMusicPlayerAnimationMs, ma_music_player_animation_ms, 180, 50, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player animation duration in ms")
 MACRO_CONFIG_INT(MaMusicPlayerShowCover, ma_music_player_show_cover, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show cover art in the music player")
 MACRO_CONFIG_INT(MaMusicPlayerUseColorForHud, ma_music_player_use_color_for_hud, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use the Music Player color for HUD rectangles")
@@ -118,7 +118,7 @@ MACRO_CONFIG_INT(MaMusicVolume, ma_music_volume, 50, 0, 100, CFGFLAG_CLIENT | CF
 
 // ===== MUSIC PLAYER STYLE =====
 MACRO_CONFIG_INT(MaMusicPlayerStyle, ma_music_player_style, 0, 0, 4, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player style (0=Card, 1=Bar, 2=Minimal, 3=Disc, 4=Banner)")
-MACRO_CONFIG_INT(MaMusicPlayerCustomColors, ma_music_player_custom_colors, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use custom colors for music player")
+MACRO_CONFIG_INT(MaMusicPlayerCustomColors, ma_music_player_custom_colors, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use custom colors for music player")
 MACRO_CONFIG_COL(MaMusicPlayerColorBg, ma_music_player_color_bg, 0xCC0A0A14, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Music player background color")
 MACRO_CONFIG_COL(MaMusicPlayerColorAccent, ma_music_player_color_accent, 0xFF3B82F6, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player accent color")
 MACRO_CONFIG_COL(MaMusicPlayerColorText, ma_music_player_color_text, 0xFFFFFFFF, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player text color")
@@ -140,6 +140,16 @@ MACRO_CONFIG_INT(MaInputOthers, ma_input_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFL
 // ===== SNAP TAP =====
 MACRO_CONFIG_INT(MaSnapTap, ma_snap_tap, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Snap Tap for opposite left/right inputs")
 MACRO_CONFIG_INT(MaSnapTapDelay, ma_snap_tap_delay, 0, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Snap Tap direction switch delay in ms (0=off)")
+
+// ===== SPECTATOR PANEL =====
+MACRO_CONFIG_INT(MaSpectatorPanel, ma_spectator_panel, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show who is spectating you when spectator data is available")
+MACRO_CONFIG_INT(MaSpectatorPanelShowNames, ma_spectator_panel_show_names, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show spectator names when available")
+MACRO_CONFIG_INT(MaSpectatorPanelShowEmpty, ma_spectator_panel_show_empty, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep spectator panel visible with zero spectators")
+MACRO_CONFIG_INT(MaSpectatorPanelMaxNames, ma_spectator_panel_max_names, 5, 1, 16, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum spectator names shown in the panel")
+MACRO_CONFIG_INT(MaSpectatorPanelOpacity, ma_spectator_panel_opacity, 78, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Spectator panel opacity")
+MACRO_CONFIG_INT(MaSpectatorPanelHudX, ma_spectator_panel_hud_x, 370, -1000, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor X position for spectator panel")
+MACRO_CONFIG_INT(MaSpectatorPanelHudY, ma_spectator_panel_hud_y, 72, -1000, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor Y position for spectator panel")
+MACRO_CONFIG_INT(MaSpectatorPanelHudScale, ma_spectator_panel_hud_scale, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor scale for spectator panel")
 
 // ===== COMPONENT EDITOR =====
 MACRO_CONFIG_INT(MaComponentsMask, ma_components_mask, 0, 0, 65535, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bitmask for disabled MΛ ツ components")

@@ -349,6 +349,24 @@ bool ExtractOutgoingTranslatableText(const CGameClient &GameClient, const char *
 		return true;
 	return ExtractOutgoingChatPrefix(GameClient, pText, pPrefix, PrefixSize, pBody, BodySize);
 }
+
+bool IsKnownTranslateBackend(const char *pBackend)
+{
+	return str_comp_nocase(pBackend, "google") == 0 ||
+	       str_comp_nocase(pBackend, "ftapi") == 0 ||
+	       str_comp_nocase(pBackend, "libretranslate") == 0;
+}
+
+bool IsLocalTranslateEndpoint(const char *pEndpoint)
+{
+	return !pEndpoint || pEndpoint[0] == '\0' ||
+	       str_startswith_nocase(pEndpoint, "localhost") ||
+	       str_startswith_nocase(pEndpoint, "127.0.0.1") ||
+	       str_startswith_nocase(pEndpoint, "http://localhost") ||
+	       str_startswith_nocase(pEndpoint, "http://127.0.0.1") ||
+	       str_startswith_nocase(pEndpoint, "https://localhost") ||
+	       str_startswith_nocase(pEndpoint, "https://127.0.0.1");
+}
 }
 
 const char *ITranslateBackend::EncodeSource(const char *pSource) const
@@ -730,6 +748,14 @@ void CTranslate::ConToggleTranslate(IConsole::IResult *pResult, void *pUserData)
 
 void CTranslate::OnConsoleInit()
 {
+	if(!IsKnownTranslateBackend(g_Config.m_TcTranslateBackend) ||
+		(str_comp_nocase(g_Config.m_TcTranslateBackend, "libretranslate") == 0 && IsLocalTranslateEndpoint(g_Config.m_TcTranslateEndpoint)))
+	{
+		str_copy(g_Config.m_TcTranslateBackend, "google", sizeof(g_Config.m_TcTranslateBackend));
+		g_Config.m_TcTranslateEndpoint[0] = '\0';
+		g_Config.m_TcTranslateKey[0] = '\0';
+	}
+
 	if(g_Config.m_TcTranslateAuto && !g_Config.m_TcTranslateAutoIncoming && !g_Config.m_TcTranslateAutoOutgoing)
 	{
 		g_Config.m_TcTranslateAutoIncoming = 1;
@@ -751,13 +777,18 @@ std::unique_ptr<ITranslateBackend> CTranslate::CreateBackend(const char *pText, 
 	if(IsAutoLanguage(pTargetLanguage))
 		return nullptr;
 
-	if(str_comp_nocase(g_Config.m_TcTranslateBackend, "libretranslate") == 0)
+	const char *pBackend = g_Config.m_TcTranslateBackend;
+	if(!IsKnownTranslateBackend(pBackend) ||
+		(str_comp_nocase(pBackend, "libretranslate") == 0 && IsLocalTranslateEndpoint(g_Config.m_TcTranslateEndpoint)))
+	{
+		pBackend = "google";
+	}
+
+	if(str_comp_nocase(pBackend, "libretranslate") == 0)
 		return std::make_unique<CTranslateBackendLibretranslate>(*Http(), pText, pSourceLanguage, pTargetLanguage);
-	if(str_comp_nocase(g_Config.m_TcTranslateBackend, "ftapi") == 0)
+	if(str_comp_nocase(pBackend, "ftapi") == 0)
 		return std::make_unique<CTranslateBackendFtapi>(*Http(), pText, pTargetLanguage);
-	if(str_comp_nocase(g_Config.m_TcTranslateBackend, "google") == 0)
-		return std::make_unique<CTranslateBackendGoogle>(*Http(), pText, pSourceLanguage, pTargetLanguage);
-	return nullptr;
+	return std::make_unique<CTranslateBackendGoogle>(*Http(), pText, pSourceLanguage, pTargetLanguage);
 }
 
 const char *CTranslate::IncomingSourceLanguage() const
