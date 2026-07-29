@@ -3868,6 +3868,80 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 
 	s_SectionBoxes.back().h = LeftView.y - s_SectionBoxes.back().y;
 
+	// ***** Stream Chat ***** //
+	LeftView.HSplitTop(MarginBetweenSections, nullptr, &LeftView);
+	s_SectionBoxes.push_back(LeftView);
+	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
+	Ui()->DoLabel(&Label, TCLocalize("Chat de stream"), HeadlineFontSize, TEXTALIGN_ML);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaStreamChat, TCLocalize("Activar chat de stream"), &g_Config.m_MaStreamChat, &LeftView, LineSize))
+		GameClient()->m_StreamChat.RequestReconnect();
+
+	if(g_Config.m_MaStreamChat)
+	{
+		static std::vector<const char *> s_StreamChatPlatformNames;
+		s_StreamChatPlatformNames = {
+			TCLocalize("Twitch"),
+			TCLocalize("YouTube (pronto)"),
+			TCLocalize("Kick (pronto)")};
+		static CUi::SDropDownState s_StreamChatPlatformDropDownState;
+		static CScrollRegion s_StreamChatPlatformDropDownScrollRegion;
+		s_StreamChatPlatformDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_StreamChatPlatformDropDownScrollRegion;
+
+		g_Config.m_MaStreamChatPlatform = std::clamp(g_Config.m_MaStreamChatPlatform, 1, (int)s_StreamChatPlatformNames.size());
+		const int OldPlatform = g_Config.m_MaStreamChatPlatform - 1;
+		LeftView.HSplitTop(LineSize, &Row, &LeftView);
+		Row.VSplitLeft(120.0f, &Label, &Row);
+		Ui()->DoLabel(&Label, TCLocalize("Plataforma"), FontSize, TEXTALIGN_ML);
+		const int NewPlatform = Ui()->DoDropDown(&Row, OldPlatform, s_StreamChatPlatformNames.data(), s_StreamChatPlatformNames.size(), s_StreamChatPlatformDropDownState);
+		if(NewPlatform != OldPlatform)
+		{
+			g_Config.m_MaStreamChatPlatform = NewPlatform + 1;
+			GameClient()->m_StreamChat.RequestReconnect();
+		}
+
+		LeftView.HSplitTop(LineSize, &Row, &LeftView);
+		Row.VSplitLeft(120.0f, &Label, &Row);
+		Ui()->DoLabel(&Label, TCLocalize("Canal / URL"), FontSize, TEXTALIGN_ML);
+		static CLineInput s_StreamChatChannel(g_Config.m_MaStreamChatChannel, sizeof(g_Config.m_MaStreamChatChannel));
+		s_StreamChatChannel.SetEmptyText("twitch.tv/tu_canal");
+		if(Ui()->DoClearableEditBox(&s_StreamChatChannel, &Row, 12.0f))
+			GameClient()->m_StreamChat.RequestReconnect();
+
+		LeftView.HSplitTop(LineSize, &Row, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaStreamChatMaxLines, &g_Config.m_MaStreamChatMaxLines, &Row, TCLocalize("Lineas visibles"), 1, 24);
+
+		LeftView.HSplitTop(LineSize, &Row, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaStreamChatOpacity, &g_Config.m_MaStreamChatOpacity, &Row, TCLocalize("Opacidad"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+
+		LeftView.HSplitTop(LineSize + 4.0f, &Row, &LeftView);
+		Row.VSplitMid(&Button, &Row, MarginSmall);
+		static CButtonContainer s_StreamChatReconnectButton;
+		if(DoButton_Menu(&s_StreamChatReconnectButton, TCLocalize("Reconectar"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f))
+			GameClient()->m_StreamChat.RequestReconnect();
+		static CButtonContainer s_StreamChatHudEditorButton;
+		if(DoButton_Menu(&s_StreamChatHudEditorButton, TCLocalize("Editar HUD"), 0, &Row, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f) && (Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK))
+		{
+			SetActive(false);
+			GameClient()->m_HudEditor.Activate();
+		}
+
+		char aStreamChatStatus[128];
+		GameClient()->m_StreamChat.GetStatus(aStreamChatStatus, sizeof(aStreamChatStatus));
+		LeftView.HSplitTop(LineSize, &Row, &LeftView);
+		if(g_Config.m_MaStreamChatPlatform != 1)
+			TextRender()->TextColor(ColorRGBA(1.0f, 0.68f, 0.35f, 1.0f));
+		else
+			TextRender()->TextColor(ColorRGBA(0.72f, 0.82f, 1.0f, 1.0f));
+		Ui()->DoLabel(&Row, g_Config.m_MaStreamChatPlatform == 1 ? aStreamChatStatus : TCLocalize("YouTube y Kick quedan preparados para una version con API."), 11.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+	else
+		LeftView.HSplitTop(LineSize * 2.0f, nullptr, &LeftView);
+
+	s_SectionBoxes.back().h = LeftView.y - s_SectionBoxes.back().y;
+
 	// ***** 3D Particles ***** //
 	LeftView.HSplitTop(MarginBetweenSections, nullptr, &LeftView);
 	s_SectionBoxes.push_back(LeftView);
@@ -4274,11 +4348,12 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 		RightView.HSplitTop(LineSize, &Button, &RightView);
 		Ui()->DoScrollbarOption(&g_Config.m_MaStartupMusicVolume, &g_Config.m_MaStartupMusicVolume, &Button, TCLocalize("Volumen"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
 
-		const char *pStartupMusicDefaultPath = "ma/startup_music/welcome to ddnet.mp3";
+		const char *pStartupMusicDefaultPath = "ma/startup_music/welcome_to_ddnet.mp3";
+		const char *pStartupMusicSpacedDefaultPath = "ma/startup_music/welcome to ddnet.mp3";
 		const char *pStartupMusicOldDefaultPath = "ma/startup_music/ma_welcome_ddnet_client.mp3";
 		const char *pStartupMusicLegacyPath = "ma/startup_music/MONTAGEM CEINTA (Slowed).mp3";
 		const char *pStartupMusicLegacyWavPath = "ma/startup_music/ma_welcome_ddnet_client.wav";
-		if(str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicOldDefaultPath) == 0 || str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicLegacyPath) == 0 || str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicLegacyWavPath) == 0)
+		if(str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicSpacedDefaultPath) == 0 || str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicOldDefaultPath) == 0 || str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicLegacyPath) == 0 || str_comp(g_Config.m_MaStartupMusicPath, pStartupMusicLegacyWavPath) == 0)
 			str_copy(g_Config.m_MaStartupMusicPath, pStartupMusicDefaultPath, sizeof(g_Config.m_MaStartupMusicPath));
 
 		struct SStartupMusicFileListContext
@@ -4911,10 +4986,11 @@ void CMenus::RenderMaConfiguracion(CUIRect MainView)
 	if(g_Config.m_MaSpectatorPanel)
 	{
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaSpectatorPanelShowNames, TCLocalize("Mostrar nombres"), &g_Config.m_MaSpectatorPanelShowNames, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaSpectatorPanelOnlyWhenSpectated, TCLocalize("Solo mostrar cuando te espectean"), &g_Config.m_MaSpectatorPanelOnlyWhenSpectated, &RightView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaSpectatorPanelShowEmpty, TCLocalize("Mostrar aunque este vacio"), &g_Config.m_MaSpectatorPanelShowEmpty, &RightView, LineSize);
 
 		RightView.HSplitTop(LineSize, &Button, &RightView);
-		Ui()->DoScrollbarOption(&g_Config.m_MaSpectatorPanelMaxNames, &g_Config.m_MaSpectatorPanelMaxNames, &Button, TCLocalize("Max nombres"), 1, 16);
+		Ui()->DoScrollbarOption(&g_Config.m_MaSpectatorPanelMaxNames, &g_Config.m_MaSpectatorPanelMaxNames, &Button, TCLocalize("Max nombres"), 1, 64);
 		RightView.HSplitTop(LineSize, &Button, &RightView);
 		Ui()->DoScrollbarOption(&g_Config.m_MaSpectatorPanelOpacity, &g_Config.m_MaSpectatorPanelOpacity, &Button, TCLocalize("Opacidad"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
 

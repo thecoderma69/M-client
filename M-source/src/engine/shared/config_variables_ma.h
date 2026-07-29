@@ -77,6 +77,16 @@ MACRO_CONFIG_INT(MaChatMediaContentFilter, ma_chat_media_content_filter, 1, 0, 1
 MACRO_CONFIG_STR(MaChatMediaAllowedDomains, ma_chat_media_allowed_domains, 512, "tenor.com; tenor.googleapis.com; imgur.com; giphy.com; discordapp.com; discordapp.net", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Semicolon-separated allowlist for chat media domains")
 MACRO_CONFIG_INT(MaChatMediaPreviewMaxWidth, ma_chat_media_preview_max_width, 220, 120, 400, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum width of chat media previews")
 
+// ===== STREAM CHAT =====
+MACRO_CONFIG_INT(MaStreamChat, ma_stream_chat, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show external stream chat overlay")
+MACRO_CONFIG_INT(MaStreamChatPlatform, ma_stream_chat_platform, 1, 1, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Stream chat platform (1=Twitch, 2=YouTube, 3=Kick)")
+MACRO_CONFIG_STR(MaStreamChatChannel, ma_stream_chat_channel, 128, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Stream chat channel or URL")
+MACRO_CONFIG_INT(MaStreamChatMaxLines, ma_stream_chat_max_lines, 8, 1, 24, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum stream chat lines shown")
+MACRO_CONFIG_INT(MaStreamChatOpacity, ma_stream_chat_opacity, 82, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Stream chat panel opacity")
+MACRO_CONFIG_INT(MaStreamChatHudX, ma_stream_chat_hud_x, 6, -1000, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor X position for stream chat")
+MACRO_CONFIG_INT(MaStreamChatHudY, ma_stream_chat_hud_y, 96, -1000, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor Y position for stream chat")
+MACRO_CONFIG_INT(MaStreamChatHudScale, ma_stream_chat_hud_scale, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor scale for stream chat")
+
 // ===== MUSIC VIDEO EFFECT =====
 MACRO_CONFIG_INT(MaMusicVideoEffect, ma_music_video_effect, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable circular music video effect")
 MACRO_CONFIG_INT(MaMusicVideoEffectSize, ma_music_video_effect_size, 120, 40, 240, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music video effect size in percent")
@@ -94,7 +104,7 @@ MACRO_CONFIG_STR(MaMusicVideoEffectImagePath, ma_music_video_effect_image_path, 
 // ===== STARTUP MUSIC =====
 MACRO_CONFIG_INT(MaStartupMusic, ma_startup_music, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Play a custom song once when opening the client")
 MACRO_CONFIG_INT(MaStartupMusicVolume, ma_startup_music_volume, 55, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Startup music volume")
-MACRO_CONFIG_STR(MaStartupMusicPath, ma_startup_music_path, IO_MAX_PATH_LENGTH, "ma/startup_music/welcome to ddnet.mp3", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Path to the custom startup music file")
+MACRO_CONFIG_STR(MaStartupMusicPath, ma_startup_music_path, IO_MAX_PATH_LENGTH, "ma/startup_music/welcome_to_ddnet.mp3", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Path to the custom startup music file")
 
 // ===== MUSIC PLAYER =====
 MACRO_CONFIG_INT(MaMusicPlayer, ma_music_player, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Music Player HUD element")
@@ -148,7 +158,8 @@ MACRO_CONFIG_INT(MaSnapTapDelay, ma_snap_tap_delay, 0, 0, 200, CFGFLAG_CLIENT | 
 MACRO_CONFIG_INT(MaSpectatorPanel, ma_spectator_panel, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show who is spectating you when spectator data is available")
 MACRO_CONFIG_INT(MaSpectatorPanelShowNames, ma_spectator_panel_show_names, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show spectator names when available")
 MACRO_CONFIG_INT(MaSpectatorPanelShowEmpty, ma_spectator_panel_show_empty, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep spectator panel visible with zero spectators")
-MACRO_CONFIG_INT(MaSpectatorPanelMaxNames, ma_spectator_panel_max_names, 5, 1, 16, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum spectator names shown in the panel")
+MACRO_CONFIG_INT(MaSpectatorPanelOnlyWhenSpectated, ma_spectator_panel_only_when_spectated, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Only show the spectator panel when somebody is spectating you")
+MACRO_CONFIG_INT(MaSpectatorPanelMaxNames, ma_spectator_panel_max_names, 64, 1, 64, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum spectator names shown in the panel")
 MACRO_CONFIG_INT(MaSpectatorPanelOpacity, ma_spectator_panel_opacity, 78, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Spectator panel opacity")
 MACRO_CONFIG_INT(MaSpectatorPanelHudX, ma_spectator_panel_hud_x, 370, -1000, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor X position for spectator panel")
 MACRO_CONFIG_INT(MaSpectatorPanelHudY, ma_spectator_panel_hud_y, 72, -1000, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor Y position for spectator panel")

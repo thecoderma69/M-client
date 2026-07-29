@@ -1,4 +1,4 @@
-#include "particles3d.h"
+﻿#include "particles3d.h"
 
 #include "visualizer/service.h"
 
@@ -94,7 +94,7 @@ static const std::array<std::array<int, 2>, 12> g_aCubeEdges = { {
 } };
 
 static constexpr int HEART_POINTS = 96;
-static constexpr int HEART_LOW_POINTS = 14;
+static constexpr int HEART_LOW_POINTS = 24;
 static constexpr int SHAPE_LAYERS = 2;
 static constexpr int MAX_SHAPE_POINTS = 64;
 static constexpr float HEART_THICKNESS = 0.35f;
@@ -431,13 +431,28 @@ void CMa3DParticles::OnRender()
 
 	float VMinX = SX0, VMaxX = SX1, VMinY = SY0, VMaxY = SY1;
 	float SpawnMinX = SX0, SpawnMaxX = SX1, SpawnMinY = SY0, SpawnMaxY = SY1;
+	const float ScreenW = maximum(SX1 - SX0, 1.0f);
+	const float ScreenH = maximum(SY1 - SY0, 1.0f);
+
+	float SizeMin = (float)std::clamp(g_Config.m_Ma3dParticlesSizeMin, 2, 200);
+	float SizeMax = (float)std::clamp(g_Config.m_Ma3dParticlesSizeMax, 2, 200);
+	if(SizeMin > SizeMax)
+		std::swap(SizeMin, SizeMax);
+	float Speed = (float)std::clamp(g_Config.m_Ma3dParticlesSpeed, 1, 500);
+
+	const float KeepMarginX = maximum(ScreenW * 0.18f, SizeMax * 24.0f);
+	const float KeepMarginY = maximum(ScreenH * 0.18f, SizeMax * 24.0f);
+	const float KeepMinX = VMinX - KeepMarginX;
+	const float KeepMaxX = VMaxX + KeepMarginX;
+	const float KeepMinY = VMinY - KeepMarginY;
+	const float KeepMaxY = VMaxY + KeepMarginY;
+
 
 	int TargetCount = std::clamp(g_Config.m_Ma3dParticlesCount, 0, PARTICLE_MAX);
 	if(g_Config.m_MaPerformanceGuard)
 	{
 		const int GuardMax = std::clamp(g_Config.m_MaPerformanceGuardMax3dParticles, 10, PARTICLE_MAX);
-		const int GuardCount = std::clamp(round_to_int((float)GuardMax * Lod), 10, GuardMax);
-		TargetCount = std::min(TargetCount, GuardCount);
+		TargetCount = std::min(TargetCount, GuardMax);
 	}
 	if((int)m_vParticles.size() > TargetCount)
 		m_vParticles.resize(TargetCount);
@@ -480,7 +495,7 @@ void CMa3DParticles::OnRender()
 		P.m_Vel *= 0.995f;
 		P.m_Pos.z = std::clamp(P.m_Pos.z, -Depth, Depth);
 
-		if((P.m_Pos.x < VMinX || P.m_Pos.x > VMaxX || P.m_Pos.y < VMinY || P.m_Pos.y > VMaxY) && !P.m_FadingOut)
+		if((P.m_Pos.x < KeepMinX || P.m_Pos.x > KeepMaxX || P.m_Pos.y < KeepMinY || P.m_Pos.y > KeepMaxY) && !P.m_FadingOut)
 		{
 			P.m_FadingOut = true;
 			P.m_FadeOutStart = m_Time;
@@ -513,9 +528,6 @@ void CMa3DParticles::OnRender()
 	int Missing = TargetCount - (int)m_vParticles.size();
 	const int SpawnBudget = g_Config.m_MaPerformanceGuard ? std::clamp(round_to_int(8.0f * Lod), 1, 8) : 8;
 	int SpawnNow = std::min(Missing, SpawnBudget);
-	float SizeMin = (float)g_Config.m_Ma3dParticlesSizeMin;
-	float SizeMax = (float)g_Config.m_Ma3dParticlesSizeMax;
-	float Speed = (float)g_Config.m_Ma3dParticlesSpeed;
 
 	for(int i = 0; i < SpawnNow; i++)
 	{
@@ -614,6 +626,7 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 	};
 
 	auto DrawExtrudedPolyline = [&](const SParticle &Part, const vec3 &RenderPos, float RenderSize, float FinalAlpha, const vec3 *pVerts, int NumPoints, bool Closed, float ScaleMul, float Thickness, bool CenterSpokes) {
+		(void)CenterSpokes;
 		if(NumPoints < 2 || NumPoints > MAX_SHAPE_POINTS)
 			return;
 
@@ -624,12 +637,10 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 		const int RenderLayers = LowDetail ? 1 : SHAPE_LAYERS;
 		const float LayerStep = RenderLayers > 1 ? 2.0f / (float)(RenderLayers - 1) : 0.0f;
 		std::array<std::array<vec2, MAX_SHAPE_POINTS>, SHAPE_LAYERS> aProjected;
-		std::array<float, SHAPE_LAYERS> aLayerZ;
 		for(int L = 0; L < RenderLayers; L++)
 		{
 			const float LayerT = RenderLayers > 1 ? -1.0f + LayerStep * (float)L : 0.0f;
 			const float Z = LayerT * (RenderSize * Thickness);
-			aLayerZ[L] = Z;
 			const float LayerScale = 1.0f - std::abs(LayerT) * 0.08f;
 			for(int i = 0; i < NumPoints; i++)
 			{
@@ -660,31 +671,6 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 			for(int i = 0; i < NumPoints; i++)
 				aVertical[i] = IGraphics::CLineItem(aProjected[L][i], aProjected[L + 1][i]);
 			Graphics()->LinesDraw(aVertical.data(), NumPoints);
-
-			std::array<IGraphics::CLineItem, MAX_SHAPE_POINTS> aDiagonal;
-			for(int i = 0; i < RingLineCount; i++)
-			{
-				const int Next = (i + 1) % NumPoints;
-				aDiagonal[i] = IGraphics::CLineItem(aProjected[L][i], aProjected[L + 1][Next]);
-			}
-			Graphics()->LinesDraw(aDiagonal.data(), RingLineCount);
-		}
-
-		if(CenterSpokes && Closed)
-		{
-			const int Front = 0;
-			const int Back = RenderLayers - 1;
-			const vec2 CenterFront = ProjectPoint(RotateWith(vec3(0.0f, 0.0f, aLayerZ[Front]), Rot) + RenderPos, Center);
-			const vec2 CenterBack = ProjectPoint(RotateWith(vec3(0.0f, 0.0f, aLayerZ[Back]), Rot) + RenderPos, Center);
-			std::array<IGraphics::CLineItem, MAX_SHAPE_POINTS> aFront;
-			std::array<IGraphics::CLineItem, MAX_SHAPE_POINTS> aBack;
-			for(int i = 0; i < NumPoints; i++)
-			{
-				aFront[i] = IGraphics::CLineItem(CenterFront, aProjected[Front][i]);
-				aBack[i] = IGraphics::CLineItem(CenterBack, aProjected[Back][i]);
-			}
-			Graphics()->LinesDraw(aFront.data(), NumPoints);
-			Graphics()->LinesDraw(aBack.data(), NumPoints);
 		}
 	};
 
@@ -718,12 +704,10 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 		const int RenderLayers = LowDetail ? 1 : SHAPE_LAYERS;
 		const float LayerStep = RenderLayers > 1 ? 2.0f / (float)(RenderLayers - 1) : 0.0f;
 		std::array<std::array<vec2, HEART_LOW_POINTS>, SHAPE_LAYERS> aProjected;
-		std::array<float, SHAPE_LAYERS> aLayerZ;
 		for(int L = 0; L < RenderLayers; L++)
 		{
 			const float LayerT = RenderLayers > 1 ? -1.0f + LayerStep * (float)L : 0.0f;
 			const float Z = LayerT * (RenderSize * HEART_THICKNESS);
-			aLayerZ[L] = Z;
 			const float LayerScale = 1.0f - std::abs(LayerT) * 0.08f;
 			for(int i = 0; i < HEART_LOW_POINTS; i++)
 			{
@@ -750,30 +734,10 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 		for(int L = 0; L < RenderLayers - 1; L++)
 		{
 			std::array<IGraphics::CLineItem, HEART_LOW_POINTS> aVertical;
-			std::array<IGraphics::CLineItem, HEART_LOW_POINTS> aDiagonal;
 			for(int i = 0; i < HEART_LOW_POINTS; i++)
-			{
-				const int Next = (i + 1) % HEART_LOW_POINTS;
 				aVertical[i] = IGraphics::CLineItem(aProjected[L][i], aProjected[L + 1][i]);
-				aDiagonal[i] = IGraphics::CLineItem(aProjected[L][i], aProjected[L + 1][Next]);
-			}
 			Graphics()->LinesDraw(aVertical.data(), aVertical.size());
-			Graphics()->LinesDraw(aDiagonal.data(), aDiagonal.size());
 		}
-
-		const int Front = 0;
-		const int Back = RenderLayers - 1;
-		const vec2 CenterFront = ProjectPoint(RotateWith(vec3(0.0f, 0.0f, aLayerZ[Front]), Rot) + RenderPos, Center);
-		const vec2 CenterBack = ProjectPoint(RotateWith(vec3(0.0f, 0.0f, aLayerZ[Back]), Rot) + RenderPos, Center);
-		std::array<IGraphics::CLineItem, HEART_LOW_POINTS> aFront;
-		std::array<IGraphics::CLineItem, HEART_LOW_POINTS> aBack;
-		for(int i = 0; i < HEART_LOW_POINTS; i++)
-		{
-			aFront[i] = IGraphics::CLineItem(CenterFront, aProjected[Front][i]);
-			aBack[i] = IGraphics::CLineItem(CenterBack, aProjected[Back][i]);
-		}
-		Graphics()->LinesDraw(aFront.data(), aFront.size());
-		Graphics()->LinesDraw(aBack.data(), aBack.size());
 	};
 
 	auto DrawStar = [&](const SParticle &Part, const vec3 &RenderPos, float RenderSize, float FinalAlpha) {
@@ -784,12 +748,10 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 		const int RenderLayers = LowDetail ? 1 : SHAPE_LAYERS;
 		const float LayerStep = RenderLayers > 1 ? 2.0f / (float)(RenderLayers - 1) : 0.0f;
 		std::array<std::array<vec2, STAR_POINTS>, SHAPE_LAYERS> aProjected;
-		std::array<float, SHAPE_LAYERS> aLayerZ;
 		for(int L = 0; L < RenderLayers; L++)
 		{
 			const float LayerT = RenderLayers > 1 ? -1.0f + LayerStep * (float)L : 0.0f;
 			const float Z = LayerT * (RenderSize * STAR_THICKNESS);
-			aLayerZ[L] = Z;
 			const float LayerScale = 1.0f - std::abs(LayerT) * 0.08f;
 			for(int i = 0; i < STAR_POINTS; i++)
 			{
@@ -816,30 +778,10 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 		for(int L = 0; L < RenderLayers - 1; L++)
 		{
 			std::array<IGraphics::CLineItem, STAR_POINTS> aVertical;
-			std::array<IGraphics::CLineItem, STAR_POINTS> aDiagonal;
 			for(int i = 0; i < STAR_POINTS; i++)
-			{
-				const int Next = (i + 1) % STAR_POINTS;
 				aVertical[i] = IGraphics::CLineItem(aProjected[L][i], aProjected[L + 1][i]);
-				aDiagonal[i] = IGraphics::CLineItem(aProjected[L][i], aProjected[L + 1][Next]);
-			}
 			Graphics()->LinesDraw(aVertical.data(), aVertical.size());
-			Graphics()->LinesDraw(aDiagonal.data(), aDiagonal.size());
 		}
-
-		const int Front = 0;
-		const int Back = RenderLayers - 1;
-		const vec2 CenterFront = ProjectPoint(RotateWith(vec3(0.0f, 0.0f, aLayerZ[Front]), Rot) + RenderPos, Center);
-		const vec2 CenterBack = ProjectPoint(RotateWith(vec3(0.0f, 0.0f, aLayerZ[Back]), Rot) + RenderPos, Center);
-		std::array<IGraphics::CLineItem, STAR_POINTS> aFront;
-		std::array<IGraphics::CLineItem, STAR_POINTS> aBack;
-		for(int i = 0; i < STAR_POINTS; i++)
-		{
-			aFront[i] = IGraphics::CLineItem(CenterFront, aProjected[Front][i]);
-			aBack[i] = IGraphics::CLineItem(CenterBack, aProjected[Back][i]);
-		}
-		Graphics()->LinesDraw(aFront.data(), aFront.size());
-		Graphics()->LinesDraw(aBack.data(), aBack.size());
 	};
 
 	auto DrawDiamond = [&](const SParticle &Part, const vec3 &RenderPos, float RenderSize, float FinalAlpha) {

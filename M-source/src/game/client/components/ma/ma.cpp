@@ -1,4 +1,4 @@
-#include "ma.h"
+﻿#include "ma.h"
 
 #include "visualizer/service.h"
 
@@ -41,11 +41,12 @@ namespace
 constexpr float MAX_EFFECT_DELTA = 0.1f;
 constexpr int MAX_MUSIC_VIDEO_POINTS = 192;
 constexpr float MUSIC_VIDEO_EDITOR_RECT_SCALE = 0.70f;
-constexpr const char *STARTUP_MUSIC_DEFAULT_PATH = "ma/startup_music/welcome to ddnet.mp3";
+constexpr const char *STARTUP_MUSIC_DEFAULT_PATH = "ma/startup_music/welcome_to_ddnet.mp3";
+constexpr const char *STARTUP_MUSIC_SPACED_DEFAULT_PATH = "ma/startup_music/welcome to ddnet.mp3";
 constexpr const char *STARTUP_MUSIC_OLD_DEFAULT_MP3_PATH = "ma/startup_music/ma_welcome_ddnet_client.mp3";
 constexpr const char *STARTUP_MUSIC_LEGACY_MP3_PATH = "ma/startup_music/MONTAGEM CEINTA (Slowed).mp3";
 constexpr const char *STARTUP_MUSIC_LEGACY_WAV_PATH = "ma/startup_music/ma_welcome_ddnet_client.wav";
-constexpr int MAX_SPECTATOR_PANEL_LINES = 18;
+constexpr int MAX_SPECTATOR_PANEL_LINES = MAX_CLIENTS + 1;
 constexpr int SPECTATOR_PANEL_LINE_LENGTH = MAX_NAME_LENGTH + 32;
 
 struct SSpectatorPanelState
@@ -193,15 +194,18 @@ static bool BuildSpectatorPanelState(CGameClient *pGameClient, bool Sixup, bool 
 				CandidateCount++;
 			}
 
-			if(CandidateCount > 0 && CandidateCount <= State.m_Count)
+			if(CandidateCount > 0)
 			{
 				for(int i = 0; i < CandidateCount; i++)
 					AddSpectatorPanelName(State, pGameClient->m_aClients[aCandidateIds[i]].m_aName, aCandidateIds[i]);
 				State.m_NamesExact = CandidateCount == State.m_Count;
+				State.m_Count = maximum(State.m_Count, CandidateCount);
 			}
 		}
 	}
 
+	if(g_Config.m_MaSpectatorPanelOnlyWhenSpectated && State.m_Count <= 0)
+		return false;
 	if(State.m_Count <= 0 && !g_Config.m_MaSpectatorPanelShowEmpty)
 		return false;
 	return true;
@@ -228,7 +232,7 @@ static int BuildSpectatorPanelLines(const SSpectatorPanelState &State, bool Forc
 
 	if(State.m_NamesExact)
 	{
-		const int MaxNames = ForcePreview ? 3 : std::clamp(g_Config.m_MaSpectatorPanelMaxNames, 1, 16);
+		const int MaxNames = ForcePreview ? 3 : std::clamp(g_Config.m_MaSpectatorPanelMaxNames, 1, (int)MAX_CLIENTS);
 		const int VisibleNames = minimum(State.m_NameCount, MaxNames);
 		for(int i = 0; i < VisibleNames; i++)
 			AddLine(State.m_aaNames[i]);
@@ -241,7 +245,7 @@ static int BuildSpectatorPanelLines(const SSpectatorPanelState &State, bool Forc
 	}
 	else if(State.m_Count > 0)
 	{
-		const int MaxNames = ForcePreview ? 3 : std::clamp(g_Config.m_MaSpectatorPanelMaxNames, 1, 16);
+		const int MaxNames = ForcePreview ? 3 : std::clamp(g_Config.m_MaSpectatorPanelMaxNames, 1, (int)MAX_CLIENTS);
 		const int VisibleNames = minimum(State.m_NameCount, MaxNames);
 		for(int i = 0; i < VisibleNames; i++)
 			AddLine(State.m_aaNames[i]);
@@ -515,6 +519,8 @@ CMa::CMa()
 void CMa::OnInit()
 {
 	m_pGraphics = Kernel()->RequestInterface<IEngineGraphics>();
+	if(g_Config.m_MaSpectatorPanelMaxNames == 5)
+		g_Config.m_MaSpectatorPanelMaxNames = MAX_CLIENTS;
 }
 
 void CMa::OnReset()
@@ -692,7 +698,7 @@ bool CMa::StartStartupMusic(bool ForceRestart)
 	StopStartupMusic();
 
 	const char *pPath = g_Config.m_MaStartupMusicPath;
-	if(pPath == nullptr || pPath[0] == '\0' || str_comp(pPath, STARTUP_MUSIC_OLD_DEFAULT_MP3_PATH) == 0 || str_comp(pPath, STARTUP_MUSIC_LEGACY_MP3_PATH) == 0 || str_comp(pPath, STARTUP_MUSIC_LEGACY_WAV_PATH) == 0)
+	if(pPath == nullptr || pPath[0] == '\0' || str_comp(pPath, STARTUP_MUSIC_SPACED_DEFAULT_PATH) == 0 || str_comp(pPath, STARTUP_MUSIC_OLD_DEFAULT_MP3_PATH) == 0 || str_comp(pPath, STARTUP_MUSIC_LEGACY_MP3_PATH) == 0 || str_comp(pPath, STARTUP_MUSIC_LEGACY_WAV_PATH) == 0)
 	{
 		str_copy(g_Config.m_MaStartupMusicPath, STARTUP_MUSIC_DEFAULT_PATH, sizeof(g_Config.m_MaStartupMusicPath));
 		pPath = STARTUP_MUSIC_DEFAULT_PATH;

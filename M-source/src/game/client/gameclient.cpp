@@ -177,6 +177,7 @@ void CGameClient::OnConsoleInit()
 					      &m_StatusBar, // TClient
 					      &m_InfoMessages,
 					      &m_Chat,
+					      &m_StreamChat, // MA Stream Chat
 					      &m_Broadcast,
 					      &m_ImportantAlert,
 					      &m_DebugHud,

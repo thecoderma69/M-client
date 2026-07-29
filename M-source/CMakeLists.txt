@@ -1561,7 +1561,7 @@ set(EXPECTED_DATA
   languages/traditional_chinese.txt
   languages/turkish.txt
   languages/ukrainian.txt
-  ma/startup_music/ma_welcome_ddnet_client.mp3
+  ma/startup_music/welcome_to_ddnet.mp3
   mapres/basic_freeze.png
   mapres/bg_cloud1.png
   mapres/bg_cloud2.png
@@ -2659,6 +2659,8 @@ if(CLIENT)
     components/ma/ma.h
     components/ma/music_player.cpp
     components/ma/music_player.h
+    components/ma/stream_chat.cpp
+    components/ma/stream_chat.h
     components/ma/hud_editor.cpp
     components/ma/hud_editor.h
     components/ma/editors/menus_assets_editor.cpp

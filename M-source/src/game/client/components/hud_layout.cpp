@@ -40,6 +40,7 @@ namespace HudLayout
 			{150.0f, 50.0f, 100, 0, true, false, 0x66000000U},
 			{250.0f, 11.0f, 100, 0, true, false, 0x66000000U},
 			{370.0f, 72.0f, 100, 0, true, true, 0xAA050510U},
+			{6.0f, 96.0f, 100, 0, true, true, 0xAA050510U},
 		};
 
 		static SModuleLayout gs_aRuntimeModuleLayouts[MODULE_COUNT];
@@ -95,6 +96,7 @@ namespace HudLayout
 			"Efecto Musica Video",
 			"Contador congelados",
 			"Espectadores",
+			"Chat de stream",
 		};
 
 		SModuleLayout ConfigLayout(EModule Module)
@@ -149,6 +151,10 @@ namespace HudLayout
 				if(HasRuntimeOverrideInternal(Module))
 					return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
 				return {(float)g_Config.m_MaSpectatorPanelHudX, (float)g_Config.m_MaSpectatorPanelHudY, g_Config.m_MaSpectatorPanelHudScale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
+			case MODULE_STREAM_CHAT:
+				if(HasRuntimeOverrideInternal(Module))
+					return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
+				return {(float)g_Config.m_MaStreamChatHudX, (float)g_Config.m_MaStreamChatHudY, g_Config.m_MaStreamChatHudScale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
 			default:
 				return Runtime;
 			}
@@ -181,6 +187,11 @@ namespace HudLayout
 				g_Config.m_MaSpectatorPanelHudX = round_to_int(Layout.m_X);
 				g_Config.m_MaSpectatorPanelHudY = round_to_int(Layout.m_Y);
 				g_Config.m_MaSpectatorPanelHudScale = Layout.m_Scale;
+				break;
+			case MODULE_STREAM_CHAT:
+				g_Config.m_MaStreamChatHudX = round_to_int(Layout.m_X);
+				g_Config.m_MaStreamChatHudY = round_to_int(Layout.m_Y);
+				g_Config.m_MaStreamChatHudScale = Layout.m_Scale;
 				break;
 			default:
 				break;

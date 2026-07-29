@@ -86,6 +86,7 @@
 #include "components/ma/ma.h"
 #include "components/ma/particles3d.h"
 #include "components/ma/music_player.h"
+#include "components/ma/stream_chat.h"
 #include "components/ma/hud_editor.h"
 #include "components/tooltips.h"
 #include "components/touch_controls.h"
@@ -241,6 +242,7 @@ public:
 	CMa m_Ma;
 	CMa3DParticles m_Ma3DParticles;
 	CMusicPlayer m_MusicPlayer;
+	CStreamChat m_StreamChat;
 	CHudEditor m_HudEditor;
 
 private:

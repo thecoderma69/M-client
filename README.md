@@ -1,4 +1,4 @@
-# MΛ ツ Client 2.1.6
+# MΛ ツ Client 2.1.7
 
 Cliente personalizado basado en DDNet/TClient para Windows x64, preparado para descargar, extraer y jugar.
 
@@ -8,7 +8,7 @@ Repositorio oficial: [thecoderma69/M-client](https://github.com/thecoderma69/M-c
 
 MΛ ツ Client es una version modificada del cliente DDNet con mejoras visuales, opciones de personalizacion, herramientas de comodidad y recursos propios.
 
-La version 2.1.6 corrige la carga de medios del chat, especialmente enlaces GIF de Tenor e Imgur.
+La version 2.1.7 agrega chat de stream para Twitch y corrige el guardado del HUD del chat de stream.
 
 ## Descargar
 
@@ -19,7 +19,7 @@ El juego listo para usar esta en:
 Descarga:
 
 ```txt
-M-Client-v2.1.6-win64.zip
+M-Client-v2.1.7-win64.zip
 ```
 
 Luego extrae el `.zip` y abre:
@@ -36,6 +36,12 @@ El codigo fuente esta en:
 M-source/
 ```
 
+## Novedades De La Version 2.1.7
+
+- Nuevo `Chat de stream` en `MΛ ツ > Visual` para ver el chat de Twitch dentro del juego.
+- El `Chat de stream` se puede mover y redimensionar desde el editor de HUD, guardando posicion y tamano.
+- Correccion del guardado de posicion del HUD del chat de stream.
+- Texto del menu principal actualizado a `MΛ ツ 2.1.7`.
 ## Novedades De La Version 2.1.6
 
 - Correccion de carga para GIFs e imagenes del chat.
@@ -218,7 +224,7 @@ Desde `MΛ ツ > Visual` puedes recargar la lista, elegir la imagen y ajustar ta
 ## Estructura De La Descarga
 
 ```txt
-M-Client-v2.1.6-win64/
+M-Client-v2.1.7-win64/
 |-- data/                 # Archivos de datos y recursos del cliente
 |-- DDNet.exe             # Ejecutable principal
 |-- DDNet-Server.exe      # Ejecutable del servidor
