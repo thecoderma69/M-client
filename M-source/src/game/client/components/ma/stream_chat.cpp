@@ -1,5 +1,6 @@
 #include "stream_chat.h"
 
+#include <base/color.h>
 #include <base/math.h>
 #include <base/net.h>
 #include <base/str.h>
@@ -469,13 +470,15 @@ CUIRect CStreamChat::GetHudEditorRect(bool ForcePreview) const
 		return CUIRect{};
 
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	const int MaxLines = ForcePreview ? STREAM_CHAT_PREVIEW_LINES : std::clamp(g_Config.m_MaStreamChatMaxLines, 1, 24);
-	const float BoxWidth = 168.0f * Scale;
+	const float BoxWidth = 168.0f * Scale * WidthStretch;
 	const float Padding = 5.0f * Scale;
 	const float HeaderFont = 6.8f * Scale;
 	const float LineFont = 5.2f * Scale;
 	const float LineGap = 1.3f * Scale;
-	const float BoxHeight = Padding * 2.0f + HeaderFont + 3.0f * Scale + MaxLines * LineFont + maximum(0, MaxLines - 1) * LineGap;
+	const float BoxHeight = (Padding * 2.0f + HeaderFont + 3.0f * Scale + MaxLines * LineFont + maximum(0, MaxLines - 1) * LineGap) * HeightStretch;
 	HudLayout::SModuleRect RawRect{Layout.m_X, Layout.m_Y, BoxWidth, BoxHeight, 5.0f * Scale};
 	const HudLayout::SModuleRect Clamped = HudLayout::ClampRectToScreen(RawRect, Width, Height);
 	return {Clamped.m_X, Clamped.m_Y, Clamped.m_W, Clamped.m_H};
@@ -505,8 +508,9 @@ void CStreamChat::RenderPanel(bool ForcePreview)
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_STREAM_CHAT, Width, Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-	const float Alpha = ForcePreview ? 0.84f : std::clamp(g_Config.m_MaStreamChatOpacity / 100.0f, 0.0f, 1.0f);
-	if(Alpha <= 0.0f)
+	const float BackgroundAlpha = ForcePreview ? 0.84f : std::clamp(g_Config.m_MaStreamChatOpacity / 100.0f, 0.0f, 1.0f);
+	const float TextAlpha = ForcePreview ? 0.95f : std::clamp(g_Config.m_MaStreamChatTextOpacity / 100.0f, 0.0f, 1.0f);
+	if(BackgroundAlpha <= 0.0f && TextAlpha <= 0.0f)
 	{
 		Graphics()->MapScreen(PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1);
 		return;
@@ -544,8 +548,8 @@ void CStreamChat::RenderPanel(bool ForcePreview)
 	const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, Rect.x, Rect.y, Rect.w, Rect.h, Width, Height);
 
 	Graphics()->TextureClear();
-	if(Layout.m_BackgroundEnabled)
-		Graphics()->DrawRect(Rect.x, Rect.y, Rect.w, Rect.h, ColorRGBA(0.015f, 0.017f, 0.035f, 0.78f * Alpha), Corners, 5.0f * Scale);
+	if(Layout.m_BackgroundEnabled && BackgroundAlpha > 0.0f)
+		Graphics()->DrawRect(Rect.x, Rect.y, Rect.w, Rect.h, ColorRGBA(0.015f, 0.017f, 0.035f, 0.78f * BackgroundAlpha), Corners, 5.0f * Scale);
 
 	float x = Rect.x + Padding;
 	float y = Rect.y + Padding;
@@ -556,26 +560,60 @@ void CStreamChat::RenderPanel(bool ForcePreview)
 	else
 		str_copy(aTitle, TCLocalize("Chat de stream"), sizeof(aTitle));
 
-	TextRender()->TextColor(ColorRGBA(0.64f, 0.44f, 1.0f, Alpha));
+	ColorRGBA MessageColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_MaStreamChatTextColor));
+	ColorRGBA HeaderColor(0.64f, 0.44f, 1.0f, TextAlpha);
+	TextRender()->TextColor(HeaderColor);
 	TextRender()->Text(x, y, HeaderFont, aTitle, Rect.w - Padding * 2.0f);
 	y += HeaderFont + 3.0f * Scale;
 
-	int Start = maximum(0, (int)vLines.size() - MaxLines);
+	const float TextMaxWidth = maximum(1.0f, Rect.w - Padding * 2.0f);
+	const int MaxRowsPerMessage = 3;
+	auto WrappedRows = [&](const char *pText, int MaxRows) {
+		int LineCount = 1;
+		STextSizeProperties Props;
+		Props.m_pLineCount = &LineCount;
+		TextRender()->TextWidth(LineFont, pText, -1, TextMaxWidth, 0, Props);
+		return std::clamp(LineCount, 1, maximum(1, MaxRows));
+	};
+	auto RenderWrappedText = [&](const char *pText, int Rows, float AlphaScale) {
+		CTextCursor Cursor;
+		Cursor.SetPosition(vec2(x, y));
+		Cursor.m_FontSize = LineFont;
+		Cursor.m_LineWidth = TextMaxWidth;
+		Cursor.m_LineSpacing = LineGap;
+		Cursor.m_MaxLines = Rows;
+		MessageColor.a = TextAlpha * AlphaScale;
+		TextRender()->TextColor(MessageColor);
+		TextRender()->TextEx(&Cursor, pText);
+		y += Rows * (LineFont + LineGap);
+	};
+
 	if(vLines.empty())
 	{
-		TextRender()->TextColor(ColorRGBA(0.82f, 0.84f, 0.92f, Alpha * 0.9f));
-		TextRender()->Text(x, y, LineFont, aStatus, Rect.w - Padding * 2.0f);
+		const int Rows = minimum(WrappedRows(aStatus, MaxLines), MaxLines);
+		RenderWrappedText(aStatus, Rows, 0.9f);
 	}
 	else
 	{
-		for(int i = Start; i < (int)vLines.size(); i++)
+		struct SRenderEntry
 		{
-			char aLine[320];
-			str_format(aLine, sizeof(aLine), "%s: %s", vLines[i].m_aUser, vLines[i].m_aText);
-			TextRender()->TextColor(ColorRGBA(0.92f, 0.93f, 0.98f, Alpha * 0.95f));
-			TextRender()->Text(x, y, LineFont, aLine, Rect.w - Padding * 2.0f);
-			y += LineFont + LineGap;
+			char m_aText[320];
+			int m_Rows;
+		};
+		std::vector<SRenderEntry> vRenderEntries;
+		int RemainingRows = MaxLines;
+		for(int i = (int)vLines.size() - 1; i >= 0 && RemainingRows > 0; i--)
+		{
+			SRenderEntry Entry;
+			str_format(Entry.m_aText, sizeof(Entry.m_aText), "%s: %s", vLines[i].m_aUser, vLines[i].m_aText);
+			Entry.m_Rows = minimum(WrappedRows(Entry.m_aText, MaxRowsPerMessage), RemainingRows);
+			vRenderEntries.push_back(Entry);
+			RemainingRows -= Entry.m_Rows;
 		}
+
+		std::reverse(vRenderEntries.begin(), vRenderEntries.end());
+		for(const SRenderEntry &Entry : vRenderEntries)
+			RenderWrappedText(Entry.m_aText, Entry.m_Rows, 0.95f);
 	}
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 	Graphics()->MapScreen(PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1);

@@ -454,9 +454,11 @@ CUIRect CVoting::GetHudRect(float Width, float Height, bool ForcePreview) const
 {
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_VOTES, Width, Height);
 	float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	CUIRect Rect = g_Config.m_TcMiniVoteHud > 0 ?
-			       CUIRect{Layout.m_X, Layout.m_Y, 70.0f * Scale, 35.0f * Scale} :
-			       CUIRect{Layout.m_X, Layout.m_Y, 120.0f * Scale, 38.0f * Scale};
+			       CUIRect{Layout.m_X, Layout.m_Y, 70.0f * Scale * WidthStretch, 35.0f * Scale * HeightStretch} :
+			       CUIRect{Layout.m_X, Layout.m_Y, 120.0f * Scale * WidthStretch, 38.0f * Scale * HeightStretch};
 	Rect.x = std::clamp(Rect.x, 0.0f, maximum(0.0f, Width - Rect.w));
 	Rect.y = std::clamp(Rect.y, 0.0f, maximum(0.0f, Height - Rect.h));
 	if(!ForcePreview && !IsVoting())

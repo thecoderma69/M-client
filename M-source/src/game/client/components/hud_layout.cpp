@@ -68,7 +68,9 @@ namespace HudLayout
 			       Runtime.m_Mode != Default.m_Mode ||
 			       Runtime.m_Enabled != Default.m_Enabled ||
 			       Runtime.m_BackgroundEnabled != Default.m_BackgroundEnabled ||
-			       Runtime.m_BackgroundColor != Default.m_BackgroundColor;
+			       Runtime.m_BackgroundColor != Default.m_BackgroundColor ||
+			       Runtime.m_WidthScale != Default.m_WidthScale ||
+			       Runtime.m_HeightScale != Default.m_HeightScale;
 		}
 
 		static const char *gs_apModuleNames[MODULE_COUNT] = {
@@ -134,27 +136,33 @@ namespace HudLayout
 			switch(Module)
 			{
 			case MODULE_MUSIC_PLAYER:
-				return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
+				return Runtime;
 			case MODULE_VOICE_TALKERS:
-				return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
+				return Runtime;
 			case MODULE_VOICE_STATUS:
-				return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
+				return Runtime;
 			case MODULE_CHAT:
-				return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
+				return Runtime;
 			case MODULE_VOTES:
-				return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
+				return Runtime;
 			case MODULE_KEYSTROKES_KEYBOARD:
-				return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
+				return Runtime;
 			case MODULE_KEYSTROKES_MOUSE:
-				return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
+				return Runtime;
 			case MODULE_MA_SPECTATORS:
 				if(HasRuntimeOverrideInternal(Module))
-					return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
-				return {(float)g_Config.m_MaSpectatorPanelHudX, (float)g_Config.m_MaSpectatorPanelHudY, g_Config.m_MaSpectatorPanelHudScale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
+					return Runtime;
+				Runtime.m_X = (float)g_Config.m_MaSpectatorPanelHudX;
+				Runtime.m_Y = (float)g_Config.m_MaSpectatorPanelHudY;
+				Runtime.m_Scale = g_Config.m_MaSpectatorPanelHudScale;
+				return Runtime;
 			case MODULE_STREAM_CHAT:
 				if(HasRuntimeOverrideInternal(Module))
-					return {Runtime.m_X, Runtime.m_Y, Runtime.m_Scale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
-				return {(float)g_Config.m_MaStreamChatHudX, (float)g_Config.m_MaStreamChatHudY, g_Config.m_MaStreamChatHudScale, Runtime.m_Mode, Runtime.m_Enabled, Runtime.m_BackgroundEnabled, Runtime.m_BackgroundColor};
+					return Runtime;
+				Runtime.m_X = (float)g_Config.m_MaStreamChatHudX;
+				Runtime.m_Y = (float)g_Config.m_MaStreamChatHudY;
+				Runtime.m_Scale = g_Config.m_MaStreamChatHudScale;
+				return Runtime;
 			default:
 				return Runtime;
 			}
@@ -249,7 +257,7 @@ namespace HudLayout
 					if(HasRuntimeOverrideInternal(Module))
 					{
 						SModuleLayout Override = gs_aRuntimeModuleLayouts[Module];
-						return {Override.m_X, Override.m_Y, Override.m_Scale, Override.m_Mode, Override.m_Enabled, Override.m_BackgroundEnabled, Override.m_BackgroundColor};
+						return Override;
 					}
 					return {X, Y, Layout.m_Scale, Layout.m_Mode, Layout.m_Enabled, Layout.m_BackgroundEnabled, Layout.m_BackgroundColor};
 				}
@@ -260,7 +268,7 @@ namespace HudLayout
 					if(HasRuntimeOverrideInternal(Module))
 					{
 						SModuleLayout Override = gs_aRuntimeModuleLayouts[Module];
-						return {Override.m_X, Override.m_Y, Override.m_Scale, Override.m_Mode, Override.m_Enabled, Override.m_BackgroundEnabled, Override.m_BackgroundColor};
+						return Override;
 					}
 					return {X, Y, Layout.m_Scale, Layout.m_Mode, Layout.m_Enabled, Layout.m_BackgroundEnabled, Layout.m_BackgroundColor};
 				}
@@ -296,6 +304,10 @@ namespace HudLayout
 			Layout.m_BackgroundColor = (unsigned)pResult->GetInteger(6);
 			if(pResult->NumArguments() > 7)
 				Layout.m_Enabled = pResult->GetInteger(7) != 0;
+			if(pResult->NumArguments() > 8)
+				Layout.m_WidthScale = std::clamp(pResult->GetInteger(8), 20, 400);
+			if(pResult->NumArguments() > 9)
+				Layout.m_HeightScale = std::clamp(pResult->GetInteger(9), 20, 400);
 			WriteConfigLayout(Module, Layout);
 		}
 
@@ -314,7 +326,7 @@ namespace HudLayout
 				str_format(
 					aLine,
 					sizeof(aLine),
-					"hud_layout_set %d %.3f %.3f %d %d %d %u %d",
+					"hud_layout_set %d %.3f %.3f %d %d %d %u %d %d %d",
 					Module,
 					Layout.m_X,
 					Layout.m_Y,
@@ -322,7 +334,9 @@ namespace HudLayout
 					Layout.m_Mode,
 					Layout.m_BackgroundEnabled ? 1 : 0,
 					Layout.m_BackgroundColor,
-					Layout.m_Enabled ? 1 : 0);
+					Layout.m_Enabled ? 1 : 0,
+					Layout.m_WidthScale,
+					Layout.m_HeightScale);
 				pConfigManager->WriteLine(aLine, ConfigDomain::MA);
 			}
 		}
@@ -367,6 +381,14 @@ namespace HudLayout
 	{
 		SModuleLayout Layout = ConfigLayout(Module);
 		Layout.m_Scale = std::clamp(Scale, 25, 300);
+		WriteConfigLayout(Module, Layout);
+	}
+
+	void SetSizeScale(EModule Module, int WidthScale, int HeightScale)
+	{
+		SModuleLayout Layout = ConfigLayout(Module);
+		Layout.m_WidthScale = std::clamp(WidthScale, 20, 400);
+		Layout.m_HeightScale = std::clamp(HeightScale, 20, 400);
 		WriteConfigLayout(Module, Layout);
 	}
 
@@ -446,7 +468,7 @@ namespace HudLayout
 		{
 			pConsole->Register(
 				"hud_layout_set",
-				"i[module] f[x] f[y] i[scale] i[mode] i[background_enabled] i[background_color] ?i[enabled]",
+				"i[module] f[x] f[y] i[scale] i[mode] i[background_enabled] i[background_color] ?i[enabled] ?i[width_scale] ?i[height_scale]",
 				CFGFLAG_CLIENT,
 				ConHudLayoutSet,
 				nullptr,

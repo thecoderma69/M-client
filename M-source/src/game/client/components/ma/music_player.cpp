@@ -1365,6 +1365,7 @@ namespace
 	{
 		float m_Scale = 1.0f;
 		float m_WidthScale = 1.0f;
+		float m_HeightScale = 1.0f;
 		float m_CompactW = 0.0f;
 		float m_CompactH = 0.0f;
 		float m_ExpandedW = 0.0f;
@@ -1906,23 +1907,24 @@ namespace
 	{
 		SMusicPlayerMetrics Metrics;
 		Metrics.m_Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-		Metrics.m_WidthScale = Width / maximum(HudLayout::CANVAS_WIDTH, 0.001f);
+		Metrics.m_WidthScale = Width / maximum(HudLayout::CANVAS_WIDTH, 0.001f) * std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+		Metrics.m_HeightScale = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 		if(MiniMode)
 		{
 			const float TitleFont = 5.8f * Metrics.m_Scale * TextScale;
 			const float PadX = 2.35f * Metrics.m_Scale * Metrics.m_WidthScale;
-			const float PadY = 1.55f * Metrics.m_Scale;
+			const float PadY = 1.55f * Metrics.m_Scale * Metrics.m_HeightScale;
 			const float CoverGap = ShowCover ? 1.35f * Metrics.m_Scale * Metrics.m_WidthScale : 0.0f;
 			const float VisualGap = ShowVisualizer ? 1.25f * Metrics.m_Scale * Metrics.m_WidthScale : 0.0f;
 			const float VisualW = ShowVisualizer ? MusicPlayerVisualizerWidth(true, Metrics.m_Scale, Metrics.m_WidthScale, 0.0f) : 0.0f;
-			Metrics.m_CompactH = maximum(10.8f * Metrics.m_Scale, TitleFont + PadY * 2.0f);
+			Metrics.m_CompactH = maximum(10.8f * Metrics.m_Scale * Metrics.m_HeightScale, TitleFont + PadY * 2.0f);
 			const float ArtSize = ShowCover ? maximum(0.0f, Metrics.m_CompactH - PadY * 2.0f) : 0.0f;
 			const float DesiredWidth = PadX * 2.0f + DisplayedTextSlotWidth + VisualGap + VisualW + ArtSize + CoverGap;
 			Metrics.m_CompactW = minimum(Width, maximum(18.0f * Metrics.m_Scale * Metrics.m_WidthScale, DesiredWidth));
 		}
 		else
 		{
-			Metrics.m_CompactH = 15.5f * Metrics.m_Scale;
+			Metrics.m_CompactH = 15.5f * Metrics.m_Scale * Metrics.m_HeightScale;
 			const float CompactArtSize = ShowCover ? minimum(Metrics.m_CompactH - 3.0f * Metrics.m_Scale, 11.6f * Metrics.m_Scale) : 0.0f;
 			const float CompactVisualW = ShowVisualizer ? MusicPlayerVisualizerWidth(false, Metrics.m_Scale, Metrics.m_WidthScale, 0.0f) : 0.0f;
 			const float CompactOuterPad = 2.5f * Metrics.m_Scale * Metrics.m_WidthScale;
@@ -1931,7 +1933,7 @@ namespace
 			Metrics.m_CompactW = CompactOuterPad * 2.0f + CompactLeftSection + DisplayedTextSlotWidth + CompactVisualW + (ShowVisualizer ? CompactInnerGap : 0.0f);
 		}
 
-		Metrics.m_ExpandedH = 25.0f * Metrics.m_Scale;
+		Metrics.m_ExpandedH = 25.0f * Metrics.m_Scale * Metrics.m_HeightScale;
 		const float ExpandedBaseW = 104.0f * Metrics.m_Scale * Metrics.m_WidthScale;
 		const float ExpandedArtSize = ShowCover ? minimum(Metrics.m_ExpandedH - 3.0f * Metrics.m_Scale, 11.8f * Metrics.m_Scale + 1.8f * Metrics.m_Scale) : 0.0f;
 		const float ExpandedTextLeftInset = 1.7f * Metrics.m_Scale * Metrics.m_WidthScale + ExpandedArtSize + (ShowCover ? (0.1f + 1.15f) * Metrics.m_Scale * Metrics.m_WidthScale : 0.0f);

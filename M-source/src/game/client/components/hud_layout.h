@@ -48,6 +48,8 @@ namespace HudLayout
 		bool m_Enabled;
 		bool m_BackgroundEnabled;
 		unsigned m_BackgroundColor;
+		int m_WidthScale = 100;
+		int m_HeightScale = 100;
 	};
 
 	struct SModuleRect
@@ -68,6 +70,7 @@ namespace HudLayout
 	bool HasRuntimeOverride(EModule Module);
 	void SetPosition(EModule Module, float X, float Y);
 	void SetScale(EModule Module, int Scale);
+	void SetSizeScale(EModule Module, int WidthScale, int HeightScale);
 	void SetEnabled(EModule Module, bool Enabled);
 	bool IsEnabled(EModule Module);
 	void ResetPosition(EModule Module);

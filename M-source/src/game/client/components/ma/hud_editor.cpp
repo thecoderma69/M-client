@@ -324,6 +324,21 @@ void CHudEditor::SetModuleScale(HudLayout::EModule Module, int Scale)
 	HudLayout::SetScale(Module, Scale);
 }
 
+int CHudEditor::GetModuleWidthScale(HudLayout::EModule Module) const
+{
+	return std::clamp(HudLayout::Get(Module, HudWidth(), HudHeight()).m_WidthScale, 20, 400);
+}
+
+int CHudEditor::GetModuleHeightScale(HudLayout::EModule Module) const
+{
+	return std::clamp(HudLayout::Get(Module, HudWidth(), HudHeight()).m_HeightScale, 20, 400);
+}
+
+void CHudEditor::SetModuleSizeScale(HudLayout::EModule Module, int WidthScale, int HeightScale)
+{
+	HudLayout::SetSizeScale(Module, WidthScale, HeightScale);
+}
+
 CUIRect CHudEditor::GetFallbackModuleRect(HudLayout::EModule Module) const
 {
 	const float Width = HudWidth();
@@ -614,13 +629,30 @@ HudLayout::EModule CHudEditor::HitTestModule(vec2 MousePos) const
 CUIRect CHudEditor::ResizeHandleRect(const CUIRect &Rect, EResizeHandle Handle) const
 {
 	const float HandleSize = std::clamp(minimum(Rect.w, Rect.h) * 0.18f, 5.0f, 9.0f);
-	float X = Rect.x;
-	float Y = Rect.y;
-	if(Handle == EResizeHandle::TOP_RIGHT || Handle == EResizeHandle::BOTTOM_RIGHT)
-		X = Rect.x + Rect.w - HandleSize;
-	if(Handle == EResizeHandle::BOTTOM_LEFT || Handle == EResizeHandle::BOTTOM_RIGHT)
-		Y = Rect.y + Rect.h - HandleSize;
-	return {X, Y, HandleSize, HandleSize};
+	const float HalfHandle = HandleSize * 0.5f;
+
+	switch(Handle)
+	{
+	case EResizeHandle::TOP_LEFT:
+		return {Rect.x, Rect.y, HandleSize, HandleSize};
+	case EResizeHandle::TOP:
+		return {Rect.x + Rect.w * 0.5f - HalfHandle, Rect.y, HandleSize, HandleSize};
+	case EResizeHandle::TOP_RIGHT:
+		return {Rect.x + Rect.w - HandleSize, Rect.y, HandleSize, HandleSize};
+	case EResizeHandle::RIGHT:
+		return {Rect.x + Rect.w - HandleSize, Rect.y + Rect.h * 0.5f - HalfHandle, HandleSize, HandleSize};
+	case EResizeHandle::BOTTOM_RIGHT:
+		return {Rect.x + Rect.w - HandleSize, Rect.y + Rect.h - HandleSize, HandleSize, HandleSize};
+	case EResizeHandle::BOTTOM:
+		return {Rect.x + Rect.w * 0.5f - HalfHandle, Rect.y + Rect.h - HandleSize, HandleSize, HandleSize};
+	case EResizeHandle::BOTTOM_LEFT:
+		return {Rect.x, Rect.y + Rect.h - HandleSize, HandleSize, HandleSize};
+	case EResizeHandle::LEFT:
+		return {Rect.x, Rect.y + Rect.h * 0.5f - HalfHandle, HandleSize, HandleSize};
+	case EResizeHandle::NONE:
+	default:
+		return {Rect.x, Rect.y, HandleSize, HandleSize};
+	}
 }
 
 vec2 CHudEditor::ResizeAnchor(const CUIRect &Rect, EResizeHandle Handle) const
@@ -629,12 +661,20 @@ vec2 CHudEditor::ResizeAnchor(const CUIRect &Rect, EResizeHandle Handle) const
 	{
 	case EResizeHandle::TOP_LEFT:
 		return vec2(Rect.x + Rect.w, Rect.y + Rect.h);
+	case EResizeHandle::TOP:
+		return vec2(Rect.x + Rect.w * 0.5f, Rect.y + Rect.h);
 	case EResizeHandle::TOP_RIGHT:
 		return vec2(Rect.x, Rect.y + Rect.h);
-	case EResizeHandle::BOTTOM_LEFT:
-		return vec2(Rect.x + Rect.w, Rect.y);
+	case EResizeHandle::RIGHT:
+		return vec2(Rect.x, Rect.y + Rect.h * 0.5f);
 	case EResizeHandle::BOTTOM_RIGHT:
 		return vec2(Rect.x, Rect.y);
+	case EResizeHandle::BOTTOM:
+		return vec2(Rect.x + Rect.w * 0.5f, Rect.y);
+	case EResizeHandle::BOTTOM_LEFT:
+		return vec2(Rect.x + Rect.w, Rect.y);
+	case EResizeHandle::LEFT:
+		return vec2(Rect.x + Rect.w, Rect.y + Rect.h * 0.5f);
 	case EResizeHandle::NONE:
 	default:
 		return vec2(Rect.x, Rect.y);
@@ -654,6 +694,10 @@ CHudEditor::EResizeHandle CHudEditor::HitTestResizeHandle(vec2 MousePos, HudLayo
 		EResizeHandle::BOTTOM_LEFT,
 		EResizeHandle::TOP_RIGHT,
 		EResizeHandle::TOP_LEFT,
+		EResizeHandle::RIGHT,
+		EResizeHandle::LEFT,
+		EResizeHandle::BOTTOM,
+		EResizeHandle::TOP,
 	};
 
 	for(int i = Count - 1; i >= 0; --i)
@@ -794,9 +838,70 @@ void CHudEditor::UpdateResizing(vec2 MousePos)
 	if(m_ResizeStartRect.w <= 1.0f || m_ResizeStartRect.h <= 1.0f)
 		return;
 
-	const float StartDistance = maximum(1.0f, distance(ResizeAnchor(m_ResizeStartRect, m_ResizeHandle), vec2(
+	const bool HorizontalOnly = m_ResizeHandle == EResizeHandle::LEFT || m_ResizeHandle == EResizeHandle::RIGHT;
+	const bool VerticalOnly = m_ResizeHandle == EResizeHandle::TOP || m_ResizeHandle == EResizeHandle::BOTTOM;
+
+	if(HorizontalOnly || VerticalOnly)
+	{
+		int NewWidthScale = m_ResizeStartWidthScale;
+		int NewHeightScale = m_ResizeStartHeightScale;
+
+		if(HorizontalOnly)
+		{
+			const float NewWidth = m_ResizeHandle == EResizeHandle::LEFT ?
+				maximum(1.0f, m_ResizeAnchor.x - MousePos.x) :
+				maximum(1.0f, MousePos.x - m_ResizeAnchor.x);
+			const float Ratio = std::clamp(NewWidth / maximum(m_ResizeStartRect.w, 1.0f), 0.20f, 4.0f);
+			NewWidthScale = std::clamp(round_to_int(m_ResizeStartWidthScale * Ratio), 20, 400);
+		}
+		else
+		{
+			const float NewHeight = m_ResizeHandle == EResizeHandle::TOP ?
+				maximum(1.0f, m_ResizeAnchor.y - MousePos.y) :
+				maximum(1.0f, MousePos.y - m_ResizeAnchor.y);
+			const float Ratio = std::clamp(NewHeight / maximum(m_ResizeStartRect.h, 1.0f), 0.20f, 4.0f);
+			NewHeightScale = std::clamp(round_to_int(m_ResizeStartHeightScale * Ratio), 20, 400);
+		}
+
+		SetModuleSizeScale(m_PressedModule, NewWidthScale, NewHeightScale);
+
+		CUIRect NewRect = GetModuleVisual(m_PressedModule).m_Rect;
+		switch(m_ResizeHandle)
+		{
+		case EResizeHandle::LEFT:
+			NewRect.x = m_ResizeAnchor.x - NewRect.w;
+			NewRect.y = m_ResizeStartRect.y;
+			break;
+		case EResizeHandle::RIGHT:
+			NewRect.x = m_ResizeAnchor.x;
+			NewRect.y = m_ResizeStartRect.y;
+			break;
+		case EResizeHandle::TOP:
+			NewRect.x = m_ResizeStartRect.x;
+			NewRect.y = m_ResizeAnchor.y - NewRect.h;
+			break;
+		case EResizeHandle::BOTTOM:
+			NewRect.x = m_ResizeStartRect.x;
+			NewRect.y = m_ResizeAnchor.y;
+			break;
+		case EResizeHandle::NONE:
+		case EResizeHandle::TOP_LEFT:
+		case EResizeHandle::TOP_RIGHT:
+		case EResizeHandle::BOTTOM_RIGHT:
+		case EResizeHandle::BOTTOM_LEFT:
+		default:
+			break;
+		}
+
+		NewRect = ClampToBounds(NewRect, HudWidth(), HudHeight());
+		ApplyDraggedPosition(m_PressedModule, NewRect);
+		return;
+	}
+
+	const vec2 StartPoint(
 		m_ResizeHandle == EResizeHandle::TOP_LEFT || m_ResizeHandle == EResizeHandle::BOTTOM_LEFT ? m_ResizeStartRect.x : m_ResizeStartRect.x + m_ResizeStartRect.w,
-		m_ResizeHandle == EResizeHandle::TOP_LEFT || m_ResizeHandle == EResizeHandle::TOP_RIGHT ? m_ResizeStartRect.y : m_ResizeStartRect.y + m_ResizeStartRect.h)));
+		m_ResizeHandle == EResizeHandle::TOP_LEFT || m_ResizeHandle == EResizeHandle::TOP_RIGHT ? m_ResizeStartRect.y : m_ResizeStartRect.y + m_ResizeStartRect.h);
+	const float StartDistance = maximum(1.0f, distance(ResizeAnchor(m_ResizeStartRect, m_ResizeHandle), StartPoint));
 	const float NewDistance = maximum(1.0f, distance(m_ResizeAnchor, MousePos));
 	const float Ratio = std::clamp(NewDistance / StartDistance, 0.20f, 4.0f);
 
@@ -822,15 +927,19 @@ void CHudEditor::UpdateResizing(vec2 MousePos)
 		NewRect.x = m_ResizeAnchor.x;
 		NewRect.y = m_ResizeAnchor.y - NewRect.h;
 		break;
-	case EResizeHandle::BOTTOM_LEFT:
-		NewRect.x = m_ResizeAnchor.x - NewRect.w;
-		NewRect.y = m_ResizeAnchor.y;
-		break;
 	case EResizeHandle::BOTTOM_RIGHT:
 		NewRect.x = m_ResizeAnchor.x;
 		NewRect.y = m_ResizeAnchor.y;
 		break;
+	case EResizeHandle::BOTTOM_LEFT:
+		NewRect.x = m_ResizeAnchor.x - NewRect.w;
+		NewRect.y = m_ResizeAnchor.y;
+		break;
 	case EResizeHandle::NONE:
+	case EResizeHandle::TOP:
+	case EResizeHandle::RIGHT:
+	case EResizeHandle::BOTTOM:
+	case EResizeHandle::LEFT:
 	default:
 		break;
 	}
@@ -838,7 +947,6 @@ void CHudEditor::UpdateResizing(vec2 MousePos)
 	NewRect = ClampToBounds(NewRect, HudWidth(), HudHeight());
 	ApplyDraggedPosition(m_PressedModule, NewRect);
 }
-
 CUi::EPopupMenuFunctionResult CHudEditor::PopupModuleSettings(void *pContext, CUIRect View, bool Active)
 {
 	(void)Active;
@@ -957,9 +1065,13 @@ void CHudEditor::RenderResizeHandles(const SModuleVisual &Visual, bool Hovered, 
 
 	const EResizeHandle aHandles[] = {
 		EResizeHandle::TOP_LEFT,
+		EResizeHandle::TOP,
 		EResizeHandle::TOP_RIGHT,
-		EResizeHandle::BOTTOM_LEFT,
+		EResizeHandle::RIGHT,
 		EResizeHandle::BOTTOM_RIGHT,
+		EResizeHandle::BOTTOM,
+		EResizeHandle::BOTTOM_LEFT,
+		EResizeHandle::LEFT,
 	};
 	for(EResizeHandle Handle : aHandles)
 	{
@@ -1341,6 +1453,8 @@ void CHudEditor::OnRender()
 		m_ResizeHandle = ResizeHoverHandle;
 		m_ResizeStartRect = GetModuleVisual(m_PressedModule).m_Rect;
 		m_ResizeStartScale = GetModuleScale(m_PressedModule);
+		m_ResizeStartWidthScale = GetModuleWidthScale(m_PressedModule);
+		m_ResizeStartHeightScale = GetModuleHeightScale(m_PressedModule);
 		m_ResizeAnchor = ResizeAnchor(m_ResizeStartRect, m_ResizeHandle);
 	}
 	else if(LeftClicked)

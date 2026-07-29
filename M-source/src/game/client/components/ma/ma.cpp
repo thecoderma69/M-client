@@ -1,4 +1,4 @@
-﻿#include "ma.h"
+#include "ma.h"
 
 #include "visualizer/service.h"
 
@@ -990,9 +990,11 @@ CUIRect CMa::GetMusicVideoEffectRect(float Width, float Height, bool ForcePrevie
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_MUSIC_VIDEO_EFFECT, Width, Height);
 	const float LayoutScale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	const float SizeScale = std::clamp(g_Config.m_MaMusicVideoEffectSize / 100.0f, 0.40f, 2.40f);
 	const float Size = minimum(Width, Height) * 0.56f * SizeScale * LayoutScale;
-	HudLayout::SModuleRect RawRect{Layout.m_X, Layout.m_Y, Size, Size, Size * 0.5f};
+	HudLayout::SModuleRect RawRect{Layout.m_X, Layout.m_Y, Size * WidthStretch, Size * HeightStretch, minimum(Size * WidthStretch, Size * HeightStretch) * 0.5f};
 	const HudLayout::SModuleRect Clamped = HudLayout::ClampRectToScreen(RawRect, Width, Height);
 	return {Clamped.m_X, Clamped.m_Y, Clamped.m_W, Clamped.m_H};
 }
@@ -1050,6 +1052,8 @@ CUIRect CMa::GetSpectatorPanelRect(float Width, float Height, bool ForcePreview)
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_MA_SPECTATORS, Width, Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	const float Padding = 5.0f * Scale;
 	const float HeaderFont = 6.8f * Scale;
 	const float LineFont = 5.6f * Scale;
@@ -1061,7 +1065,9 @@ CUIRect CMa::GetSpectatorPanelRect(float Width, float Height, bool ForcePreview)
 	for(int i = 0; i < LineCount; i++)
 		BoxWidth = maximum(BoxWidth, TextRender()->TextWidth(LineFont, aaLines[i], -1, -1.0f) + Padding * 2.0f);
 
-	const float BoxHeight = Padding * 2.0f + HeaderFont + (LineCount > 0 ? 2.5f * Scale + LineCount * LineFont + maximum(0, LineCount - 1) * LineGap : 0.0f);
+	BoxWidth *= WidthStretch;
+
+	const float BoxHeight = (Padding * 2.0f + HeaderFont + (LineCount > 0 ? 2.5f * Scale + LineCount * LineFont + maximum(0, LineCount - 1) * LineGap : 0.0f)) * HeightStretch;
 	HudLayout::SModuleRect RawRect{Layout.m_X, Layout.m_Y, BoxWidth, BoxHeight, 5.0f * Scale};
 	const HudLayout::SModuleRect Clamped = HudLayout::ClampRectToScreen(RawRect, Width, Height);
 	return {Clamped.m_X, Clamped.m_Y, Clamped.m_W, Clamped.m_H};

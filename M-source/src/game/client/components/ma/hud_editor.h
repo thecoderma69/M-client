@@ -26,9 +26,13 @@ private:
 	{
 		NONE = 0,
 		TOP_LEFT,
+		TOP,
 		TOP_RIGHT,
-		BOTTOM_LEFT,
+		RIGHT,
 		BOTTOM_RIGHT,
+		BOTTOM,
+		BOTTOM_LEFT,
+		LEFT,
 	};
 
 	struct SModuleVisual
@@ -60,6 +64,8 @@ private:
 	vec2 m_ResizeAnchor = vec2(0.0f, 0.0f);
 	CUIRect m_ResizeStartRect{};
 	int m_ResizeStartScale = 100;
+	int m_ResizeStartWidthScale = 100;
+	int m_ResizeStartHeightScale = 100;
 	SPopupMenuId m_SettingsPopupId;
 	CButtonContainer m_ResetAllButton;
 	CButtonContainer m_ToggleModuleButton;
@@ -75,6 +81,9 @@ private:
 	bool IsResizableModule(HudLayout::EModule Module) const;
 	int GetModuleScale(HudLayout::EModule Module) const;
 	void SetModuleScale(HudLayout::EModule Module, int Scale);
+	int GetModuleWidthScale(HudLayout::EModule Module) const;
+	int GetModuleHeightScale(HudLayout::EModule Module) const;
+	void SetModuleSizeScale(HudLayout::EModule Module, int WidthScale, int HeightScale);
 	void RenderModulePreview(const SModuleVisual &Visual) const;
 	void RenderChatExtraPreview(const SModuleVisual &Visual) const;
 	void CollectModuleVisuals(SModuleVisual *pOut, int &Count) const;

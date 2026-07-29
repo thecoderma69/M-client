@@ -132,24 +132,31 @@ void CKeystrokeHud::OnRender()
 	if(!ShowKeys && !ShowMouse)
 		return;
 
-	float KeyScale = g_Config.m_TcKeystrokeHudSize / 100.0f;
-	float MouseScale = g_Config.m_TcKeystrokeHudMouseSize / 100.0f;
-	float KeyW = 40.0f * KeyScale;
-	float KeyH = 40.0f * KeyScale;
-	float Gap = 6.0f * KeyScale;
-	float SpaceH = 22.0f * KeyScale;
-
-	float KeyTotalW = KeyW * 2.0f + Gap;
-	float KeyTotalH = KeyH + Gap + SpaceH;
-
-	float MouseW = 40.0f * MouseScale;
-	float MouseH = 40.0f * MouseScale;
-	float MouseGap = 6.0f * MouseScale;
-	float MouseTotalW = MouseW * 2.0f + MouseGap;
-	float MouseTotalH = MouseH;
-
 	float ScreenW = 300.0f * Graphics()->ScreenAspect();
 	float ScreenH = 300.0f;
+	const auto KeyLayout = HudLayout::Get(HudLayout::MODULE_KEYSTROKES_KEYBOARD, ScreenW, ScreenH);
+	const auto MouseLayout = HudLayout::Get(HudLayout::MODULE_KEYSTROKES_MOUSE, ScreenW, ScreenH);
+
+	float KeyScale = g_Config.m_TcKeystrokeHudSize / 100.0f;
+	float MouseScale = g_Config.m_TcKeystrokeHudMouseSize / 100.0f;
+	const float KeyWidthStretch = std::clamp(KeyLayout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float KeyHeightStretch = std::clamp(KeyLayout.m_HeightScale / 100.0f, 0.20f, 4.0f);
+	const float MouseWidthStretch = std::clamp(MouseLayout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float MouseHeightStretch = std::clamp(MouseLayout.m_HeightScale / 100.0f, 0.20f, 4.0f);
+	float KeyW = 40.0f * KeyScale * KeyWidthStretch;
+	float KeyH = 40.0f * KeyScale * KeyHeightStretch;
+	float Gap = 6.0f * KeyScale * KeyWidthStretch;
+	float VerticalGap = 6.0f * KeyScale * KeyHeightStretch;
+	float SpaceH = 22.0f * KeyScale * KeyHeightStretch;
+
+	float KeyTotalW = KeyW * 2.0f + Gap;
+	float KeyTotalH = KeyH + VerticalGap + SpaceH;
+
+	float MouseW = 40.0f * MouseScale * MouseWidthStretch;
+	float MouseH = 40.0f * MouseScale * MouseHeightStretch;
+	float MouseGap = 6.0f * MouseScale * MouseWidthStretch;
+	float MouseTotalW = MouseW * 2.0f + MouseGap;
+	float MouseTotalH = MouseH;
 
 	float KeyPosX;
 	float KeyPosY;
@@ -263,7 +270,7 @@ void CKeystrokeHud::OnRender()
 	{
 		DrawKeystrokeModel(Graphics(), KeyPosX, KeyPosY, KeyW, KeyH, PressedA ? ColorPressed : ColorUnpressed, g_Config.m_TcKeystrokeHudStyle, KeyRounding, KeyScale);
 		DrawKeystrokeModel(Graphics(), KeyPosX + KeyW + Gap, KeyPosY, KeyW, KeyH, PressedD ? ColorPressed : ColorUnpressed, g_Config.m_TcKeystrokeHudStyle, KeyRounding, KeyScale);
-		DrawKeystrokeModel(Graphics(), KeyPosX, KeyPosY + KeyH + Gap, KeyTotalW, SpaceH, PressedSpace ? ColorPressed : ColorUnpressed, g_Config.m_TcKeystrokeHudStyle, KeyRounding, KeyScale);
+		DrawKeystrokeModel(Graphics(), KeyPosX, KeyPosY + KeyH + VerticalGap, KeyTotalW, SpaceH, PressedSpace ? ColorPressed : ColorUnpressed, g_Config.m_TcKeystrokeHudStyle, KeyRounding, KeyScale);
 
 		if(g_Config.m_TcKeystrokeHudShowText)
 		{
@@ -276,9 +283,9 @@ void CKeystrokeHud::OnRender()
 			static float s_TextWidthSpace = 0.0f;
 			static float s_CachedSpaceTextSize = 0.0f;
 
-			if(KeyScale != s_CachedScale)
+			if(TextSize != s_CachedScale)
 			{
-				s_CachedScale = KeyScale;
+				s_CachedScale = TextSize;
 				s_TextWidthA = TextRender()->TextWidth(TextSize, "A");
 				s_TextWidthD = TextRender()->TextWidth(TextSize, "D");
 				float SpaceTextSize = SpaceH * 0.5f;
@@ -290,7 +297,7 @@ void CKeystrokeHud::OnRender()
 			TextRender()->Text(KeyPosX + KeyW + Gap + KeyW / 2.0f - s_TextWidthD / 2.0f, KeyPosY + KeyH / 2.0f - TextSize / 2.0f, TextSize, "D");
 
 			if(g_Config.m_TcKeystrokeHudShowSpace)
-				TextRender()->Text(KeyPosX + KeyTotalW / 2.0f - s_TextWidthSpace / 2.0f, KeyPosY + KeyH + Gap + SpaceH / 2.0f - s_CachedSpaceTextSize / 2.0f, s_CachedSpaceTextSize, "SPACE");
+				TextRender()->Text(KeyPosX + KeyTotalW / 2.0f - s_TextWidthSpace / 2.0f, KeyPosY + KeyH + VerticalGap + SpaceH / 2.0f - s_CachedSpaceTextSize / 2.0f, s_CachedSpaceTextSize, "SPACE");
 		}
 	}
 
@@ -308,9 +315,9 @@ void CKeystrokeHud::OnRender()
 
 			float MouseTextSize = MouseH * 0.45f;
 
-			if(MouseScale != s_CachedScaleM)
+			if(MouseTextSize != s_CachedScaleM)
 			{
-				s_CachedScaleM = MouseScale;
+				s_CachedScaleM = MouseTextSize;
 				s_TextWidthM1 = TextRender()->TextWidth(MouseTextSize, "LMB");
 				s_TextWidthM2 = TextRender()->TextWidth(MouseTextSize, "RMB");
 				s_CachedMouseTextSize = MouseTextSize;

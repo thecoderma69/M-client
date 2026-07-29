@@ -4575,10 +4575,12 @@ CUIRect CChat::GetHudRect(float Width, float Height, bool ForcePreview) const
 {
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_CHAT, Width, Height);
 	float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	const float ScaledFontSize = FontSize() * (8.0f / 6.0f);
 	const float InputHeight = maximum(2.25f * ScaledFontSize, maximum(ScaledFontSize + 4.0f, 16.0f));
-	const float RectHeight = (ForcePreview ? 80.0f : (m_PrevShowChat ? 50.0f : 80.0f)) * Scale + InputHeight;
-	const float RectWidth = minimum(g_Config.m_ClChatWidth * Scale, maximum(80.0f, Width - Layout.m_X - 5.0f));
+	const float RectHeight = (ForcePreview ? 80.0f : (m_PrevShowChat ? 50.0f : 80.0f)) * Scale * HeightStretch + InputHeight;
+	const float RectWidth = minimum(g_Config.m_ClChatWidth * Scale * WidthStretch, maximum(80.0f, Width - Layout.m_X - 5.0f));
 	float AnchorY = Layout.m_Y;
 	if(!HudLayout::HasRuntimeOverride(HudLayout::MODULE_CHAT))
 		AnchorY = Height - (20.0f * FontSize() / 6.0f + (g_Config.m_TcStatusBar ? g_Config.m_TcStatusBarHeight : 0.0f));

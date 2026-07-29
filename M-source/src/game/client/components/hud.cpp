@@ -351,8 +351,10 @@ CUIRect CHud::GetScoreHudRect(bool ForcePreview) const
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_SCORE, m_Width, m_Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-	const float Width = 112.0f * Scale;
-	const float Height = 56.0f * Scale;
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
+	const float Width = 112.0f * Scale * WidthStretch;
+	const float Height = 56.0f * Scale * HeightStretch;
 	HudLayout::SModuleRect RawRect;
 	if(!HudLayout::HasRuntimeOverride(HudLayout::MODULE_SCORE))
 		RawRect = {m_Width - Width, 285.0f - Height, Width, Height, 5.0f * Scale};
@@ -373,14 +375,16 @@ void CHud::RenderScoreHud(bool ForcePreview)
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_SCORE, m_Width, m_Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	const float RightEdge = Rect.x + Rect.w;
 	const float BaseY = Rect.y;
-	const float ScoreSingleBoxHeight = 18.0f * Scale;
+	const float ScoreSingleBoxHeight = 18.0f * Scale * HeightStretch;
 	const float ScoreTextSize = 14.0f * Scale;
 	const float NameTextSize = 8.0f * Scale;
 	const float RankTextSize = 10.0f * Scale;
-	const float RowStep = 28.0f * Scale;
-	const float Split = 3.0f * Scale;
+	const float RowStep = 28.0f * Scale * HeightStretch;
+	const float Split = 3.0f * Scale * WidthStretch;
 	const float Rounding = 5.0f * Scale;
 
 	auto DrawScoreBox = [&](float X, float Y, float W, float H, const ColorRGBA &Color) {
@@ -1631,9 +1635,11 @@ CUIRect CHud::GetSpectatorCountRect(bool ForcePreview)
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_SPECTATOR_COUNT, m_Width, m_Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	const float Fontsize = 6.0f * Scale;
-	const float BoxHeight = 14.0f * Scale;
-	const float BoxWidth = 13.0f * Scale + TextRender()->TextWidth(Fontsize, State.m_aCountBuf);
+	const float BoxHeight = 14.0f * Scale * HeightStretch;
+	const float BoxWidth = (13.0f * Scale + TextRender()->TextWidth(Fontsize, State.m_aCountBuf)) * WidthStretch;
 
 	HudLayout::SModuleRect RawRect;
 	if(!HudLayout::HasRuntimeOverride(HudLayout::MODULE_SPECTATOR_COUNT))
@@ -1943,8 +1949,10 @@ CUIRect CHud::GetMovementInformationRect(bool ForcePreview) const
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_MOVEMENT_INFO, m_Width, m_Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-	const float BoxWidth = 62.0f * Scale;
-	const float BoxHeight = GetMovementInformationBoxHeight(State, Scale);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
+	const float BoxWidth = 62.0f * Scale * WidthStretch;
+	const float BoxHeight = GetMovementInformationBoxHeight(State, Scale) * HeightStretch;
 	HudLayout::SModuleRect RawRect;
 
 	if(!HudLayout::HasRuntimeOverride(HudLayout::MODULE_MOVEMENT_INFO))
@@ -1975,9 +1983,10 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_MOVEMENT_INFO, m_Width, m_Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-	const float LineSpacer = 1.0f * Scale; // above and below each entry
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
+	const float LineSpacer = 1.0f * Scale * HeightStretch; // above and below each entry
 	const float Fontsize = 6.0f * Scale;
-	const float LineHeight = MOVEMENT_INFORMATION_LINE_HEIGHT * Scale;
+	const float LineHeight = MOVEMENT_INFORMATION_LINE_HEIGHT * Scale * HeightStretch;
 	const ColorRGBA BackgroundColor = ThemeHudColor(GameClient(), color_cast<ColorRGBA>(ColorHSLA(Layout.m_BackgroundColor, true)), ForcePreview, 1.0f);
 	const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, Rect.x, Rect.y, Rect.w, Rect.h, m_Width, m_Height);
 
@@ -2150,6 +2159,8 @@ CUIRect CHud::GetLocalTimeRect(bool ForcePreview) const
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_LOCAL_TIME, m_Width, m_Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 
 	const bool Seconds = g_Config.m_TcShowLocalTimeSeconds; // TClient
 
@@ -2206,6 +2217,8 @@ CUIRect CHud::GetFrozenHudRect(bool ForcePreview) const
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_FROZEN_HUD, m_Width, m_Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	const float TeeSize = g_Config.m_TcFrozenHudTeeSize * Scale;
 	int MaxTees = (int)(8.3f * (m_Width / m_Height) * 13.0f / maximum(TeeSize, 1.0f));
 	if(!g_Config.m_ClShowfps && !g_Config.m_ClShowpred)
@@ -2215,8 +2228,8 @@ CUIRect CHud::GetFrozenHudRect(bool ForcePreview) const
 	const int TotalRows = maximum(1, minimum(MaxRows, (State.m_NumInTeam + MaxTees - 1) / MaxTees));
 
 	HudLayout::SModuleRect RawRect;
-	RawRect.m_W = TeeSize * minimum(State.m_NumInTeam, MaxTees);
-	RawRect.m_H = TeeSize + 3.0f * Scale + (TotalRows - 1) * TeeSize;
+	RawRect.m_W = TeeSize * minimum(State.m_NumInTeam, MaxTees) * WidthStretch;
+	RawRect.m_H = (TeeSize + 3.0f * Scale + (TotalRows - 1) * TeeSize) * HeightStretch;
 	RawRect.m_Rounding = 5.0f * Scale;
 	if(!HudLayout::HasRuntimeOverride(HudLayout::MODULE_FROZEN_HUD))
 	{
@@ -2256,6 +2269,8 @@ void CHud::RenderFrozenHud(bool ForcePreview)
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_FROZEN_HUD, m_Width, m_Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	const float TeeSize = g_Config.m_TcFrozenHudTeeSize * Scale;
 	const float RowStep = TeeSize + 3.0f * Scale;
 	int MaxTees = (int)(8.3f * (m_Width / m_Height) * 13.0f / maximum(TeeSize, 1.0f));
@@ -2338,13 +2353,15 @@ CUIRect CHud::GetFrozenCounterRect(const char *pText, bool ForcePreview) const
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_FROZEN_COUNTER, m_Width, m_Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	const float FontSize = 10.0f * Scale;
 	const float PaddingX = 2.0f * Scale;
 	const float PaddingY = 1.0f * Scale;
 	const float TextWidth = TextRender()->TextWidth(FontSize, pText, -1, -1.0f);
 	HudLayout::SModuleRect RawRect;
-	RawRect.m_W = TextWidth + PaddingX * 2.0f;
-	RawRect.m_H = FontSize + PaddingY * 2.0f;
+	RawRect.m_W = (TextWidth + PaddingX * 2.0f) * WidthStretch;
+	RawRect.m_H = (FontSize + PaddingY * 2.0f) * HeightStretch;
 	RawRect.m_Rounding = 3.0f * Scale;
 	if(!HudLayout::HasRuntimeOverride(HudLayout::MODULE_FROZEN_COUNTER))
 	{
@@ -2369,6 +2386,8 @@ void CHud::RenderFrozenCounterText(const char *pText, bool ForcePreview)
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_FROZEN_COUNTER, m_Width, m_Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	const float FontSize = 10.0f * Scale;
 	const float PaddingX = 2.0f * Scale;
 	const float PaddingY = 1.0f * Scale;
@@ -2686,18 +2705,21 @@ void CHud::RenderRecord()
 
 CUIRect CHud::GetKeystrokesKeyboardHudEditorRect(float Width, float Height) const
 {
-	float Scale = g_Config.m_TcKeystrokeHudSize / 100.0f;
-	float KeyW = 40.0f * Scale;
-	float KeyH = 40.0f * Scale;
-	float Gap = 6.0f * Scale;
-	float SpaceH = 22.0f * Scale;
-	float KeyTotalW = KeyW * 2.0f + Gap;
-	float KeyTotalH = KeyH + Gap + SpaceH;
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_KEYSTROKES_KEYBOARD, Width, Height);
+	const float Scale = g_Config.m_TcKeystrokeHudSize / 100.0f;
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
+	const float KeyW = 40.0f * Scale * WidthStretch;
+	const float KeyH = 40.0f * Scale * HeightStretch;
+	const float Gap = 6.0f * Scale * WidthStretch;
+	const float VerticalGap = 6.0f * Scale * HeightStretch;
+	const float SpaceH = 22.0f * Scale * HeightStretch;
+	const float KeyTotalW = KeyW * 2.0f + Gap;
+	const float KeyTotalH = KeyH + VerticalGap + SpaceH;
 	float KeyPosX;
 	float KeyPosY;
 	if(HudLayout::HasRuntimeOverride(HudLayout::MODULE_KEYSTROKES_KEYBOARD))
 	{
-		const auto Layout = HudLayout::Get(HudLayout::MODULE_KEYSTROKES_KEYBOARD, Width, Height);
 		KeyPosX = Layout.m_X;
 		KeyPosY = Layout.m_Y;
 	}
@@ -2711,17 +2733,19 @@ CUIRect CHud::GetKeystrokesKeyboardHudEditorRect(float Width, float Height) cons
 
 CUIRect CHud::GetKeystrokesMouseHudEditorRect(float Width, float Height) const
 {
-	float Scale = g_Config.m_TcKeystrokeHudMouseSize / 100.0f;
-	float MouseW = 40.0f * Scale;
-	float MouseH = 40.0f * Scale;
-	float MouseGap = 6.0f * Scale;
-	float MouseTotalW = MouseW * 2.0f + MouseGap;
-	float MouseTotalH = MouseH;
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_KEYSTROKES_MOUSE, Width, Height);
+	const float Scale = g_Config.m_TcKeystrokeHudMouseSize / 100.0f;
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
+	const float MouseW = 40.0f * Scale * WidthStretch;
+	const float MouseH = 40.0f * Scale * HeightStretch;
+	const float MouseGap = 6.0f * Scale * WidthStretch;
+	const float MouseTotalW = MouseW * 2.0f + MouseGap;
+	const float MouseTotalH = MouseH;
 	float MousePosX;
 	float MousePosY;
 	if(HudLayout::HasRuntimeOverride(HudLayout::MODULE_KEYSTROKES_MOUSE))
 	{
-		const auto Layout = HudLayout::Get(HudLayout::MODULE_KEYSTROKES_MOUSE, Width, Height);
 		MousePosX = Layout.m_X;
 		MousePosY = Layout.m_Y;
 	}
@@ -2732,14 +2756,17 @@ CUIRect CHud::GetKeystrokesMouseHudEditorRect(float Width, float Height) const
 	}
 	return {MousePosX, MousePosY, MouseTotalW, MouseTotalH};
 }
-
 CUIRect CHud::GetScoreHudEditorRect(float Width, float Height) const
 {
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_SCORE, Width, Height);
 	float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
+	const float RectW = 112.0f * Scale * WidthStretch;
+	const float RectH = 56.0f * Scale * HeightStretch;
 	if(!HudLayout::HasRuntimeOverride(HudLayout::MODULE_SCORE))
-		return {Width - 112.0f * Scale, 285.0f - 56.0f * Scale, 112.0f * Scale, 56.0f * Scale};
-	return {Layout.m_X, Layout.m_Y, 112.0f * Scale, 56.0f * Scale};
+		return {Width - RectW, 285.0f - RectH, RectW, RectH};
+	return {Layout.m_X, Layout.m_Y, RectW, RectH};
 }
 
 void CHud::RenderScoreHudPreview()
@@ -2759,14 +2786,18 @@ void CHud::RenderKeystrokesKeyboardPreview()
 	CUIRect Rect = GetKeystrokesKeyboardHudEditorRect(ScreenW, ScreenH);
 	Graphics()->MapScreen(0.0f, 0.0f, ScreenW, ScreenH);
 	float Scale = g_Config.m_TcKeystrokeHudSize / 100.0f;
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_KEYSTROKES_KEYBOARD, ScreenW, ScreenH);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	ColorRGBA C = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_TcKeystrokeHudColorUnpressed)).WithAlpha(g_Config.m_TcKeystrokeHudAlpha / 100.0f);
-	float KeyW = 40.0f * Scale;
-	float KeyH = 40.0f * Scale;
-	float Gap = 6.0f * Scale;
-	float SpaceH = 22.0f * Scale;
+	float KeyW = 40.0f * Scale * WidthStretch;
+	float KeyH = 40.0f * Scale * HeightStretch;
+	float Gap = 6.0f * Scale * WidthStretch;
+	float VerticalGap = 6.0f * Scale * HeightStretch;
+	float SpaceH = 22.0f * Scale * HeightStretch;
 	DrawKeystrokeHudModel(Graphics(), Rect.x, Rect.y, KeyW, KeyH, C, g_Config.m_TcKeystrokeHudStyle, 4.0f * Scale, Scale);
 	DrawKeystrokeHudModel(Graphics(), Rect.x + KeyW + Gap, Rect.y, KeyW, KeyH, C, g_Config.m_TcKeystrokeHudStyle, 4.0f * Scale, Scale);
-	DrawKeystrokeHudModel(Graphics(), Rect.x, Rect.y + KeyH + Gap, Rect.w, SpaceH, C, g_Config.m_TcKeystrokeHudStyle, 4.0f * Scale, Scale);
+	DrawKeystrokeHudModel(Graphics(), Rect.x, Rect.y + KeyH + VerticalGap, Rect.w, SpaceH, C, g_Config.m_TcKeystrokeHudStyle, 4.0f * Scale, Scale);
 }
 
 void CHud::RenderKeystrokesMousePreview()
@@ -2778,10 +2809,13 @@ void CHud::RenderKeystrokesMousePreview()
 	CUIRect Rect = GetKeystrokesMouseHudEditorRect(ScreenW, ScreenH);
 	Graphics()->MapScreen(0.0f, 0.0f, ScreenW, ScreenH);
 	float Scale = g_Config.m_TcKeystrokeHudMouseSize / 100.0f;
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_KEYSTROKES_MOUSE, ScreenW, ScreenH);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
 	ColorRGBA C = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_TcKeystrokeHudColorUnpressed)).WithAlpha(g_Config.m_TcKeystrokeHudAlpha / 100.0f);
-	float MouseW = 40.0f * Scale;
-	float MouseH = 40.0f * Scale;
-	float MouseGap = 6.0f * Scale;
+	float MouseW = 40.0f * Scale * WidthStretch;
+	float MouseH = 40.0f * Scale * HeightStretch;
+	float MouseGap = 6.0f * Scale * WidthStretch;
 	DrawKeystrokeHudModel(Graphics(), Rect.x, Rect.y, MouseW, MouseH, C, g_Config.m_TcKeystrokeHudMouseStyle, 4.0f * Scale, Scale);
 	DrawKeystrokeHudModel(Graphics(), Rect.x + MouseW + MouseGap, Rect.y, MouseW, MouseH, C, g_Config.m_TcKeystrokeHudMouseStyle, 4.0f * Scale, Scale);
 }
