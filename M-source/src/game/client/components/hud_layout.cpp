@@ -41,6 +41,7 @@ namespace HudLayout
 			{250.0f, 11.0f, 100, 0, true, false, 0x66000000U},
 			{370.0f, 72.0f, 100, 0, true, true, 0xAA050510U},
 			{6.0f, 96.0f, 100, 0, true, true, 0xAA050510U},
+			{190.0f, 96.0f, 100, 0, true, true, 0xAA050510U},
 		};
 
 		static SModuleLayout gs_aRuntimeModuleLayouts[MODULE_COUNT];
@@ -99,6 +100,7 @@ namespace HudLayout
 			"Contador congelados",
 			"Espectadores",
 			"Chat de stream",
+			"Fuente de actividad",
 		};
 
 		SModuleLayout ConfigLayout(EModule Module)
@@ -163,6 +165,13 @@ namespace HudLayout
 				Runtime.m_Y = (float)g_Config.m_MaStreamChatHudY;
 				Runtime.m_Scale = g_Config.m_MaStreamChatHudScale;
 				return Runtime;
+			case MODULE_STREAM_ACTIVITY:
+				if(HasRuntimeOverrideInternal(Module))
+					return Runtime;
+				Runtime.m_X = (float)g_Config.m_MaStreamActivityHudX;
+				Runtime.m_Y = (float)g_Config.m_MaStreamActivityHudY;
+				Runtime.m_Scale = g_Config.m_MaStreamActivityHudScale;
+				return Runtime;
 			default:
 				return Runtime;
 			}
@@ -200,6 +209,11 @@ namespace HudLayout
 				g_Config.m_MaStreamChatHudX = round_to_int(Layout.m_X);
 				g_Config.m_MaStreamChatHudY = round_to_int(Layout.m_Y);
 				g_Config.m_MaStreamChatHudScale = Layout.m_Scale;
+				break;
+			case MODULE_STREAM_ACTIVITY:
+				g_Config.m_MaStreamActivityHudX = round_to_int(Layout.m_X);
+				g_Config.m_MaStreamActivityHudY = round_to_int(Layout.m_Y);
+				g_Config.m_MaStreamActivityHudScale = Layout.m_Scale;
 				break;
 			default:
 				break;

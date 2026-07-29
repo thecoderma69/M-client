@@ -3913,7 +3913,13 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 		Ui()->DoScrollbarOption(&g_Config.m_MaStreamChatMaxLines, &g_Config.m_MaStreamChatMaxLines, &Row, TCLocalize("Lineas visibles"), 1, 24);
 
 		LeftView.HSplitTop(LineSize, &Row, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_MaStreamChatOpacity, &g_Config.m_MaStreamChatOpacity, &Row, TCLocalize("Opacidad"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		Ui()->DoScrollbarOption(&g_Config.m_MaStreamChatTextOpacity, &g_Config.m_MaStreamChatTextOpacity, &Row, TCLocalize("Opacidad texto"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+
+		LeftView.HSplitTop(LineSize, &Row, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaStreamChatOpacity, &g_Config.m_MaStreamChatOpacity, &Row, TCLocalize("Opacidad fondo"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+
+		static CButtonContainer s_StreamChatTextColor;
+		DoLine_ColorPicker(&s_StreamChatTextColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Color texto"), &g_Config.m_MaStreamChatTextColor, ColorRGBA(1.0f, 1.0f, 1.0f), false);
 
 		LeftView.HSplitTop(LineSize + 4.0f, &Row, &LeftView);
 		Row.VSplitMid(&Button, &Row, MarginSmall);
@@ -3942,6 +3948,107 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 
 	s_SectionBoxes.back().h = LeftView.y - s_SectionBoxes.back().y;
 
+	// ***** Stream Activity Feed ***** //
+	LeftView.HSplitTop(MarginBetweenSections, nullptr, &LeftView);
+	s_SectionBoxes.push_back(LeftView);
+	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
+	Ui()->DoLabel(&Label, TCLocalize("Fuente de actividad"), HeadlineFontSize, TEXTALIGN_ML);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaStreamActivityFeed, TCLocalize("Mostrar fuente de actividad"), &g_Config.m_MaStreamActivityFeed, &LeftView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaStreamActivityStats, TCLocalize("Mostrar estadisticas"), &g_Config.m_MaStreamActivityStats, &LeftView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaStreamViewerStats, TCLocalize("Mostrar espectadores reales"), &g_Config.m_MaStreamViewerStats, &LeftView, LineSize);
+
+	static std::vector<const char *> s_StreamActivityPlatformNames;
+	s_StreamActivityPlatformNames = {
+		TCLocalize("Usar plataforma del chat"),
+		TCLocalize("Twitch"),
+		TCLocalize("YouTube"),
+		TCLocalize("Kick")};
+	static CUi::SDropDownState s_StreamActivityPlatformDropDownState;
+	static CScrollRegion s_StreamActivityPlatformDropDownScrollRegion;
+	s_StreamActivityPlatformDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_StreamActivityPlatformDropDownScrollRegion;
+
+	g_Config.m_MaStreamActivityPlatform = std::clamp(g_Config.m_MaStreamActivityPlatform, 0, (int)s_StreamActivityPlatformNames.size() - 1);
+	const int OldActivityPlatform = g_Config.m_MaStreamActivityPlatform;
+	LeftView.HSplitTop(LineSize, &Row, &LeftView);
+	Row.VSplitLeft(120.0f, &Label, &Row);
+	Ui()->DoLabel(&Label, TCLocalize("Fuente"), FontSize, TEXTALIGN_ML);
+	const int NewActivityPlatform = Ui()->DoDropDown(&Row, OldActivityPlatform, s_StreamActivityPlatformNames.data(), s_StreamActivityPlatformNames.size(), s_StreamActivityPlatformDropDownState);
+	if(NewActivityPlatform != OldActivityPlatform)
+		g_Config.m_MaStreamActivityPlatform = NewActivityPlatform;
+
+	const int ActivityApiPlatform = g_Config.m_MaStreamActivityPlatform == 0 ? g_Config.m_MaStreamChatPlatform : g_Config.m_MaStreamActivityPlatform;
+	if(g_Config.m_MaStreamViewerStats)
+	{
+		LeftView.HSplitTop(LineSize, &Row, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaStreamViewerStatsRefresh, &g_Config.m_MaStreamViewerStatsRefresh, &Row, TCLocalize("Actualizar espectadores cada"), 10, 300, &CUi::ms_LinearScrollbarScale, 0u, "s");
+
+		if(ActivityApiPlatform == 1)
+		{
+			LeftView.HSplitTop(LineSize, &Row, &LeftView);
+			Row.VSplitLeft(145.0f, &Label, &Row);
+			Ui()->DoLabel(&Label, TCLocalize("Twitch Client ID"), FontSize, TEXTALIGN_ML);
+			static CLineInput s_StreamStatsTwitchClientId(g_Config.m_MaStreamStatsTwitchClientId, sizeof(g_Config.m_MaStreamStatsTwitchClientId));
+			s_StreamStatsTwitchClientId.SetHidden(true);
+			Ui()->DoClearableEditBox(&s_StreamStatsTwitchClientId, &Row, 12.0f);
+
+			LeftView.HSplitTop(LineSize, &Row, &LeftView);
+			Row.VSplitLeft(145.0f, &Label, &Row);
+			Ui()->DoLabel(&Label, TCLocalize("Twitch token"), FontSize, TEXTALIGN_ML);
+			static CLineInput s_StreamStatsTwitchToken(g_Config.m_MaStreamStatsTwitchToken, sizeof(g_Config.m_MaStreamStatsTwitchToken));
+			s_StreamStatsTwitchToken.SetHidden(true);
+			Ui()->DoClearableEditBox(&s_StreamStatsTwitchToken, &Row, 12.0f);
+		}
+		else if(ActivityApiPlatform == 2)
+		{
+			LeftView.HSplitTop(LineSize, &Row, &LeftView);
+			Row.VSplitLeft(145.0f, &Label, &Row);
+			Ui()->DoLabel(&Label, TCLocalize("YouTube API key"), FontSize, TEXTALIGN_ML);
+			static CLineInput s_StreamStatsYoutubeApiKey(g_Config.m_MaStreamStatsYoutubeApiKey, sizeof(g_Config.m_MaStreamStatsYoutubeApiKey));
+			s_StreamStatsYoutubeApiKey.SetHidden(true);
+			Ui()->DoClearableEditBox(&s_StreamStatsYoutubeApiKey, &Row, 12.0f);
+		}
+		else if(ActivityApiPlatform == 3)
+		{
+			LeftView.HSplitTop(LineSize, &Row, &LeftView);
+			Row.VSplitLeft(145.0f, &Label, &Row);
+			Ui()->DoLabel(&Label, TCLocalize("Kick token"), FontSize, TEXTALIGN_ML);
+			static CLineInput s_StreamStatsKickToken(g_Config.m_MaStreamStatsKickToken, sizeof(g_Config.m_MaStreamStatsKickToken));
+			s_StreamStatsKickToken.SetHidden(true);
+			Ui()->DoClearableEditBox(&s_StreamStatsKickToken, &Row, 12.0f);
+
+			LeftView.HSplitTop(LineSize, &Row, &LeftView);
+			Row.VSplitLeft(145.0f, &Label, &Row);
+			Ui()->DoLabel(&Label, TCLocalize("Kick broadcaster ID"), FontSize, TEXTALIGN_ML);
+			static CLineInput s_StreamStatsKickBroadcasterId(g_Config.m_MaStreamStatsKickBroadcasterId, sizeof(g_Config.m_MaStreamStatsKickBroadcasterId));
+			s_StreamStatsKickBroadcasterId.SetHidden(true);
+			Ui()->DoClearableEditBox(&s_StreamStatsKickBroadcasterId, &Row, 12.0f);
+		}
+	}
+
+	if(g_Config.m_MaStreamActivityFeed)
+	{
+		LeftView.HSplitTop(LineSize, &Row, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaStreamActivityMaxEvents, &g_Config.m_MaStreamActivityMaxEvents, &Row, TCLocalize("Eventos visibles"), 1, 12);
+	}
+
+	char aStreamActivitySummary[256];
+	GameClient()->m_StreamChat.GetActivitySummary(aStreamActivitySummary, sizeof(aStreamActivitySummary));
+	LeftView.HSplitTop(LineSize, &Row, &LeftView);
+	TextRender()->TextColor(ColorRGBA(0.72f, 0.82f, 1.0f, 1.0f));
+	Ui()->DoLabel(&Row, aStreamActivitySummary, 10.5f, TEXTALIGN_ML);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	if(g_Config.m_MaStreamActivityPlatform >= 2)
+	{
+		LeftView.HSplitTop(LineSize, &Row, &LeftView);
+		TextRender()->TextColor(ColorRGBA(1.0f, 0.68f, 0.35f, 1.0f));
+		Ui()->DoLabel(&Row, TCLocalize("YouTube y Kick requieren API/token para datos reales."), 10.5f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+
+	s_SectionBoxes.back().h = LeftView.y - s_SectionBoxes.back().y;
 	// ***** 3D Particles ***** //
 	LeftView.HSplitTop(MarginBetweenSections, nullptr, &LeftView);
 	s_SectionBoxes.push_back(LeftView);

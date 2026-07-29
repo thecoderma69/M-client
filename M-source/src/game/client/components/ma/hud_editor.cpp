@@ -40,6 +40,7 @@ namespace
 		return Module == HudLayout::MODULE_CHAT ||
 		       Module == HudLayout::MODULE_MUSIC_PLAYER ||
 		       Module == HudLayout::MODULE_STREAM_CHAT ||
+		       Module == HudLayout::MODULE_STREAM_ACTIVITY ||
 		       Module == HudLayout::MODULE_MUSIC_VIDEO_EFFECT ||
 		       Module == HudLayout::MODULE_SCORE ||
 		       Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD ||
@@ -57,6 +58,7 @@ namespace
 		return Module == HudLayout::MODULE_CHAT ||
 		       Module == HudLayout::MODULE_MUSIC_PLAYER ||
 		       Module == HudLayout::MODULE_STREAM_CHAT ||
+		       Module == HudLayout::MODULE_STREAM_ACTIVITY ||
 		       Module == HudLayout::MODULE_MUSIC_VIDEO_EFFECT ||
 		       Module == HudLayout::MODULE_SCORE ||
 		       Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD ||
@@ -73,6 +75,7 @@ namespace
 	{
 		return Module == HudLayout::MODULE_MUSIC_PLAYER ||
 		       Module == HudLayout::MODULE_STREAM_CHAT ||
+		       Module == HudLayout::MODULE_STREAM_ACTIVITY ||
 		       Module == HudLayout::MODULE_MUSIC_VIDEO_EFFECT ||
 		       Module == HudLayout::MODULE_SCORE ||
 		       Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD ||
@@ -436,6 +439,9 @@ CUIRect CHudEditor::GetFallbackModuleRect(HudLayout::EModule Module) const
 	case HudLayout::MODULE_STREAM_CHAT:
 		Rect = GameClient()->m_StreamChat.GetHudEditorRect(true);
 		break;
+	case HudLayout::MODULE_STREAM_ACTIVITY:
+		Rect = GameClient()->m_StreamChat.GetActivityHudEditorRect(true);
+		break;
 	case HudLayout::MODULE_NOTIFY_LAST:
 		Rect = {Layout.m_X, Layout.m_Y, 185.0f, 16.0f};
 		break;
@@ -495,7 +501,18 @@ CHudEditor::SModuleVisual CHudEditor::GetModuleVisual(HudLayout::EModule Module)
 		const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
 		Visual.m_Rounding = 5.0f * Scale;
 		break;
-	}	case HudLayout::MODULE_VOICE_TALKERS:
+	}
+	case HudLayout::MODULE_STREAM_ACTIVITY:
+	{
+		Visual.m_Rect = GameClient()->m_StreamChat.GetActivityHudEditorRect(false);
+		if(Visual.m_Rect.w <= 0.0f || Visual.m_Rect.h <= 0.0f)
+			Visual.m_Rect = GameClient()->m_StreamChat.GetActivityHudEditorRect(true);
+		const auto Layout = HudLayout::Get(HudLayout::MODULE_STREAM_ACTIVITY, Width, Height);
+		const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+		Visual.m_Rounding = 5.0f * Scale;
+		break;
+	}
+	case HudLayout::MODULE_VOICE_TALKERS:
 		Visual.m_Editable = false;
 		break;
 	case HudLayout::MODULE_VOICE_STATUS:
@@ -588,6 +605,7 @@ void CHudEditor::CollectModuleVisuals(SModuleVisual *pOut, int &Count) const
 	// Keep chat at the bottom like BestClient, so smaller modules stay easy to select.
 	AddModule(HudLayout::MODULE_CHAT);
 	AddModule(HudLayout::MODULE_STREAM_CHAT);
+	AddModule(HudLayout::MODULE_STREAM_ACTIVITY);
 	AddModule(HudLayout::MODULE_MUSIC_PLAYER);
 	AddModule(HudLayout::MODULE_MUSIC_VIDEO_EFFECT);
 	AddModule(HudLayout::MODULE_SCORE);
@@ -1315,9 +1333,11 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 	// Draw true HUD previews first, then add interactive editor overlays on top.
 	const bool MusicPlayerHasLiveRect = IsMusicPlayerEnabled(GameClient()) && GameClient()->m_MusicPlayer.HudReservation().m_Visible;
 	const bool StreamChatLive = g_Config.m_MaStreamChat != 0 && HudLayout::IsEnabled(HudLayout::MODULE_STREAM_CHAT);
+	const bool StreamActivityLive = g_Config.m_MaStreamChat != 0 && (g_Config.m_MaStreamActivityStats != 0 || g_Config.m_MaStreamActivityFeed != 0) && HudLayout::IsEnabled(HudLayout::MODULE_STREAM_ACTIVITY);
 	const bool MusicVideoEffectLive = g_Config.m_MaMusicVideoEffect != 0 && HudLayout::IsEnabled(HudLayout::MODULE_MUSIC_VIDEO_EFFECT);
 	GameClient()->m_Chat.RenderHud(true);
 	GameClient()->m_StreamChat.RenderHudEditor(!StreamChatLive);
+	GameClient()->m_StreamChat.RenderActivityHudEditor(!StreamActivityLive);
 	GameClient()->m_MusicPlayer.RenderHudEditor(!MusicPlayerHasLiveRect);
 	GameClient()->m_Ma.RenderMusicVideoEffectHudEditor(!MusicVideoEffectLive);
 	GameClient()->m_Hud.RenderScoreHudPreview();
