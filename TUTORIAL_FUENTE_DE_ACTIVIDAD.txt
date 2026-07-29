@@ -1,0 +1,211 @@
+TUTORIAL FUENTE DE ACTIVIDAD - MΛ ツ CLIENT 2.1.7
+=====================================================
+
+Este archivo explica como activar y configurar la Fuente de actividad para directos.
+No incluye claves reales. Usa tus propios datos y no muestres tus claves en directo.
+
+IMPORTANTE SOBRE SEGURIDAD
+--------------------------
+
+- No compartas tu Client Secret de Twitch, YouTube o Kick.
+- No muestres el panel de desarrollador en stream.
+- En el cliente, los campos sensibles aparecen ocultos como contrasena.
+- Si una clave se mostro por accidente, genera una nueva y borra la anterior.
+- Para compartir el cliente, no incluyas tu carpeta personal de configuracion de DDNet.
+
+RUTA DENTRO DEL CLIENTE
+-----------------------
+
+1. Abre MΛ ツ Client.
+2. Entra a Configuracion.
+3. Entra al apartado MΛ ツ.
+4. Abre la pestana Visual.
+5. Baja hasta encontrar estas secciones:
+
+   - Chat de stream
+   - Fuente de actividad
+
+QUE HACE CADA SECCION
+---------------------
+
+Chat de stream:
+Muestra mensajes del chat dentro del juego.
+
+Fuente de actividad:
+Muestra eventos y estadisticas del directo, como espectadores reales, mensajes,
+chatters, pico de espectadores y tiempo activo.
+
+ACTIVAR CHAT DE STREAM
+----------------------
+
+1. Ve a Configuracion > MΛ ツ > Visual.
+2. Busca Chat de stream.
+3. Activa Activar chat de stream.
+4. En Plataforma, selecciona Twitch.
+5. En Canal / URL, escribe tu canal.
+
+Puedes usar cualquiera de estos formatos:
+
+   tu_canal
+   https://twitch.tv/tu_canal
+   twitch.tv/tu_canal
+
+6. Ajusta Lineas visibles a tu gusto.
+7. Ajusta Opacidad texto.
+8. Ajusta Opacidad fondo.
+9. Cambia Color texto si quieres otro color.
+10. Si cambiaste el canal o no conecta, pulsa Reconectar.
+
+ACTIVAR FUENTE DE ACTIVIDAD
+---------------------------
+
+1. Ve a Configuracion > MΛ ツ > Visual.
+2. Busca Fuente de actividad.
+3. Activa Mostrar fuente de actividad.
+4. Activa Mostrar estadisticas si quieres ver resumen del directo.
+5. Activa Mostrar espectadores reales si quieres que consulte la API de la plataforma.
+6. En Fuente, elige una opcion:
+
+   - Usar plataforma del chat
+   - Twitch
+   - YouTube
+   - Kick
+
+Si eliges Usar plataforma del chat, usara la misma plataforma configurada en Chat de stream.
+
+CONFIGURAR TWITCH PARA ESPECTADORES REALES
+------------------------------------------
+
+Para Twitch necesitas:
+
+- Twitch Client ID
+- Twitch access token
+
+No necesitas pegar el Client Secret dentro del juego. El secret solo se usa para generar el token.
+
+Pasos:
+
+1. Entra a Twitch Developer Console.
+2. Crea o abre tu aplicacion.
+3. Copia el Client ID.
+4. Genera un Client Secret nuevo si no tienes uno.
+5. Abre PowerShell.
+6. Usa este comando, cambiando solo el Client ID:
+
+   $clientId = "PEGA_AQUI_TU_CLIENT_ID"
+   $clientSecret = Read-Host "Pega tu Client Secret de Twitch"
+
+   $r = Invoke-RestMethod -Method Post -Uri "https://id.twitch.tv/oauth2/token" -Body @{
+     client_id = $clientId
+     client_secret = $clientSecret
+     grant_type = "client_credentials"
+   }
+
+   $r.access_token
+
+7. PowerShell te pedira el Client Secret. Pegalo ahi.
+8. PowerShell mostrara un access token. Copia solo ese token.
+9. Vuelve al cliente.
+10. Ve a Configuracion > MΛ ツ > Visual > Fuente de actividad.
+11. Activa Mostrar espectadores reales.
+12. En Fuente, selecciona Twitch o Usar plataforma del chat.
+13. En Twitch Client ID, pega tu Client ID.
+14. En Twitch token, pega el access token generado.
+15. Ajusta Actualizar espectadores cada.
+
+Recomendacion:
+Usa 30 a 60 segundos para Actualizar espectadores cada. Es suficiente para directo y evita hacer demasiadas consultas.
+
+CONFIGURAR YOUTUBE
+------------------
+
+Para YouTube necesitas una YouTube API key y la URL o ID del video en vivo.
+
+Pasos:
+
+1. En Chat de stream, coloca la URL o ID del video en Canal / URL.
+2. En Fuente de actividad, selecciona YouTube.
+3. Activa Mostrar espectadores reales.
+4. En YouTube API key, pega tu API key.
+
+Formatos aceptados:
+
+   https://www.youtube.com/watch?v=ID_DEL_VIDEO
+   https://youtu.be/ID_DEL_VIDEO
+   https://www.youtube.com/live/ID_DEL_VIDEO
+   ID_DEL_VIDEO
+
+CONFIGURAR KICK
+---------------
+
+Para Kick necesitas:
+
+- Kick token
+- Kick broadcaster ID numerico
+
+Pasos:
+
+1. En Fuente de actividad, selecciona Kick.
+2. Activa Mostrar espectadores reales.
+3. En Kick token, pega tu token.
+4. En Kick broadcaster ID, coloca el ID numerico del streamer.
+
+Si falta el broadcaster ID numerico, el cliente indicara que Kick necesita ese dato.
+
+MOVER CHAT Y FUENTE DE ACTIVIDAD EN EL HUD
+------------------------------------------
+
+El Chat de stream y la Fuente de actividad son HUD separados.
+Puedes mover uno sin mover el otro.
+
+Pasos:
+
+1. Entra a una partida o abre una demo.
+2. Ve a Configuracion > MΛ ツ > Visual.
+3. En Chat de stream, pulsa Editar HUD.
+4. En el editor veras dos cajas separadas:
+
+   - Chat de stream
+   - Fuente de actividad
+
+5. Arrastra Chat de stream para mover solo los mensajes del chat.
+6. Arrastra Fuente de actividad para mover solo estadisticas y eventos.
+7. Usa esquinas o bordes para cambiar tamano.
+8. Cierra el editor.
+9. El juego guarda la posicion automaticamente.
+
+CONSEJOS PARA DIRECTO
+---------------------
+
+- Mant?n las claves fuera de pantalla.
+- Si usas OBS, revisa la escena antes de iniciar directo.
+- Si una API deja de actualizar, pulsa Reconectar o desactiva/activa Mostrar espectadores reales.
+- Si cambias de canal, vuelve a pulsar Reconectar.
+- No compartas archivos de configuracion personales con tus amigos.
+- El archivo correcto para jugar desde el release es DDNet.exe.
+
+SOLUCION RAPIDA DE PROBLEMAS
+----------------------------
+
+No aparece el chat:
+- Revisa que Activar chat de stream este activado.
+- Revisa que Plataforma este en Twitch.
+- Revisa que Canal / URL tenga tu canal correcto.
+- Pulsa Reconectar.
+
+No aparecen espectadores reales:
+- Activa Mostrar espectadores reales.
+- Revisa que la Fuente sea la correcta.
+- Revisa que el token/API key este bien pegado.
+- En Twitch, revisa que Client ID y token sean del mismo proyecto.
+- En Kick, revisa que el broadcaster ID sea numerico.
+
+Se ve en el lugar incorrecto:
+- Entra al editor de HUD.
+- Mueve Fuente de actividad separado del Chat de stream.
+- Cierra el editor para guardar.
+
+FIN DEL TUTORIAL
+----------------
+
+Archivo creado para MΛ ツ Client 2.1.7.
