@@ -1,4 +1,4 @@
-/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
+﻿/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #ifndef GAME_CLIENT_COMPONENTS_MENUS_H
 #define GAME_CLIENT_COMPONENTS_MENUS_H
@@ -955,7 +955,9 @@ private:
 	void RenderSettingsTClientConfigs(CUIRect MainView);
 	void RenderSettingsTClientMa(CUIRect MainView);
 	void RenderMaConfiguracion(CUIRect MainView);
+	void RenderMaNickNames(CUIRect MainView);
 	void RenderMaVisual(CUIRect MainView);
+	void RenderMaGif(CUIRect MainView);
 	void RenderMaLluvia(CUIRect MainView);
 	void RenderMaAnimeLove(CUIRect MainView);
 	void RenderMaKeystroke(CUIRect MainView);
@@ -1000,3 +1002,4 @@ private:
 	SAssetsEditorState m_AssetsEditorState;
 };
 #endif
+

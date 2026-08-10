@@ -359,7 +359,7 @@ if(NOT MSVC AND NOT HAIKU)
 
   add_cxx_compiler_flag_if_supported(OUR_FLAGS_OWN -Wall)
   add_cxx_compiler_flag_if_supported(OUR_FLAGS_OWN -Wextra)
-  add_cxx_compiler_flag_if_supported(OUR_FLAGS_OWN -Wno-psabi) # parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<CCommandProcessorFragment_Vulkan::SMemoryBlock<1>*, std::vector<CCommandProcessorFragment_Vulkan::SMemoryBlock<1>, std::allocator<CCommandProcessorFragment_Vulkan::SMemoryBlock<1> > > >’ changed in GCC 7.1
+  add_cxx_compiler_flag_if_supported(OUR_FLAGS_OWN -Wno-psabi) # parameter passing for argument of type â€˜__gnu_cxx::__normal_iterator<CCommandProcessorFragment_Vulkan::SMemoryBlock<1>*, std::vector<CCommandProcessorFragment_Vulkan::SMemoryBlock<1>, std::allocator<CCommandProcessorFragment_Vulkan::SMemoryBlock<1> > > >â€™ changed in GCC 7.1
   add_cxx_compiler_flag_if_supported(OUR_FLAGS_OWN -Wno-unused-parameter)
   add_cxx_compiler_flag_if_supported(OUR_FLAGS_OWN -Wno-missing-field-initializers)
   if(CMAKE_BUILD_TYPE STREQUAL Debug)
@@ -1561,6 +1561,7 @@ set(EXPECTED_DATA
   languages/traditional_chinese.txt
   languages/turkish.txt
   languages/ukrainian.txt
+  ma/gifs/gifs.txt
   ma/startup_music/welcome_to_ddnet.mp3
   mapres/basic_freeze.png
   mapres/bg_cloud1.png
@@ -2572,6 +2573,7 @@ if(CLIENT)
     components/mapsounds.h
     components/media_decoder.cpp
     components/media_decoder.h
+    components/wic_gif_decoder.cpp
     components/menu_background.cpp
     components/menu_background.h
     components/menu_media_background.cpp
@@ -2664,6 +2666,12 @@ if(CLIENT)
     components/ma/hud_editor.cpp
     components/ma/hud_editor.h
     components/ma/editors/menus_assets_editor.cpp
+    components/ma/cherry_gifs.cpp
+    components/ma/cherry_gifs.h
+    components/ma/gif_bubbles.cpp
+    components/ma/gif_bubbles.h
+    components/ma/gif_wheel.cpp
+    components/ma/gif_wheel.h
     components/ma/particles3d.cpp
     components/ma/particles3d.h
     components/ma/visualizer/analyzer.cpp

@@ -44,13 +44,15 @@ namespace
 		       Module == HudLayout::MODULE_MUSIC_VIDEO_EFFECT ||
 		       Module == HudLayout::MODULE_SCORE ||
 		       Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD ||
+		       Module == HudLayout::MODULE_KEYSTROKES_SPACE ||
 		       Module == HudLayout::MODULE_KEYSTROKES_MOUSE ||
 		       Module == HudLayout::MODULE_MOVEMENT_INFO ||
 		       Module == HudLayout::MODULE_VOTES ||
 		       Module == HudLayout::MODULE_LOCAL_TIME ||
 		       Module == HudLayout::MODULE_FROZEN_HUD ||
 		       Module == HudLayout::MODULE_FROZEN_COUNTER ||
-		       Module == HudLayout::MODULE_MA_SPECTATORS;
+		       Module == HudLayout::MODULE_MA_SPECTATORS ||
+	       Module == HudLayout::MODULE_MA_TEAM_STATS;
 	}
 
 	bool IsEditorPreviewModule(HudLayout::EModule Module)
@@ -62,13 +64,15 @@ namespace
 		       Module == HudLayout::MODULE_MUSIC_VIDEO_EFFECT ||
 		       Module == HudLayout::MODULE_SCORE ||
 		       Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD ||
+		       Module == HudLayout::MODULE_KEYSTROKES_SPACE ||
 		       Module == HudLayout::MODULE_KEYSTROKES_MOUSE ||
 		       Module == HudLayout::MODULE_MOVEMENT_INFO ||
 		       Module == HudLayout::MODULE_VOTES ||
 		       Module == HudLayout::MODULE_LOCAL_TIME ||
 		       Module == HudLayout::MODULE_FROZEN_HUD ||
 		       Module == HudLayout::MODULE_FROZEN_COUNTER ||
-		       Module == HudLayout::MODULE_MA_SPECTATORS;
+		       Module == HudLayout::MODULE_MA_SPECTATORS ||
+	       Module == HudLayout::MODULE_MA_TEAM_STATS;
 	}
 
 	bool IsLivePreviewModule(HudLayout::EModule Module)
@@ -79,6 +83,7 @@ namespace
 		       Module == HudLayout::MODULE_MUSIC_VIDEO_EFFECT ||
 		       Module == HudLayout::MODULE_SCORE ||
 		       Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD ||
+		       Module == HudLayout::MODULE_KEYSTROKES_SPACE ||
 		       Module == HudLayout::MODULE_KEYSTROKES_MOUSE ||
 		       Module == HudLayout::MODULE_MOVEMENT_INFO ||
 		       Module == HudLayout::MODULE_CHAT ||
@@ -86,7 +91,8 @@ namespace
 		       Module == HudLayout::MODULE_LOCAL_TIME ||
 		       Module == HudLayout::MODULE_FROZEN_HUD ||
 		       Module == HudLayout::MODULE_FROZEN_COUNTER ||
-		       Module == HudLayout::MODULE_MA_SPECTATORS;
+		       Module == HudLayout::MODULE_MA_SPECTATORS ||
+	       Module == HudLayout::MODULE_MA_TEAM_STATS;
 	}
 
 	bool PointInRect(vec2 Point, const CUIRect &Rect)
@@ -113,6 +119,10 @@ namespace
 		else if(Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD)
 		{
 			g_Config.m_TcKeystrokeHudSize = 100;
+		}
+		else if(Module == HudLayout::MODULE_KEYSTROKES_SPACE)
+		{
+			g_Config.m_TcKeystrokeHudSpaceSize = 100;
 		}
 		else if(Module == HudLayout::MODULE_KEYSTROKES_MOUSE)
 		{
@@ -307,6 +317,8 @@ int CHudEditor::GetModuleScale(HudLayout::EModule Module) const
 {
 	if(Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD)
 		return std::clamp(g_Config.m_TcKeystrokeHudSize, 1, 200);
+	if(Module == HudLayout::MODULE_KEYSTROKES_SPACE)
+		return std::clamp(g_Config.m_TcKeystrokeHudSpaceSize, 1, 200);
 	if(Module == HudLayout::MODULE_KEYSTROKES_MOUSE)
 		return std::clamp(g_Config.m_TcKeystrokeHudMouseSize, 1, 200);
 	return HudLayout::Get(Module, HudWidth(), HudHeight()).m_Scale;
@@ -317,6 +329,11 @@ void CHudEditor::SetModuleScale(HudLayout::EModule Module, int Scale)
 	if(Module == HudLayout::MODULE_KEYSTROKES_KEYBOARD)
 	{
 		g_Config.m_TcKeystrokeHudSize = std::clamp(Scale, 1, 200);
+		return;
+	}
+	if(Module == HudLayout::MODULE_KEYSTROKES_SPACE)
+	{
+		g_Config.m_TcKeystrokeHudSpaceSize = std::clamp(Scale, 1, 200);
 		return;
 	}
 	if(Module == HudLayout::MODULE_KEYSTROKES_MOUSE)
@@ -415,6 +432,9 @@ CUIRect CHudEditor::GetFallbackModuleRect(HudLayout::EModule Module) const
 	case HudLayout::MODULE_KEYSTROKES_KEYBOARD:
 		Rect = CUIRect();
 		break;
+	case HudLayout::MODULE_KEYSTROKES_SPACE:
+		Rect = CUIRect();
+		break;
 	case HudLayout::MODULE_KEYSTROKES_MOUSE:
 		Rect = CUIRect();
 		break;
@@ -435,6 +455,9 @@ CUIRect CHudEditor::GetFallbackModuleRect(HudLayout::EModule Module) const
 	}
 	case HudLayout::MODULE_MA_SPECTATORS:
 		Rect = GameClient()->m_Ma.GetSpectatorPanelHudEditorRect(true);
+		break;
+	case HudLayout::MODULE_MA_TEAM_STATS:
+		Rect = GameClient()->m_Ma.GetTeamStatsPanelHudEditorRect(true);
 		break;
 	case HudLayout::MODULE_STREAM_CHAT:
 		Rect = GameClient()->m_StreamChat.GetHudEditorRect(true);
@@ -543,6 +566,10 @@ CHudEditor::SModuleVisual CHudEditor::GetModuleVisual(HudLayout::EModule Module)
 		Visual.m_Rect = GameClient()->m_Hud.GetKeystrokesKeyboardHudEditorRect(Width, Height);
 		Visual.m_Rounding = 4.0f;
 		break;
+	case HudLayout::MODULE_KEYSTROKES_SPACE:
+		Visual.m_Rect = GameClient()->m_Hud.GetKeystrokesSpaceHudEditorRect(Width, Height);
+		Visual.m_Rounding = 4.0f;
+		break;
 	case HudLayout::MODULE_KEYSTROKES_MOUSE:
 		Visual.m_Rect = GameClient()->m_Hud.GetKeystrokesMouseHudEditorRect(Width, Height);
 		Visual.m_Rounding = 4.0f;
@@ -568,6 +595,12 @@ CHudEditor::SModuleVisual CHudEditor::GetModuleVisual(HudLayout::EModule Module)
 		if(Visual.m_Rect.w <= 0.0f || Visual.m_Rect.h <= 0.0f)
 			Visual.m_Rect = GameClient()->m_Ma.GetSpectatorPanelHudEditorRect(true);
 		Visual.m_Rounding = 5.0f * std::clamp(HudLayout::Get(HudLayout::MODULE_MA_SPECTATORS, Width, Height).m_Scale / 100.0f, 0.25f, 3.0f);
+		break;
+	case HudLayout::MODULE_MA_TEAM_STATS:
+		Visual.m_Rect = GameClient()->m_Ma.GetTeamStatsPanelHudEditorRect(false);
+		if(Visual.m_Rect.w <= 0.0f || Visual.m_Rect.h <= 0.0f)
+			Visual.m_Rect = GameClient()->m_Ma.GetTeamStatsPanelHudEditorRect(true);
+		Visual.m_Rounding = 5.0f * std::clamp(HudLayout::Get(HudLayout::MODULE_MA_TEAM_STATS, Width, Height).m_Scale / 100.0f, 0.25f, 3.0f);
 		break;
 	default:
 		Visual.m_Editable = false;
@@ -610,6 +643,7 @@ void CHudEditor::CollectModuleVisuals(SModuleVisual *pOut, int &Count) const
 	AddModule(HudLayout::MODULE_MUSIC_VIDEO_EFFECT);
 	AddModule(HudLayout::MODULE_SCORE);
 	AddModule(HudLayout::MODULE_KEYSTROKES_KEYBOARD);
+	AddModule(HudLayout::MODULE_KEYSTROKES_SPACE);
 	AddModule(HudLayout::MODULE_KEYSTROKES_MOUSE);
 	AddModule(HudLayout::MODULE_MOVEMENT_INFO);
 	AddModule(HudLayout::MODULE_VOTES);
@@ -617,6 +651,7 @@ void CHudEditor::CollectModuleVisuals(SModuleVisual *pOut, int &Count) const
 	AddModule(HudLayout::MODULE_FROZEN_HUD);
 	AddModule(HudLayout::MODULE_FROZEN_COUNTER);
 	AddModule(HudLayout::MODULE_MA_SPECTATORS);
+	AddModule(HudLayout::MODULE_MA_TEAM_STATS);
 }
 
 HudLayout::EModule CHudEditor::HitTestModule(vec2 MousePos) const
@@ -925,7 +960,7 @@ void CHudEditor::UpdateResizing(vec2 MousePos)
 
 	int MinScale = 25;
 	int MaxScale = 300;
-	if(m_PressedModule == HudLayout::MODULE_KEYSTROKES_KEYBOARD || m_PressedModule == HudLayout::MODULE_KEYSTROKES_MOUSE)
+	if(m_PressedModule == HudLayout::MODULE_KEYSTROKES_KEYBOARD || m_PressedModule == HudLayout::MODULE_KEYSTROKES_SPACE || m_PressedModule == HudLayout::MODULE_KEYSTROKES_MOUSE)
 	{
 		MinScale = 1;
 		MaxScale = 200;
@@ -992,8 +1027,8 @@ CUi::EPopupMenuFunctionResult CHudEditor::PopupModuleSettings(void *pContext, CU
 		pThis->Ui()->DoLabel(&ScaleLabel, aScale, 8.0f, TEXTALIGN_ML);
 
 		View.HSplitTop(14.0f, &ScaleSlider, &View);
-		const int MinScale = (pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_KEYBOARD || pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_MOUSE) ? 1 : 25;
-		const int MaxScale = (pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_KEYBOARD || pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_MOUSE) ? 200 : 300;
+		const int MinScale = (pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_KEYBOARD || pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_SPACE || pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_MOUSE) ? 1 : 25;
+		const int MaxScale = (pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_KEYBOARD || pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_SPACE || pThis->m_SelectedModule == HudLayout::MODULE_KEYSTROKES_MOUSE) ? 200 : 300;
 		const float Relative = CUi::ms_LinearScrollbarScale.ToRelative(Scale, MinScale, MaxScale);
 		const float NewRelative = pThis->Ui()->DoScrollbarH(&pThis->m_SelectedModule, &ScaleSlider, Relative);
 		pThis->SetModuleScale(pThis->m_SelectedModule, CUi::ms_LinearScrollbarScale.ToAbsolute(NewRelative, MinScale, MaxScale));
@@ -1335,6 +1370,7 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 	const bool StreamChatLive = g_Config.m_MaStreamChat != 0 && HudLayout::IsEnabled(HudLayout::MODULE_STREAM_CHAT);
 	const bool StreamActivityLive = g_Config.m_MaStreamChat != 0 && (g_Config.m_MaStreamActivityStats != 0 || g_Config.m_MaStreamActivityFeed != 0) && HudLayout::IsEnabled(HudLayout::MODULE_STREAM_ACTIVITY);
 	const bool MusicVideoEffectLive = g_Config.m_MaMusicVideoEffect != 0 && HudLayout::IsEnabled(HudLayout::MODULE_MUSIC_VIDEO_EFFECT);
+	const bool TeamStatsLive = g_Config.m_MaTeamStatsPanel != 0 && HudLayout::IsEnabled(HudLayout::MODULE_MA_TEAM_STATS);
 	GameClient()->m_Chat.RenderHud(true);
 	GameClient()->m_StreamChat.RenderHudEditor(!StreamChatLive);
 	GameClient()->m_StreamChat.RenderActivityHudEditor(!StreamActivityLive);
@@ -1342,6 +1378,7 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 	GameClient()->m_Ma.RenderMusicVideoEffectHudEditor(!MusicVideoEffectLive);
 	GameClient()->m_Hud.RenderScoreHudPreview();
 	GameClient()->m_Hud.RenderKeystrokesKeyboardPreview();
+	GameClient()->m_Hud.RenderKeystrokesSpacePreview();
 	GameClient()->m_Hud.RenderKeystrokesMousePreview();
 	GameClient()->m_Hud.RenderMovementInformationPreview();
 	GameClient()->m_Voting.RenderHud(true);
@@ -1349,6 +1386,7 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 	GameClient()->m_Hud.RenderFrozenHudPreview();
 	GameClient()->m_Hud.RenderFrozenCounterPreview();
 	GameClient()->m_Ma.RenderSpectatorPanelHudEditor(true);
+	GameClient()->m_Ma.RenderTeamStatsPanelHudEditor(!TeamStatsLive);
 	// Voice chat not available in TClient
 	// GameClient()->m_VoiceChat.RenderHudTalkingIndicator(Width, Height, true);
 	// GameClient()->m_VoiceChat.RenderHudMuteStatusIndicator(Width, Height, true);

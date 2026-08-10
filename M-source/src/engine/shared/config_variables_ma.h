@@ -7,7 +7,7 @@
 #define MACRO_CONFIG_STR(MaName, ScriptName, Len, Def, Save, Desc) ;
 #endif
 
-MACRO_CONFIG_INT(MaEnabled, ma_enabled, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable MΛ ツ features")
+MACRO_CONFIG_INT(MaEnabled, ma_enabled, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable M? ? features")
 
 // ===== ASPECT RATIO =====
 MACRO_CONFIG_INT(MaCustomAspectRatioMode, ma_custom_aspect_ratio_mode, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Aspect ratio mode (0=off, 1=preset, 2=custom)")
@@ -74,8 +74,21 @@ MACRO_CONFIG_INT(MaChatMediaPreview, ma_chat_media_preview, 1, 0, 1, CFGFLAG_CLI
 MACRO_CONFIG_INT(MaChatMediaPhotos, ma_chat_media_photos, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render photo previews from chat links")
 MACRO_CONFIG_INT(MaChatMediaGifs, ma_chat_media_gifs, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render GIF and animated media previews from chat links")
 MACRO_CONFIG_INT(MaChatMediaContentFilter, ma_chat_media_content_filter, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Allow chat media previews only from configured domains")
-MACRO_CONFIG_STR(MaChatMediaAllowedDomains, ma_chat_media_allowed_domains, 512, "tenor.com; media.tenor.com; media1.tenor.com; c.tenor.com; imgur.com; i.imgur.com; giphy.com; media.giphy.com; media1.giphy.com; discordapp.com; discordapp.net; cdn.discordapp.com; media.discordapp.net", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Semicolon-separated allowlist for chat media domains")
+MACRO_CONFIG_STR(MaChatMediaAllowedDomains, ma_chat_media_allowed_domains, 512, "tenor.com; media.tenor.com; media1.tenor.com; c.tenor.com; imgur.com; i.imgur.com; giphy.com; media.giphy.com; media1.giphy.com; gifs.teeworlds.xyz; discordapp.com; discordapp.net; cdn.discordapp.com; media.discordapp.net", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Semicolon-separated allowlist for chat media domains")
 MACRO_CONFIG_INT(MaChatMediaPreviewMaxWidth, ma_chat_media_preview_max_width, 220, 120, 400, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum width of chat media previews")
+
+// ===== GIF BROWSER =====
+MACRO_CONFIG_INT(MaCherryGifsShowNsfw, ma_cherrygifs_show_nsfw, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Include NSFW gifs in the CherryGifs browser")
+MACRO_CONFIG_INT(MaCherryGifsSortTop, ma_cherrygifs_sort_top, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Sort CherryGifs browser by top instead of new")
+MACRO_CONFIG_INT(MaGifApiSource, ma_gif_api_source, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "GIF browser source (0=local, 1=GIPHY)")
+MACRO_CONFIG_STR(MaTenorApiKey, ma_tenor_api_key, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Tenor API key for online GIF search")
+MACRO_CONFIG_STR(MaTenorClientKey, ma_tenor_client_key, 64, "ma_client", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Tenor client_key for online GIF search")
+MACRO_CONFIG_STR(MaGiphyApiKey, ma_giphy_api_key, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "GIPHY API key for online GIF search")
+MACRO_CONFIG_INT(MaGifWheelScale, ma_gif_wheel_scale, 100, 50, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Scale of the MA GIF wheel")
+MACRO_CONFIG_INT(MaGifBubbleAboveHead, ma_gif_bubble_above_head, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show a floating gif bubble above the sender when a recognized gif link is posted in chat")
+MACRO_CONFIG_STR(MaGifBubbleDomains, ma_gif_bubble_domains, 256, "gifs.teeworlds.xyz; i.imgur.com; media.giphy.com; i.giphy.com; giphy.com; tenor.com; media.tenor.com; media1.tenor.com; c.tenor.com", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Semicolon-separated domains that trigger the above-head gif bubble")
+MACRO_CONFIG_INT(MaGifBubbleDurationMs, ma_gif_bubble_duration_ms, 5000, 1000, 15000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long the above-head gif bubble stays visible")
+MACRO_CONFIG_INT(MaGifBubbleOffsetY, ma_gif_bubble_offset_y, 90, 0, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Vertical offset of the above-head gif bubble")
 
 // ===== STREAM CHAT =====
 MACRO_CONFIG_INT(MaStreamChat, ma_stream_chat, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show external stream chat overlay")
@@ -181,8 +194,22 @@ MACRO_CONFIG_INT(MaSpectatorPanelHudX, ma_spectator_panel_hud_x, 370, -1000, 100
 MACRO_CONFIG_INT(MaSpectatorPanelHudY, ma_spectator_panel_hud_y, 72, -1000, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor Y position for spectator panel")
 MACRO_CONFIG_INT(MaSpectatorPanelHudScale, ma_spectator_panel_hud_scale, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor scale for spectator panel")
 
+// ===== TEAM STATS PANEL =====
+MACRO_CONFIG_INT(MaTeamStatsPanel, ma_team_stats_panel, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show MA team statistics HUD panel")
+MACRO_CONFIG_INT(MaTeamStatsPanelOnlyInTeam, ma_team_stats_panel_only_in_team, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Only show team statistics after joining a DDNet team")
+MACRO_CONFIG_INT(MaTeamStatsPanelShowSelf, ma_team_stats_panel_show_self, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Always show your own team statistics")
+MACRO_CONFIG_INT(MaTeamStatsPanelMaxPlayers, ma_team_stats_panel_max_players, 3, 1, 12, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum players shown in the MA team statistics panel")
+MACRO_CONFIG_INT(MaTeamStatsPanelOpacity, ma_team_stats_panel_opacity, 78, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MA team statistics panel background opacity")
+MACRO_CONFIG_INT(MaTeamStatsPanelTextOpacity, ma_team_stats_panel_text_opacity, 100, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MA team statistics panel text opacity")
+MACRO_CONFIG_COL(MaTeamStatsPanelTitleColor, ma_team_stats_panel_title_color, 0x85FFC9, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MA team statistics panel title color")
+MACRO_CONFIG_COL(MaTeamStatsPanelTextColor, ma_team_stats_panel_text_color, 255, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MA team statistics panel text color")
+MACRO_CONFIG_COL(MaTeamStatsPanelHighlightColor, ma_team_stats_panel_highlight_color, 0x55FFDB, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MA team statistics panel highlighted text color")
+MACRO_CONFIG_INT(MaTeamStatsPanelHudX, ma_team_stats_panel_hud_x, 248, -1000, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor X position for MA team statistics panel")
+MACRO_CONFIG_INT(MaTeamStatsPanelHudY, ma_team_stats_panel_hud_y, 92, -1000, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor Y position for MA team statistics panel")
+MACRO_CONFIG_INT(MaTeamStatsPanelHudScale, ma_team_stats_panel_hud_scale, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor scale for MA team statistics panel")
+
 // ===== COMPONENT EDITOR =====
-MACRO_CONFIG_INT(MaComponentsMask, ma_components_mask, 0, 0, 65535, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bitmask for disabled MΛ ツ components")
+MACRO_CONFIG_INT(MaComponentsMask, ma_components_mask, 0, 0, 65535, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bitmask for disabled M? ? components")
 
 // ===== HUD POSITIONS =====
 MACRO_CONFIG_INT(MaHudChatX, ma_hud_chat_x, 5, -1000, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor X position for chat")

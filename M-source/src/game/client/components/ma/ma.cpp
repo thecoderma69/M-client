@@ -48,6 +48,7 @@ constexpr const char *STARTUP_MUSIC_LEGACY_MP3_PATH = "ma/startup_music/MONTAGEM
 constexpr const char *STARTUP_MUSIC_LEGACY_WAV_PATH = "ma/startup_music/ma_welcome_ddnet_client.wav";
 constexpr int MAX_SPECTATOR_PANEL_LINES = MAX_CLIENTS + 1;
 constexpr int SPECTATOR_PANEL_LINE_LENGTH = MAX_NAME_LENGTH + 32;
+constexpr float TEAM_STATS_HAMMER_DISTANCE = 120.0f;
 
 struct SSpectatorPanelState
 {
@@ -141,6 +142,44 @@ static bool IsPotentialSpectator(CGameClient *pGameClient, const CNetObj_PlayerI
 	return pInfo->m_Team == TEAM_SPECTATORS || Client.m_Paused || Client.m_Spec;
 }
 
+static bool MaTeamStatsIsSameTeamPlayer(CGameClient *pGameClient, int ClientId, int LocalTeam, bool OnlyInTeam)
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS || !pGameClient->m_Snap.m_apPlayerInfos[ClientId])
+		return false;
+	if(OnlyInTeam && LocalTeam <= TEAM_FLOCK)
+		return false;
+	if(pGameClient->m_Teams.Team(ClientId) != LocalTeam)
+		return false;
+
+	const CGameClient::CClientData &Client = pGameClient->m_aClients[ClientId];
+	const CNetObj_PlayerInfo *pInfo = pGameClient->m_Snap.m_apPlayerInfos[ClientId];
+	return pInfo->m_Team != TEAM_SPECTATORS && !Client.m_Paused && !Client.m_Spec;
+}
+
+static bool MaTeamStatsIsPlayable(CGameClient *pGameClient, int ClientId, int LocalTeam, bool OnlyInTeam)
+{
+	return MaTeamStatsIsSameTeamPlayer(pGameClient, ClientId, LocalTeam, OnlyInTeam) && pGameClient->m_Snap.m_aCharacters[ClientId].m_Active;
+}
+
+static bool MaTeamStatsIsFrozen(CGameClient *pGameClient, int ClientId)
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return false;
+	const CGameClient::CClientData &Client = pGameClient->m_aClients[ClientId];
+	return Client.m_DeepFrozen || Client.m_FreezeEnd != 0;
+}
+
+static void MaTeamStatsFormatTime(int Ticks, int TickSpeed, char *pBuffer, int BufferSize)
+{
+	const int Seconds = TickSpeed > 0 ? maximum(0, Ticks / TickSpeed) : 0;
+	const int Minutes = Seconds / 60;
+	const int Hours = Minutes / 60;
+	if(Hours > 0)
+		str_format(pBuffer, BufferSize, "%d:%02d:%02d", Hours, Minutes % 60, Seconds % 60);
+	else
+		str_format(pBuffer, BufferSize, "%02d:%02d", Minutes, Seconds % 60);
+}
+
 static bool BuildSpectatorPanelState(CGameClient *pGameClient, bool Sixup, bool ForcePreview, SSpectatorPanelState &State)
 {
 	State = SSpectatorPanelState{};
@@ -183,23 +222,53 @@ static bool BuildSpectatorPanelState(CGameClient *pGameClient, bool Sixup, bool 
 		{
 			State.m_Count = pGameClient->m_Snap.m_SpectatorCount;
 
-			int aCandidateIds[MAX_CLIENTS] = {};
-			int CandidateCount = 0;
+			int ExactCount = 0;
 			for(const CNetObj_PlayerInfo *pInfo : pGameClient->m_Snap.m_apInfoByName)
 			{
 				if(!IsPotentialSpectator(pGameClient, pInfo))
 					continue;
 
-				aCandidateIds[CandidateCount] = pInfo->m_ClientId;
-				CandidateCount++;
+				const int ClientId = pInfo->m_ClientId;
+				if(pGameClient->m_aClients[ClientId].m_MaWatchingLocal)
+				{
+					AddSpectatorPanelName(State, pGameClient->m_aClients[ClientId].m_aName, ClientId);
+					ExactCount++;
+				}
 			}
 
-			if(CandidateCount > 0)
+			if(ExactCount > 0)
 			{
-				for(int i = 0; i < CandidateCount; i++)
-					AddSpectatorPanelName(State, pGameClient->m_aClients[aCandidateIds[i]].m_aName, aCandidateIds[i]);
-				State.m_NamesExact = CandidateCount == State.m_Count;
-				State.m_Count = maximum(State.m_Count, CandidateCount);
+				State.m_Count = ExactCount;
+				State.m_NamesExact = true;
+			}
+			else if(State.m_Count > 0)
+			{
+				bool aAdded[MAX_CLIENTS] = {};
+				auto AddOfficialCandidate = [&](const CNetObj_PlayerInfo *pCandidate) {
+					if(State.m_NameCount >= State.m_Count || !pCandidate)
+						return;
+					const int CandidateId = pCandidate->m_ClientId;
+					if(CandidateId < 0 || CandidateId >= MAX_CLIENTS || aAdded[CandidateId])
+						return;
+					aAdded[CandidateId] = true;
+					AddSpectatorPanelName(State, pGameClient->m_aClients[CandidateId].m_aName, CandidateId);
+				};
+
+				for(const CNetObj_PlayerInfo *pInfo : pGameClient->m_Snap.m_apInfoByName)
+				{
+					if(!IsPotentialSpectator(pGameClient, pInfo))
+						continue;
+					const CGameClient::CClientData &Client = pGameClient->m_aClients[pInfo->m_ClientId];
+					if(pInfo->m_Team == TEAM_SPECTATORS || Client.m_Spec)
+						AddOfficialCandidate(pInfo);
+				}
+
+				for(const CNetObj_PlayerInfo *pInfo : pGameClient->m_Snap.m_apInfoByName)
+				{
+					if(!IsPotentialSpectator(pGameClient, pInfo))
+						continue;
+					AddOfficialCandidate(pInfo);
+				}
 			}
 		}
 	}
@@ -210,7 +279,6 @@ static bool BuildSpectatorPanelState(CGameClient *pGameClient, bool Sixup, bool 
 		return false;
 	return true;
 }
-
 static int BuildSpectatorPanelLines(const SSpectatorPanelState &State, bool ForcePreview, char aaLines[MAX_SPECTATOR_PANEL_LINES][SPECTATOR_PANEL_LINE_LENGTH])
 {
 	int LineCount = 0;
@@ -230,20 +298,7 @@ static int BuildSpectatorPanelLines(const SSpectatorPanelState &State, bool Forc
 	if(!g_Config.m_MaSpectatorPanelShowNames && !ForcePreview)
 		return LineCount;
 
-	if(State.m_NamesExact)
-	{
-		const int MaxNames = ForcePreview ? 3 : std::clamp(g_Config.m_MaSpectatorPanelMaxNames, 1, (int)MAX_CLIENTS);
-		const int VisibleNames = minimum(State.m_NameCount, MaxNames);
-		for(int i = 0; i < VisibleNames; i++)
-			AddLine(State.m_aaNames[i]);
-		if(State.m_NameCount > VisibleNames)
-		{
-			char aMore[32];
-			str_format(aMore, sizeof(aMore), "+%d mas", State.m_NameCount - VisibleNames);
-			AddLine(aMore);
-		}
-	}
-	else if(State.m_Count > 0)
+	if(State.m_NameCount > 0)
 	{
 		const int MaxNames = ForcePreview ? 3 : std::clamp(g_Config.m_MaSpectatorPanelMaxNames, 1, (int)MAX_CLIENTS);
 		const int VisibleNames = minimum(State.m_NameCount, MaxNames);
@@ -528,6 +583,7 @@ void CMa::OnReset()
 	m_MusicPlaying = false;
 	m_MusicInitialized = false;
 	ResetMusicVideoEffect();
+	ResetTeamStats();
 }
 
 void CMa::OnShutdown()
@@ -1038,6 +1094,452 @@ void CMa::RenderMusicVideoEffectHudEditor(bool ForcePreview)
 	RenderMusicVideoEffect(ForcePreview);
 }
 
+void CMa::ResetTeamStats()
+{
+	for(STeamStatsPlayer &Stats : m_aTeamStats)
+		Stats = STeamStatsPlayer{};
+	m_TeamStatsLastTick = -1;
+	m_TeamStatsLastLocalTeam = -999;
+	m_TeamStatsRaceStartTick = -1;
+	m_TeamStatsFinishedRaceStartTick = -1;
+	m_TeamStatsFinishTick = -1;
+	m_TeamStatsRunActive = false;
+	m_TeamStatsRunFinished = false;
+}
+
+void CMa::FinishTeamStatsRun(int FinishTick)
+{
+	if(m_TeamStatsRaceStartTick < 0)
+	{
+		if(GameClient()->m_Snap.m_pGameInfoObj && (GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_RACETIME))
+			m_TeamStatsRaceStartTick = -GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer;
+		else
+			return;
+	}
+
+	const int SafeFinishTick = maximum(FinishTick, m_TeamStatsRaceStartTick);
+	for(STeamStatsPlayer &Stats : m_aTeamStats)
+	{
+		if(Stats.m_Active && Stats.m_WasAlive && Stats.m_AliveStartTick >= 0)
+			Stats.m_BestAliveTicks += SafeFinishTick - Stats.m_AliveStartTick;
+		Stats.m_Active = false;
+		Stats.m_WasAlive = false;
+		Stats.m_WasFrozen = false;
+	}
+
+	m_TeamStatsRunActive = false;
+	m_TeamStatsRunFinished = true;
+	m_TeamStatsFinishTick = SafeFinishTick;
+	m_TeamStatsFinishedRaceStartTick = m_TeamStatsRaceStartTick;
+	m_TeamStatsLastTick = SafeFinishTick;
+}
+
+void CMa::UpdateTeamStats()
+{
+	if(!g_Config.m_MaTeamStatsPanel)
+		return;
+	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+	{
+		ResetTeamStats();
+		return;
+	}
+	if(!GameClient()->m_Snap.m_pLocalInfo || GameClient()->m_Snap.m_LocalClientId < 0)
+		return;
+
+	const int Tick = Client()->GameTick(g_Config.m_ClDummy);
+	if(Tick <= 0 || Tick == m_TeamStatsLastTick)
+		return;
+
+	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
+	const int LocalTeam = GameClient()->m_Teams.Team(LocalId);
+	const bool OnlyInTeam = g_Config.m_MaTeamStatsPanelOnlyInTeam != 0;
+	if(OnlyInTeam && LocalTeam <= TEAM_FLOCK)
+	{
+		if(m_TeamStatsLastLocalTeam != LocalTeam)
+			ResetTeamStats();
+		m_TeamStatsLastLocalTeam = LocalTeam;
+		m_TeamStatsLastTick = Tick;
+		return;
+	}
+
+	if(m_TeamStatsLastLocalTeam != LocalTeam)
+		ResetTeamStats();
+	m_TeamStatsLastLocalTeam = LocalTeam;
+
+	const bool RaceTimeNow = GameClient()->m_Snap.m_pGameInfoObj && (GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_RACETIME);
+	const int RaceStartTick = RaceTimeNow ? -GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer : -1;
+	if(m_TeamStatsRunFinished && RaceTimeNow && RaceStartTick == m_TeamStatsFinishedRaceStartTick)
+	{
+		m_TeamStatsLastTick = Tick;
+		return;
+	}
+	if(!RaceTimeNow)
+	{
+		m_TeamStatsRunActive = false;
+		m_TeamStatsLastTick = Tick;
+		return;
+	}
+	if(!m_TeamStatsRunActive || m_TeamStatsRaceStartTick != RaceStartTick)
+	{
+		ResetTeamStats();
+		m_TeamStatsLastLocalTeam = LocalTeam;
+		m_TeamStatsRaceStartTick = RaceStartTick;
+		m_TeamStatsRunActive = true;
+		m_TeamStatsRunFinished = false;
+		m_TeamStatsLastTick = -1;
+	}
+
+	bool aEligible[MAX_CLIENTS] = {};
+	bool aFrozen[MAX_CLIENTS] = {};
+	bool aWasFrozen[MAX_CLIENTS] = {};
+	const int TickSpeed = maximum(Client()->GameTickSpeed(), 1);
+	const bool FirstRunSnapshot = m_TeamStatsLastTick < 0;
+
+	for(int i = 0; i < MAX_CLIENTS; ++i)
+	{
+		STeamStatsPlayer &Stats = m_aTeamStats[i];
+		if(!GameClient()->m_Snap.m_apPlayerInfos[i])
+		{
+			if(Stats.m_WasAlive && Stats.m_AliveStartTick >= 0)
+				Stats.m_BestAliveTicks += Tick - Stats.m_AliveStartTick;
+			Stats = STeamStatsPlayer{};
+			continue;
+		}
+
+		const bool Eligible = MaTeamStatsIsPlayable(GameClient(), i, LocalTeam, OnlyInTeam);
+		aEligible[i] = Eligible;
+		if(!Eligible)
+		{
+			if(Stats.m_WasAlive && Stats.m_AliveStartTick >= 0)
+				Stats.m_BestAliveTicks += Tick - Stats.m_AliveStartTick;
+			Stats.m_Active = false;
+			Stats.m_WasAlive = false;
+			Stats.m_WasFrozen = false;
+			continue;
+		}
+
+		if(Stats.m_Team != LocalTeam)
+			Stats = STeamStatsPlayer{};
+
+		const CNetObj_Character &Character = GameClient()->m_Snap.m_aCharacters[i].m_Cur;
+		const bool FirstActive = !Stats.m_Active;
+		const bool Frozen = MaTeamStatsIsFrozen(GameClient(), i);
+		aFrozen[i] = Frozen;
+		aWasFrozen[i] = Stats.m_WasFrozen;
+		Stats.m_Team = LocalTeam;
+		Stats.m_Active = true;
+		if(FirstActive)
+			Stats.m_LastAttackTick = Character.m_AttackTick;
+		if(Frozen)
+		{
+			if(Stats.m_WasAlive && Stats.m_AliveStartTick >= 0)
+				Stats.m_BestAliveTicks += Tick - Stats.m_AliveStartTick;
+			Stats.m_WasAlive = false;
+		}
+		else
+		{
+			if(FirstActive || !Stats.m_WasAlive)
+				Stats.m_AliveStartTick = (FirstActive && FirstRunSnapshot) ? maximum(m_TeamStatsRaceStartTick, 0) : Tick;
+			Stats.m_WasAlive = true;
+		}
+	}
+
+	for(int Helper = 0; Helper < MAX_CLIENTS; ++Helper)
+	{
+		if(!aEligible[Helper])
+			continue;
+		const int Hooked = GameClient()->m_Snap.m_aCharacters[Helper].m_Cur.m_HookedPlayer;
+		if(Hooked >= 0 && Hooked < MAX_CLIENTS && Hooked != Helper && aEligible[Hooked] && aFrozen[Hooked])
+		{
+			m_aTeamStats[Hooked].m_LastHookedBy = Helper;
+			m_aTeamStats[Hooked].m_LastHookedTick = Tick;
+		}
+	}
+
+	for(int Helper = 0; Helper < MAX_CLIENTS; ++Helper)
+	{
+		if(!aEligible[Helper])
+			continue;
+		STeamStatsPlayer &HelperStats = m_aTeamStats[Helper];
+		const CNetObj_Character &HelperChar = GameClient()->m_Snap.m_aCharacters[Helper].m_Cur;
+		const bool AttackChanged = HelperChar.m_AttackTick > 0 && HelperChar.m_AttackTick != HelperStats.m_LastAttackTick;
+		if(AttackChanged && HelperChar.m_Weapon == WEAPON_HAMMER)
+		{
+			const vec2 HelperPos(HelperChar.m_X, HelperChar.m_Y);
+			for(int Target = 0; Target < MAX_CLIENTS; ++Target)
+			{
+				if(Target == Helper || !aEligible[Target] || (!aFrozen[Target] && !aWasFrozen[Target]))
+					continue;
+				const CNetObj_Character &TargetChar = GameClient()->m_Snap.m_aCharacters[Target].m_Cur;
+				if(distance(HelperPos, vec2(TargetChar.m_X, TargetChar.m_Y)) <= TEAM_STATS_HAMMER_DISTANCE)
+				{
+					m_aTeamStats[Target].m_LastHammerBy = Helper;
+					m_aTeamStats[Target].m_LastHammerTick = Tick;
+				}
+			}
+		}
+		HelperStats.m_LastAttackTick = HelperChar.m_AttackTick;
+	}
+
+	for(int Target = 0; Target < MAX_CLIENTS; ++Target)
+	{
+		if(!aEligible[Target])
+			continue;
+		STeamStatsPlayer &TargetStats = m_aTeamStats[Target];
+		if(TargetStats.m_WasFrozen && !aFrozen[Target])
+		{
+			const int HookBy = TargetStats.m_LastHookedBy;
+			const int HammerBy = TargetStats.m_LastHammerBy;
+			const bool HookRecent = HookBy >= 0 && Tick - TargetStats.m_LastHookedTick <= TickSpeed * 3;
+			const bool HammerRecent = HammerBy >= 0 && Tick - TargetStats.m_LastHammerTick <= TickSpeed * 2;
+			int Rescuer = -1;
+			if(HammerRecent && HammerBy != Target && aEligible[HammerBy])
+				Rescuer = HammerBy;
+			else if(HookRecent && HookBy != Target && aEligible[HookBy])
+				Rescuer = HookBy;
+
+			if(Rescuer >= 0 && Tick - TargetStats.m_LastRescueTick > TickSpeed / 2)
+			{
+				m_aTeamStats[Rescuer].m_Saves++;
+				TargetStats.m_LastRescueTick = Tick;
+				TargetStats.m_LastHookedBy = -1;
+				TargetStats.m_LastHammerBy = -1;
+			}
+		}
+		TargetStats.m_WasFrozen = aFrozen[Target];
+	}
+
+	m_TeamStatsLastTick = Tick;
+}
+
+int CMa::BuildTeamStatsPanelLines(bool ForcePreview, char aaLines[MAX_CLIENTS + 8][MAX_NAME_LENGTH + 96], bool aHighlight[MAX_CLIENTS + 8]) const
+{
+	int LineCount = 0;
+	auto AddLine = [&](const char *pText, bool Highlight = false) {
+		if(LineCount >= MAX_CLIENTS + 8)
+			return;
+		str_copy(aaLines[LineCount], pText, MAX_NAME_LENGTH + 96);
+		aHighlight[LineCount] = Highlight;
+		LineCount++;
+	};
+
+	if(ForcePreview)
+	{
+		AddLine("Mayor tiempo vivo: Eimy 04:21");
+		AddLine("Mejor rescate: Leo 7");
+		AddLine("1. Leo  7 rescates  03:58");
+		AddLine("2. Eimy  4 rescates  04:21");
+		AddLine("Yo: 2 rescates  02:10", true);
+		return LineCount;
+	}
+
+	if(!g_Config.m_MaTeamStatsPanel || !GameClient()->m_Snap.m_pLocalInfo || GameClient()->m_Snap.m_LocalClientId < 0)
+		return 0;
+
+	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
+	const int LocalTeam = GameClient()->m_Teams.Team(LocalId);
+	const bool OnlyInTeam = g_Config.m_MaTeamStatsPanelOnlyInTeam != 0;
+	if(OnlyInTeam && LocalTeam <= TEAM_FLOCK)
+		return 0;
+
+	if(!m_TeamStatsRunActive && !m_TeamStatsRunFinished)
+	{
+		AddLine("Esperando inicio del mapa...");
+		AddLine("El contador inicia con el timer.");
+		return LineCount;
+	}
+
+	struct SEntry
+	{
+		int m_ClientId;
+		int m_Saves;
+		int m_BestAliveTicks;
+		bool m_Local;
+	};
+	std::vector<SEntry> vEntries;
+	const int Tick = (m_TeamStatsRunFinished && m_TeamStatsFinishTick > 0) ? m_TeamStatsFinishTick : Client()->GameTick(g_Config.m_ClDummy);
+	const int TickSpeed = maximum(Client()->GameTickSpeed(), 1);
+	for(int i = 0; i < MAX_CLIENTS; ++i)
+	{
+		if(!MaTeamStatsIsSameTeamPlayer(GameClient(), i, LocalTeam, OnlyInTeam))
+			continue;
+		const STeamStatsPlayer &Stats = m_aTeamStats[i];
+		int AliveTicks = Stats.m_BestAliveTicks;
+		if(!m_TeamStatsRunFinished && Stats.m_Active && Stats.m_WasAlive && Stats.m_AliveStartTick > 0)
+			AliveTicks += Tick - Stats.m_AliveStartTick;
+		if(i != LocalId && Stats.m_Saves <= 0 && AliveTicks <= 0)
+			continue;
+		vEntries.push_back({i, Stats.m_Saves, AliveTicks, i == LocalId});
+	}
+
+	if(vEntries.empty())
+	{
+		AddLine(m_TeamStatsRunFinished ? "Sin datos del run." : "Sin datos todavia.");
+		return LineCount;
+	}
+
+	std::stable_sort(vEntries.begin(), vEntries.end(), [&](const SEntry &Left, const SEntry &Right) {
+		if(Left.m_Saves != Right.m_Saves)
+			return Left.m_Saves > Right.m_Saves;
+		if(Left.m_BestAliveTicks != Right.m_BestAliveTicks)
+			return Left.m_BestAliveTicks > Right.m_BestAliveTicks;
+		return str_comp_nocase(GameClient()->m_aClients[Left.m_ClientId].m_aName, GameClient()->m_aClients[Right.m_ClientId].m_aName) < 0;
+	});
+
+	const SEntry *pBestAlive = &vEntries[0];
+	const SEntry *pBestSaves = &vEntries[0];
+	for(const SEntry &Entry : vEntries)
+	{
+		if(Entry.m_BestAliveTicks > pBestAlive->m_BestAliveTicks)
+			pBestAlive = &Entry;
+		if(Entry.m_Saves > pBestSaves->m_Saves)
+			pBestSaves = &Entry;
+	}
+
+	char aTime[32];
+	char aLine[MAX_NAME_LENGTH + 96];
+	MaTeamStatsFormatTime(pBestAlive->m_BestAliveTicks, TickSpeed, aTime, sizeof(aTime));
+	str_format(aLine, sizeof(aLine), "Mayor tiempo vivo: %s %s", GameClient()->m_aClients[pBestAlive->m_ClientId].m_aName, aTime);
+	AddLine(aLine, pBestAlive->m_Local);
+	str_format(aLine, sizeof(aLine), "Mejor rescate: %s %d", GameClient()->m_aClients[pBestSaves->m_ClientId].m_aName, pBestSaves->m_Saves);
+	AddLine(aLine, pBestSaves->m_Local);
+
+	const int MaxPlayers = std::clamp(g_Config.m_MaTeamStatsPanelMaxPlayers, 1, 12);
+	bool LocalShown = false;
+	const int VisiblePlayers = minimum(MaxPlayers, (int)vEntries.size());
+	for(int i = 0; i < VisiblePlayers; ++i)
+	{
+		const SEntry &Entry = vEntries[i];
+		MaTeamStatsFormatTime(Entry.m_BestAliveTicks, TickSpeed, aTime, sizeof(aTime));
+		str_format(aLine, sizeof(aLine), "%d. %s  %d rescates  %s", i + 1, GameClient()->m_aClients[Entry.m_ClientId].m_aName, Entry.m_Saves, aTime);
+		AddLine(aLine, Entry.m_Local);
+		if(Entry.m_Local)
+			LocalShown = true;
+	}
+
+	if(g_Config.m_MaTeamStatsPanelShowSelf && !LocalShown)
+	{
+		for(const SEntry &Entry : vEntries)
+		{
+			if(!Entry.m_Local)
+				continue;
+			MaTeamStatsFormatTime(Entry.m_BestAliveTicks, TickSpeed, aTime, sizeof(aTime));
+			str_format(aLine, sizeof(aLine), "Yo: %d rescates  %s", Entry.m_Saves, aTime);
+			AddLine(aLine, true);
+			break;
+		}
+	}
+
+	return LineCount;
+}
+
+CUIRect CMa::GetTeamStatsPanelRect(float Width, float Height, bool ForcePreview) const
+{
+	if(!ForcePreview && (!g_Config.m_MaTeamStatsPanel || !HudLayout::IsEnabled(HudLayout::MODULE_MA_TEAM_STATS)))
+		return CUIRect{};
+
+	char aaLines[MAX_CLIENTS + 8][MAX_NAME_LENGTH + 96] = {};
+	bool aHighlight[MAX_CLIENTS + 8] = {};
+	const int LineCount = BuildTeamStatsPanelLines(ForcePreview, aaLines, aHighlight);
+	if(LineCount <= 0)
+		return CUIRect{};
+
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_MA_TEAM_STATS, Width, Height);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
+	const float Padding = 5.0f * Scale;
+	const float HeaderFont = 6.8f * Scale;
+	const float LineFont = 5.5f * Scale;
+	const float LineGap = 1.4f * Scale;
+
+	const char *pTitle = TCLocalize((ForcePreview || m_TeamStatsRunFinished) ? "Mejores jugadores" : "Estadisticas team");
+	float BoxWidth = maximum(104.0f * Scale, TextRender()->TextWidth(HeaderFont, pTitle, -1, -1.0f) + Padding * 2.0f);
+	for(int i = 0; i < LineCount; ++i)
+		BoxWidth = maximum(BoxWidth, TextRender()->TextWidth(LineFont, aaLines[i], -1, -1.0f) + Padding * 2.0f);
+	BoxWidth *= WidthStretch;
+
+	const float BoxHeight = (Padding * 2.0f + HeaderFont + 2.5f * Scale + LineCount * LineFont + maximum(0, LineCount - 1) * LineGap) * HeightStretch;
+	HudLayout::SModuleRect RawRect{Layout.m_X, Layout.m_Y, BoxWidth, BoxHeight, 5.0f * Scale};
+	const HudLayout::SModuleRect Clamped = HudLayout::ClampRectToScreen(RawRect, Width, Height);
+	return {Clamped.m_X, Clamped.m_Y, Clamped.m_W, Clamped.m_H};
+}
+
+CUIRect CMa::GetTeamStatsPanelHudEditorRect(bool ForcePreview) const
+{
+	const float Height = HudLayout::CANVAS_HEIGHT;
+	const float Width = Height * (m_pGraphics ? m_pGraphics->ScreenAspect() : 1.0f);
+	return GetTeamStatsPanelRect(Width, Height, ForcePreview);
+}
+
+void CMa::RenderTeamStatsPanel(bool ForcePreview)
+{
+	if(!ForcePreview && (!g_Config.m_MaTeamStatsPanel || !HudLayout::IsEnabled(HudLayout::MODULE_MA_TEAM_STATS)))
+		return;
+
+	char aaLines[MAX_CLIENTS + 8][MAX_NAME_LENGTH + 96] = {};
+	bool aHighlight[MAX_CLIENTS + 8] = {};
+	const int LineCount = BuildTeamStatsPanelLines(ForcePreview, aaLines, aHighlight);
+	if(LineCount <= 0)
+		return;
+
+	float PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1;
+	Graphics()->GetScreen(&PrevScreenX0, &PrevScreenY0, &PrevScreenX1, &PrevScreenY1);
+
+	const float Width = HudLayout::CANVAS_HEIGHT * Graphics()->ScreenAspect();
+	const float Height = HudLayout::CANVAS_HEIGHT;
+	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+
+	const CUIRect Rect = GetTeamStatsPanelRect(Width, Height, ForcePreview);
+	if(Rect.w <= 0.0f || Rect.h <= 0.0f)
+	{
+		Graphics()->MapScreen(PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1);
+		return;
+	}
+
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_MA_TEAM_STATS, Width, Height);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float BgAlpha = ForcePreview ? 0.86f : std::clamp(g_Config.m_MaTeamStatsPanelOpacity / 100.0f, 0.0f, 1.0f);
+	const float TextAlpha = ForcePreview ? 1.0f : std::clamp(g_Config.m_MaTeamStatsPanelTextOpacity / 100.0f, 0.0f, 1.0f);
+	ColorRGBA TitleColor = ForcePreview ? ColorRGBA(0.58f, 0.95f, 1.0f, 1.0f) : color_cast<ColorRGBA>(ColorHSLA(g_Config.m_MaTeamStatsPanelTitleColor));
+	ColorRGBA TextColor = ForcePreview ? ColorRGBA(0.88f, 0.90f, 0.96f, 1.0f) : color_cast<ColorRGBA>(ColorHSLA(g_Config.m_MaTeamStatsPanelTextColor));
+	ColorRGBA HighlightColor = ForcePreview ? ColorRGBA(0.72f, 1.0f, 0.72f, 1.0f) : color_cast<ColorRGBA>(ColorHSLA(g_Config.m_MaTeamStatsPanelHighlightColor));
+	TitleColor.a = TextAlpha;
+	TextColor.a = 0.92f * TextAlpha;
+	HighlightColor.a = TextAlpha;
+
+	const float Padding = 5.0f * Scale;
+	const float HeaderFont = 6.8f * Scale;
+	const float LineFont = 5.5f * Scale;
+	const float LineGap = 1.4f * Scale;
+	const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, Rect.x, Rect.y, Rect.w, Rect.h, Width, Height);
+
+	Graphics()->TextureClear();
+	if(Layout.m_BackgroundEnabled && BgAlpha > 0.0f)
+		Graphics()->DrawRect(Rect.x, Rect.y, Rect.w, Rect.h, ColorRGBA(0.02f, 0.02f, 0.06f, 0.78f * BgAlpha), Corners, 5.0f * Scale);
+
+	float x = Rect.x + Padding;
+	float y = Rect.y + Padding;
+	TextRender()->TextColor(TitleColor);
+	const char *pTitle = TCLocalize((ForcePreview || m_TeamStatsRunFinished) ? "Mejores jugadores" : "Estadisticas team");
+	TextRender()->Text(x, y, HeaderFont, pTitle, -1.0f);
+	y += HeaderFont + 3.0f * Scale;
+
+	for(int i = 0; i < LineCount; ++i)
+	{
+		TextRender()->TextColor(aHighlight[i] ? HighlightColor : TextColor);
+		TextRender()->Text(x, y, LineFont, aaLines[i], -1.0f);
+		y += LineFont + LineGap;
+	}
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	Graphics()->MapScreen(PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1);
+}
+
+void CMa::RenderTeamStatsPanelHudEditor(bool ForcePreview)
+{
+	RenderTeamStatsPanel(ForcePreview);
+}
 CUIRect CMa::GetSpectatorPanelRect(float Width, float Height, bool ForcePreview) const
 {
 	if(!ForcePreview && (!g_Config.m_MaSpectatorPanel || !HudLayout::IsEnabled(HudLayout::MODULE_MA_SPECTATORS)))
@@ -1418,6 +1920,7 @@ void CMa::OnRender()
 	if(!g_Config.m_MaMusicVideoEffectBehind)
 		RenderMusicVideoEffect(false);
 	RenderSpectatorPanel(false);
+	RenderTeamStatsPanel(false);
 	// Music Player is now handled by the separate CMusicPlayer component
 }
 
@@ -1425,9 +1928,21 @@ void CMa::OnNewSnapshot()
 {
 	if(!g_Config.m_MaEnabled)
 		return;
+	UpdateTeamStats();
 	// Music Player is now handled by the separate CMusicPlayer component
 }
 
+void CMa::OnMessage(int MsgType, void *pRawMsg)
+{
+	if(!g_Config.m_MaEnabled || !g_Config.m_MaTeamStatsPanel || MsgType != NETMSGTYPE_SV_RACEFINISH)
+		return;
+
+	CNetMsg_Sv_RaceFinish *pMsg = (CNetMsg_Sv_RaceFinish *)pRawMsg;
+	const int LocalId = GameClient()->m_aLocalIds[0];
+	const int DummyId = GameClient()->Client()->DummyConnected() ? GameClient()->m_aLocalIds[1] : -1;
+	if(pMsg->m_ClientId == LocalId || pMsg->m_ClientId == DummyId)
+		FinishTeamStatsRun(Client()->GameTick(g_Config.m_ClDummy));
+}
 bool CMa::OnInput(const IInput::CEvent &Event)
 {
 	if(!g_Config.m_MaEnabled)

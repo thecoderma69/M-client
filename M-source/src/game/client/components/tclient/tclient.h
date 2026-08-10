@@ -106,7 +106,7 @@ public:
 	bool ChatDoSpecId(const char *pInput);
 	bool InfoTaskDone() { return m_pTClientInfoTask && m_pTClientInfoTask->State() == EHttpState::DONE; }
 	bool m_FetchedTClientInfo = false;
-	char m_aVersionStr[10] = "0";
+	char m_aVersionStr[64] = "0";
 
 	Regex m_RegexChatIgnore;
 };

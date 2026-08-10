@@ -1,9 +1,14 @@
-/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
+﻿/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 
 #include "spectator.h"
 
 #include "camera.h"
+
+#include <base/color.h>
+#include <base/math.h>
+#include <base/str.h>
+#include <base/system.h>
 
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
@@ -15,8 +20,174 @@
 #include <game/client/gameclient.h>
 #include <game/localization.h>
 
+#include <algorithm>
 #include <limits>
 
+namespace
+{
+struct SMaSpectatorNameEffectSettings
+{
+	int m_Style = 0;
+	unsigned m_Color1 = 65425;
+	unsigned m_Color2 = 41131;
+	int m_Glow = 70;
+	bool m_Moving = false;
+};
+
+static void MaSpectatorNameEffectFillOwn(SMaSpectatorNameEffectSettings &Settings)
+{
+	Settings.m_Style = std::clamp(g_Config.m_MaNameEffectsOwnStyle, 0, 3);
+	Settings.m_Color1 = g_Config.m_MaNameEffectsOwnColor1;
+	Settings.m_Color2 = g_Config.m_MaNameEffectsOwnColor2;
+	Settings.m_Glow = std::clamp(g_Config.m_MaNameEffectsOwnGlow, 0, 100);
+	Settings.m_Moving = g_Config.m_MaNameEffectsOwnMoving != 0;
+}
+
+static void MaSpectatorNameEffectCopyTrimmedField(const char *pStart, const char *pEnd, char *pDst, int DstSize)
+{
+	while(pStart < pEnd && (*pStart == ' ' || *pStart == '\t'))
+		++pStart;
+	while(pEnd > pStart && (*(pEnd - 1) == ' ' || *(pEnd - 1) == '\t'))
+		--pEnd;
+
+	const int CopyLen = minimum<int>((int)(pEnd - pStart), DstSize - 1);
+	for(int i = 0; i < CopyLen; ++i)
+		pDst[i] = pStart[i];
+	pDst[CopyLen] = '\0';
+}
+
+static unsigned MaSpectatorNameEffectParseColor(const char *pText, unsigned DefaultColor)
+{
+	if(!pText || pText[0] == '\0')
+		return DefaultColor;
+	const int64_t Value = str_toint64_base(pText, 10);
+	return Value < 0 ? DefaultColor : (unsigned)Value;
+}
+
+static bool MaSpectatorNameEffectParseEntryRecord(const char *pStart, const char *pEnd, const char *pName, SMaSpectatorNameEffectSettings &Settings)
+{
+	char aaFields[6][MAX_NAME_LENGTH] = {{0}};
+	int Field = 0;
+	const char *pFieldStart = pStart;
+	for(const char *pCursor = pStart; pCursor <= pEnd && Field < 6; ++pCursor)
+	{
+		if(pCursor == pEnd || *pCursor == '|')
+		{
+			MaSpectatorNameEffectCopyTrimmedField(pFieldStart, pCursor, aaFields[Field], sizeof(aaFields[Field]));
+			++Field;
+			pFieldStart = pCursor + 1;
+		}
+	}
+
+	if(aaFields[0][0] == '\0' || str_comp_nocase(aaFields[0], pName) != 0)
+		return false;
+
+	Settings.m_Style = std::clamp(aaFields[1][0] ? str_toint(aaFields[1]) : g_Config.m_MaNameEffectsStyle, 0, 3);
+	Settings.m_Color1 = MaSpectatorNameEffectParseColor(aaFields[2], g_Config.m_MaNameEffectsColor1);
+	Settings.m_Color2 = MaSpectatorNameEffectParseColor(aaFields[3], g_Config.m_MaNameEffectsColor2);
+	Settings.m_Glow = std::clamp(aaFields[4][0] ? str_toint(aaFields[4]) : g_Config.m_MaNameEffectsGlow, 0, 100);
+	Settings.m_Moving = aaFields[5][0] ? str_toint(aaFields[5]) != 0 : g_Config.m_MaNameEffectsMoving != 0;
+	return true;
+}
+
+static bool MaSpectatorNameEffectFindConfiguredEntry(const char *pName, SMaSpectatorNameEffectSettings &Settings)
+{
+	const char *pCursor = g_Config.m_MaNameEffectsEntries;
+	while(*pCursor)
+	{
+		while(*pCursor == ';' || *pCursor == '\n' || *pCursor == '\r')
+			++pCursor;
+		const char *pStart = pCursor;
+		while(*pCursor && *pCursor != ';' && *pCursor != '\n' && *pCursor != '\r')
+			++pCursor;
+		if(pCursor > pStart && MaSpectatorNameEffectParseEntryRecord(pStart, pCursor, pName, Settings))
+			return true;
+	}
+	return false;
+}
+
+static bool MaSpectatorNameEffectApplies(CGameClient *pGameClient, int ClientId, const char *pName, SMaSpectatorNameEffectSettings &Settings)
+{
+	if(!g_Config.m_MaNameEffects || !pName || pName[0] == '\0')
+		return false;
+	const bool Local = ClientId >= 0 && (pGameClient->m_aLocalIds[0] == ClientId || pGameClient->m_aLocalIds[1] == ClientId);
+	if(g_Config.m_MaNameEffectsOwn && Local)
+	{
+		MaSpectatorNameEffectFillOwn(Settings);
+		return true;
+	}
+	return MaSpectatorNameEffectFindConfiguredEntry(pName, Settings);
+}
+
+static ColorRGBA MaSpectatorNameEffectConfigColor(unsigned ConfigColor, float Alpha)
+{
+	ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(ConfigColor, true));
+	Color.a = std::clamp(Color.a, 0.25f, 1.0f) * Alpha;
+	return Color;
+}
+
+static ColorRGBA MaSpectatorNameEffectMixColors(ColorRGBA A, ColorRGBA B, float Amount)
+{
+	Amount = std::clamp(Amount, 0.0f, 1.0f);
+	return ColorRGBA(A.r + (B.r - A.r) * Amount, A.g + (B.g - A.g) * Amount, A.b + (B.b - A.b) * Amount, A.a + (B.a - A.a) * Amount);
+}
+
+static ColorRGBA MaSpectatorNameEffectLetterColor(int LetterIndex, float Alpha, const SMaSpectatorNameEffectSettings &Settings, int MotionTick)
+{
+	const int Style = std::clamp(Settings.m_Style, 0, 3);
+	if(Style == 0)
+	{
+		const int HueOffset = Settings.m_Moving ? MotionTick * 8 : 0;
+		const float Hue = (float)(((LetterIndex * 89 + HueOffset) % 360 + 360) % 360) / 360.0f;
+		ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(Hue, 1.0f, 0.62f));
+		Color.a = Alpha;
+		return Color;
+	}
+
+	ColorRGBA Primary = MaSpectatorNameEffectConfigColor(Settings.m_Color1, Alpha);
+	ColorRGBA Accent = MaSpectatorNameEffectConfigColor(Settings.m_Color2, Alpha);
+	if(Settings.m_Moving)
+	{
+		const int Phase = (LetterIndex * 37 + MotionTick * 9) % 120;
+		const float Mix = Phase < 60 ? Phase / 60.0f : (120 - Phase) / 60.0f;
+		return MaSpectatorNameEffectMixColors(Primary, Accent, Mix);
+	}
+	return Primary;
+}
+
+static void MaSpectatorRenderNameEffect(ITextRender *pTextRender, CTextCursor *pCursor, const char *pName, const SMaSpectatorNameEffectSettings &Settings, float Alpha)
+{
+	const int Style = std::clamp(Settings.m_Style, 0, 3);
+	const bool Stars = Style == 2 || Style == 3;
+	const int MotionTick = Settings.m_Moving ? (int)((time_get() * 12) / time_freq()) : 0;
+
+	if(Stars)
+	{
+		pTextRender->TextColor(MaSpectatorNameEffectConfigColor(Settings.m_Color2, Alpha));
+		pTextRender->TextEx(pCursor, "\xE2\x9C\xA6 ");
+	}
+
+	const char *pChar = pName;
+	int LetterIndex = 0;
+	while(*pChar)
+	{
+		const char *pNext = pChar;
+		str_utf8_decode(&pNext);
+		const int CharLen = maximum<int>(1, (int)(pNext - pChar));
+		pTextRender->TextColor(MaSpectatorNameEffectLetterColor(LetterIndex, Alpha, Settings, MotionTick));
+		pTextRender->TextEx(pCursor, pChar, CharLen);
+		pChar += CharLen;
+		++LetterIndex;
+	}
+
+	if(Stars)
+	{
+		pTextRender->TextColor(MaSpectatorNameEffectConfigColor(Settings.m_Color2, Alpha));
+		pTextRender->TextEx(pCursor, " \xE2\x9C\xA6");
+	}
+	pTextRender->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+}
+} // namespace
 bool CSpectator::CanChangeSpectatorId()
 {
 	// don't change SpectatorId when not spectating
@@ -507,17 +678,22 @@ void CSpectator::OnRender()
 			}
 		}
 		float TeeAlpha;
+		float NameAlpha;
 		if(Client()->State() == IClient::STATE_DEMOPLAYBACK &&
 			!GameClient()->m_Snap.m_aCharacters[GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId].m_Active)
 		{
-			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.25f);
+			NameAlpha = 0.25f;
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, NameAlpha);
 			TeeAlpha = 0.5f;
 		}
 		else
 		{
-			TextRender()->TextColor(1.0f, 1.0f, 1.0f, PlayerSelected ? 1.0f : 0.5f);
+			NameAlpha = PlayerSelected ? 1.0f : 0.5f;
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, NameAlpha);
 			TeeAlpha = 1.0f;
 		}
+		const int ClientId = GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId;
+		const char *pClientName = GameClient()->m_aClients[ClientId].m_aName;
 		CTextCursor NameCursor;
 		NameCursor.SetPosition(vec2(Width / 2.0f + x + 50.0f, Height / 2.0f + y + BoxMove + (LineHeight - FontSize) / 2.f));
 		NameCursor.m_FontSize = FontSize;
@@ -526,17 +702,25 @@ void CSpectator::OnRender()
 		if(g_Config.m_ClShowIds)
 		{
 			char aClientId[16];
-			GameClient()->FormatClientId(GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId, aClientId, EClientIdFormat::INDENT_AUTO);
+			GameClient()->FormatClientId(ClientId, aClientId, EClientIdFormat::INDENT_AUTO);
 			TextRender()->TextEx(&NameCursor, aClientId);
 		}
 
-		// TClient
-		if(pInfo && pInfo->m_ClientId > 0 && g_Config.m_TcWarList && g_Config.m_TcWarListSpectate && GameClient()->m_WarList.GetAnyWar(pInfo->m_ClientId))
+		SMaSpectatorNameEffectSettings NameEffectSettings;
+		if(MaSpectatorNameEffectApplies(GameClient(), ClientId, pClientName, NameEffectSettings))
 		{
-			TextRender()->TextColor(GameClient()->m_WarList.GetPriorityColor(pInfo->m_ClientId));
+			MaSpectatorRenderNameEffect(TextRender(), &NameCursor, pClientName, NameEffectSettings, NameAlpha);
 		}
+		else
+		{
+			// TClient
+			if(pInfo && pInfo->m_ClientId > 0 && g_Config.m_TcWarList && g_Config.m_TcWarListSpectate && GameClient()->m_WarList.GetAnyWar(pInfo->m_ClientId))
+			{
+				TextRender()->TextColor(GameClient()->m_WarList.GetPriorityColor(pInfo->m_ClientId));
+			}
 
-		TextRender()->TextEx(&NameCursor, GameClient()->m_aClients[GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId].m_aName);
+			TextRender()->TextEx(&NameCursor, pClientName);
+		}
 
 		if(GameClient()->m_MultiViewActivated)
 		{

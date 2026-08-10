@@ -33,6 +33,11 @@ namespace
 		return pData != nullptr && DataSize >= 8 && mem_comp(pData, s_aPngSig, 8) == 0;
 	}
 
+	bool IsGifSignature(const unsigned char *pData, size_t DataSize)
+	{
+		return pData != nullptr && DataSize >= 6 && (mem_comp(pData, "GIF87a", 6) == 0 || mem_comp(pData, "GIF89a", 6) == 0);
+	}
+
 #if defined(CONF_VIDEORECORDER)
 	struct CFfmpegMemoryReader
 	{
@@ -413,6 +418,27 @@ namespace MediaDecoder
 #endif
 	}
 
+	struct WicRawFrame
+	{
+		uint8_t *m_pData;
+		int m_Width;
+		int m_Height;
+		int m_DurationMs;
+	};
+
+	struct WicDecodedFrames
+	{
+		WicRawFrame *m_pFrames;
+		int m_FrameCount;
+		int m_Width;
+		int m_Height;
+	};
+
+	extern "C" {
+		bool WicDecodeGif(const unsigned char *pData, size_t DataSize, WicDecodedFrames *pOut, int MaxDimension, int MaxFrames, bool DecodeAllFrames);
+		void WicFreeFrames(WicDecodedFrames *pFrames);
+	}
+
 #if defined(CONF_VIDEORECORDER)
 	bool DecodeImageWithFfmpegCpu(IGraphics *pGraphics, const unsigned char *pData, size_t DataSize, const char *pContextName, SMediaDecodedFrames &DecodedFrames, const SMediaDecodeLimits &Limits)
 	{
@@ -422,6 +448,34 @@ namespace MediaDecoder
 
 		if(!pData || DataSize == 0)
 			return false;
+
+		// Try WIC for GIFs first; it is more reliable for GIF frames on Windows.
+		if(IsGifSignature(pData, DataSize))
+		{
+			WicDecodedFrames Wic;
+			if(WicDecodeGif(pData, DataSize, &Wic, Limits.m_MaxDimension > 0 ? Limits.m_MaxDimension : 960,
+				Limits.m_MaxFrames > 0 ? Limits.m_MaxFrames : 360, Limits.m_DecodeAllFrames))
+			{
+				DecodedFrames.m_Width = Wic.m_Width;
+				DecodedFrames.m_Height = Wic.m_Height;
+				DecodedFrames.m_Animated = Wic.m_FrameCount > 1;
+				DecodedFrames.m_AnimationStart = time_get();
+				for(int i = 0; i < Wic.m_FrameCount; ++i)
+				{
+					CImageInfo Img;
+					Img.m_Width = Wic.m_pFrames[i].m_Width;
+					Img.m_Height = Wic.m_pFrames[i].m_Height;
+					Img.m_Format = CImageInfo::FORMAT_RGBA;
+					Img.m_pData = Wic.m_pFrames[i].m_pData;
+					SMediaRawFrame Raw;
+					Raw.m_DurationMs = Wic.m_pFrames[i].m_DurationMs;
+					Raw.m_Image = std::move(Img);
+					DecodedFrames.m_vFrames.push_back(std::move(Raw));
+				}
+				free(Wic.m_pFrames);
+				return !DecodedFrames.m_vFrames.empty();
+			}
+		}
 
 		CFfmpegMemoryReader Reader{pData, DataSize, 0};
 		uint8_t *pIoBuffer = (uint8_t *)av_malloc(4096);

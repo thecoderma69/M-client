@@ -2,6 +2,7 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "scoreboard.h"
 
+#include <base/str.h>
 #include <base/time.h>
 
 #include <engine/console.h>
@@ -21,6 +22,204 @@
 #include <game/client/gameclient.h>
 #include <game/client/ui.h>
 #include <game/localization.h>
+
+
+struct SMaScoreboardNameEffectSettings
+{
+	bool m_Active = false;
+	int m_Style = 0;
+	unsigned m_Color1 = 65425;
+	unsigned m_Color2 = 41131;
+	int m_Glow = 70;
+	bool m_Moving = false;
+};
+
+static void MaScoreboardNameEffectFillGlobal(SMaScoreboardNameEffectSettings &Settings)
+{
+	Settings.m_Active = true;
+	Settings.m_Style = std::clamp(g_Config.m_MaNameEffectsStyle, 0, 3);
+	Settings.m_Color1 = g_Config.m_MaNameEffectsColor1;
+	Settings.m_Color2 = g_Config.m_MaNameEffectsColor2;
+	Settings.m_Glow = std::clamp(g_Config.m_MaNameEffectsGlow, 0, 100);
+	Settings.m_Moving = g_Config.m_MaNameEffectsMoving != 0;
+}
+
+static void MaScoreboardNameEffectFillOwn(SMaScoreboardNameEffectSettings &Settings)
+{
+	Settings.m_Active = true;
+	Settings.m_Style = std::clamp(g_Config.m_MaNameEffectsOwnStyle, 0, 3);
+	Settings.m_Color1 = g_Config.m_MaNameEffectsOwnColor1;
+	Settings.m_Color2 = g_Config.m_MaNameEffectsOwnColor2;
+	Settings.m_Glow = std::clamp(g_Config.m_MaNameEffectsOwnGlow, 0, 100);
+	Settings.m_Moving = g_Config.m_MaNameEffectsOwnMoving != 0;
+}
+
+static void MaScoreboardNameEffectCopyTrimmedField(const char *pStart, const char *pEnd, char *pDst, int DstSize)
+{
+	while(pStart < pEnd && (*pStart == ' ' || *pStart == '\t'))
+		++pStart;
+	while(pEnd > pStart && (*(pEnd - 1) == ' ' || *(pEnd - 1) == '\t'))
+		--pEnd;
+
+	const int CopyLen = minimum<int>((int)(pEnd - pStart), DstSize - 1);
+	for(int i = 0; i < CopyLen; ++i)
+		pDst[i] = pStart[i];
+	pDst[CopyLen] = '\0';
+}
+
+static unsigned MaScoreboardNameEffectParseColor(const char *pText, unsigned DefaultColor)
+{
+	if(!pText || pText[0] == '\0')
+		return DefaultColor;
+	const int64_t Value = str_toint64_base(pText, 10);
+	return Value < 0 ? DefaultColor : (unsigned)Value;
+}
+
+static bool MaScoreboardNameEffectNameListContains(const char *pList, const char *pName)
+{
+	const char *pCursor = pList;
+	while(*pCursor)
+	{
+		while(*pCursor == ';' || *pCursor == ',' || *pCursor == '|' || *pCursor == ' ' || *pCursor == '\t' || *pCursor == '\n' || *pCursor == '\r')
+			++pCursor;
+
+		const char *pStart = pCursor;
+		while(*pCursor && *pCursor != ';' && *pCursor != ',' && *pCursor != '|' && *pCursor != '\n' && *pCursor != '\r')
+			++pCursor;
+
+		char aToken[MAX_NAME_LENGTH];
+		MaScoreboardNameEffectCopyTrimmedField(pStart, pCursor, aToken, sizeof(aToken));
+		if(aToken[0] != '\0' && str_comp_nocase(aToken, pName) == 0)
+			return true;
+	}
+	return false;
+}
+
+static bool MaScoreboardNameEffectParseEntryRecord(const char *pStart, const char *pEnd, const char *pName, SMaScoreboardNameEffectSettings &Settings)
+{
+	char aaFields[6][MAX_NAME_LENGTH] = {{0}};
+	int Field = 0;
+	const char *pFieldStart = pStart;
+	for(const char *pCursor = pStart; pCursor <= pEnd && Field < 6; ++pCursor)
+	{
+		if(pCursor == pEnd || *pCursor == '|')
+		{
+			MaScoreboardNameEffectCopyTrimmedField(pFieldStart, pCursor, aaFields[Field], sizeof(aaFields[Field]));
+			++Field;
+			pFieldStart = pCursor + 1;
+		}
+	}
+
+	if(aaFields[0][0] == '\0' || str_comp_nocase(aaFields[0], pName) != 0)
+		return false;
+
+	Settings.m_Active = true;
+	Settings.m_Style = std::clamp(aaFields[1][0] ? str_toint(aaFields[1]) : g_Config.m_MaNameEffectsStyle, 0, 3);
+	Settings.m_Color1 = MaScoreboardNameEffectParseColor(aaFields[2], g_Config.m_MaNameEffectsColor1);
+	Settings.m_Color2 = MaScoreboardNameEffectParseColor(aaFields[3], g_Config.m_MaNameEffectsColor2);
+	Settings.m_Glow = std::clamp(aaFields[4][0] ? str_toint(aaFields[4]) : g_Config.m_MaNameEffectsGlow, 0, 100);
+	Settings.m_Moving = aaFields[5][0] ? str_toint(aaFields[5]) != 0 : g_Config.m_MaNameEffectsMoving != 0;
+	return true;
+}
+
+static bool MaScoreboardNameEffectFindConfiguredEntry(const char *pName, SMaScoreboardNameEffectSettings &Settings)
+{
+	const char *pCursor = g_Config.m_MaNameEffectsEntries;
+	while(*pCursor)
+	{
+		while(*pCursor == ';' || *pCursor == '\n' || *pCursor == '\r')
+			++pCursor;
+		const char *pStart = pCursor;
+		while(*pCursor && *pCursor != ';' && *pCursor != '\n' && *pCursor != '\r')
+			++pCursor;
+		if(pCursor > pStart && MaScoreboardNameEffectParseEntryRecord(pStart, pCursor, pName, Settings))
+			return true;
+	}
+	return false;
+}
+
+static bool MaScoreboardNameEffectApplies(CGameClient *pGameClient, int ClientId, const char *pName, SMaScoreboardNameEffectSettings &Settings)
+{
+	if(!g_Config.m_MaNameEffects || !pName || pName[0] == '\0')
+		return false;
+	const bool Local = ClientId >= 0 && (pGameClient->m_aLocalIds[0] == ClientId || pGameClient->m_aLocalIds[1] == ClientId);
+	if(g_Config.m_MaNameEffectsOwn && Local)
+	{
+		MaScoreboardNameEffectFillOwn(Settings);
+		return true;
+	}
+	if(MaScoreboardNameEffectFindConfiguredEntry(pName, Settings))
+		return true;
+
+	return false;
+}
+
+static ColorRGBA MaScoreboardNameEffectConfigColor(unsigned ConfigColor, float Alpha)
+{
+	ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(ConfigColor, true));
+	Color.a = std::clamp(Color.a, 0.25f, 1.0f) * Alpha;
+	return Color;
+}
+
+static ColorRGBA MaScoreboardNameEffectMixColors(ColorRGBA A, ColorRGBA B, float Amount)
+{
+	Amount = std::clamp(Amount, 0.0f, 1.0f);
+	return ColorRGBA(A.r + (B.r - A.r) * Amount, A.g + (B.g - A.g) * Amount, A.b + (B.b - A.b) * Amount, A.a + (B.a - A.a) * Amount);
+}
+
+static ColorRGBA MaScoreboardNameEffectLetterColor(int LetterIndex, float Alpha, const SMaScoreboardNameEffectSettings &Settings, int MotionTick)
+{
+	const int Style = std::clamp(Settings.m_Style, 0, 3);
+	if(Style == 0)
+	{
+		const int HueOffset = Settings.m_Moving ? MotionTick * 8 : 0;
+		const float Hue = (float)(((LetterIndex * 89 + HueOffset) % 360 + 360) % 360) / 360.0f;
+		ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(Hue, 1.0f, 0.62f));
+		Color.a = Alpha;
+		return Color;
+	}
+
+	ColorRGBA Primary = MaScoreboardNameEffectConfigColor(Settings.m_Color1, Alpha);
+	ColorRGBA Accent = MaScoreboardNameEffectConfigColor(Settings.m_Color2, Alpha);
+	if(Settings.m_Moving)
+	{
+		const int Phase = (LetterIndex * 37 + MotionTick * 9) % 120;
+		const float Mix = Phase < 60 ? Phase / 60.0f : (120 - Phase) / 60.0f;
+		return MaScoreboardNameEffectMixColors(Primary, Accent, Mix);
+	}
+	return Primary;
+}
+
+static void MaScoreboardRenderNameEffect(ITextRender *pTextRender, CTextCursor *pCursor, const char *pName, const SMaScoreboardNameEffectSettings &Settings, float Alpha)
+{
+	const int Style = std::clamp(Settings.m_Style, 0, 3);
+	const bool Stars = Style == 2 || Style == 3;
+	const int MotionTick = Settings.m_Moving ? (int)((time_get() * 12) / time_freq()) : 0;
+	if(Stars)
+	{
+		pTextRender->TextColor(MaScoreboardNameEffectConfigColor(Settings.m_Color2, Alpha));
+		pTextRender->TextEx(pCursor, "\xE2\x9C\xA6 ");
+	}
+
+	const char *pChar = pName;
+	int LetterIndex = 0;
+	while(*pChar)
+	{
+		const char *pNext = pChar;
+		str_utf8_decode(&pNext);
+		const int CharLen = maximum<int>(1, (int)(pNext - pChar));
+		pTextRender->TextColor(MaScoreboardNameEffectLetterColor(LetterIndex, Alpha, Settings, MotionTick));
+		pTextRender->TextEx(pCursor, pChar, CharLen);
+		pChar += CharLen;
+		++LetterIndex;
+	}
+
+	if(Stars)
+	{
+		pTextRender->TextColor(MaScoreboardNameEffectConfigColor(Settings.m_Color2, Alpha));
+		pTextRender->TextEx(pCursor, " \xE2\x9C\xA6");
+	}
+}
 
 CScoreboard::CScoreboard()
 {
@@ -762,11 +961,21 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 					TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 				}
 
-				// TClient
-				if(pInfo->m_ClientId >= 0 && g_Config.m_TcWarList && g_Config.m_TcWarListScoreboard && GameClient()->m_WarList.GetAnyWar(pInfo->m_ClientId))
-					TextRender()->TextColor(GameClient()->m_WarList.GetNameplateColor(pInfo->m_ClientId));
+				SMaScoreboardNameEffectSettings NameEffectSettings;
+				const bool NameEffectActive = MaScoreboardNameEffectApplies(GameClient(), pInfo->m_ClientId, ClientData.m_aName, NameEffectSettings);
+				if(NameEffectActive)
+				{
+					MaScoreboardRenderNameEffect(TextRender(), &Cursor, ClientData.m_aName, NameEffectSettings, TextColor.a);
+				}
+				else
+				{
+					// TClient
+					if(pInfo->m_ClientId >= 0 && g_Config.m_TcWarList && g_Config.m_TcWarListScoreboard && GameClient()->m_WarList.GetAnyWar(pInfo->m_ClientId))
+						TextRender()->TextColor(GameClient()->m_WarList.GetNameplateColor(pInfo->m_ClientId));
 
-				TextRender()->TextEx(&Cursor, ClientData.m_aName);
+					TextRender()->TextEx(&Cursor, ClientData.m_aName);
+				}
+				TextRender()->TextColor(TextColor);
 
 				// ready / watching
 				if(Client()->IsSixup() && Client()->m_TranslationContext.m_aClients[pInfo->m_ClientId].m_PlayerFlags7 & protocol7::PLAYERFLAG_READY)
@@ -1215,3 +1424,4 @@ CUi::EPopupMenuFunctionResult CScoreboard::CMapTitlePopupContext::Render(void *p
 
 	return CUi::POPUP_KEEP_OPEN;
 }
+

@@ -1,0 +1,117 @@
+/* Copyright (c) 2026 BestProject Team */
+#ifndef GAME_CLIENT_COMPONENTS_MA_CHERRY_GIFS_H
+#define GAME_CLIENT_COMPONENTS_MA_CHERRY_GIFS_H
+
+#include <engine/console.h>
+#include <engine/graphics.h>
+
+#include <game/client/component.h>
+#include <game/client/components/media_decoder.h>
+
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+class CHttpRequest;
+
+struct SCherryGif
+{
+	char m_aId[32] = "";
+	char m_aUrl[256] = "";
+	char m_aPreviewUrl[256] = "";
+	char m_aCaption[128] = "";
+	int m_Likes = 0;
+	bool m_Nsfw = false;
+	std::vector<std::string> m_vTags;
+
+	std::vector<SMediaFrame> m_vThumbnailFrames;
+	bool m_ThumbnailAnimated = false;
+	int64_t m_ThumbnailAnimationStart = 0;
+	bool m_ThumbnailRequested = false;
+	bool m_ThumbnailFailed = false;
+};
+
+// Client for MA GIF browser sources: local database, Tenor, and CherryGifs fallback.
+class CCherryGifs : public CComponent
+{
+	enum class EListProvider
+	{
+		Local,
+		CherryGifs,
+		Tenor,
+		Giphy
+	};
+
+	std::vector<SCherryGif> m_vResults;
+	std::vector<SCherryGif> m_vLocalDatabase;
+	bool m_LocalDatabaseLoaded = false;
+	int m_Offset = 0;
+	int m_Total = 0;
+	char m_aNextPos[128] = "";
+	EListProvider m_ListProvider = EListProvider::Local;
+	bool m_HasMore = false;
+	bool m_Loading = false;
+	bool m_Error = false;
+	char m_aErrorText[128] = "";
+
+	bool m_Initialized = false;
+	char m_aAppliedQuery[128] = "";
+	bool m_AppliedSortTop = false;
+	bool m_AppliedIncludeNsfw = false;
+
+	char m_aPendingQuery[128] = "";
+	bool m_PendingSortTop = false;
+	bool m_PendingIncludeNsfw = false;
+	float m_PendingChangeTimer = -1.0f;
+
+	std::shared_ptr<CHttpRequest> m_pListRequest;
+	float m_ListRequestCooldown = 0.0f;
+
+	struct SThumbnailJob
+	{
+		std::shared_ptr<CHttpRequest> m_pRequest;
+		char m_aGifId[32] = "";
+	};
+	std::vector<SThumbnailJob> m_vThumbnailJobs;
+
+	// Remembers the nsfw flag for every gif url we've ever seen from the API this session (not
+	// just the currently loaded page), so chat can hide/mark a CherryGifs link as nsfw even after
+	// the browser has paged past it.
+	std::unordered_map<std::string, bool> m_NsfwByUrl;
+
+	void EnsureLocalDatabase();
+	void AppendLocalMatches();
+	bool DecodeThumbnailBytes(SCherryGif &Gif, const unsigned char *pData, size_t DataSize);
+
+	void ApplyFilters();
+	void StartListRequest(bool Reset);
+	void PollListRequest();
+	void PollThumbnails();
+
+	static void ConCherryGifsTestList(IConsole::IResult *pResult, void *pUserData);
+
+public:
+	int Sizeof() const override { return sizeof(*this); }
+	void OnConsoleInit() override;
+	void OnRender() override;
+
+	// Called every frame by the UI with the currently desired filters; debounces internally.
+	void SetFilters(const char *pQuery, bool SortTop, bool IncludeNsfw);
+	void ReloadLocalDatabase();
+	void LoadMore();
+	void RequestThumbnail(int Index);
+	bool GetThumbnailTexture(const SCherryGif &Gif, IGraphics::CTextureHandle &Texture) const;
+
+	// Returns true if we know whether pUrl is nsfw (filling OutNsfw), false if we've never seen
+	// this url from the API (e.g. someone else posted a CherryGifs link we haven't browsed to).
+	bool TryGetNsfw(const char *pUrl, bool &OutNsfw) const;
+
+	const std::vector<SCherryGif> &Results() const { return m_vResults; }
+	bool IsLoading() const { return m_Loading; }
+	bool HasMore() const { return m_HasMore; }
+	bool HasError() const { return m_Error; }
+	const char *ErrorText() const { return m_aErrorText; }
+};
+
+#endif // GAME_CLIENT_COMPONENTS_MA_CHERRY_GIFS_H

@@ -1,4 +1,4 @@
-/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
+﻿/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #ifndef GAME_CLIENT_COMPONENTS_EMOTICON_H
 #define GAME_CLIENT_COMPONENTS_EMOTICON_H
@@ -18,6 +18,7 @@ class CEmoticon : public CComponent
 
 	bool m_WasActive;
 	bool m_Active;
+	bool m_PreferGifWheel = false;
 
 	vec2 m_SelectorMouse;
 	int m_SelectedEmote;
@@ -42,10 +43,12 @@ public:
 
 	void Emote(int Emoticon);
 	void EyeEmote(int EyeEmote);
+	void Activate();
 
 	bool IsActive() const { return m_Active; }
 
 	friend class CBindWheel;
+	friend class CGifWheel;
 };
 
 #endif

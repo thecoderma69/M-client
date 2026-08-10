@@ -14,6 +14,7 @@
 #include <engine/shared/config.h>
 
 #include <game/gamecore.h>
+#include <game/ma_protocol.h>
 #include <game/teamscore.h>
 
 MACRO_ALLOC_POOL_ID_IMPL(CPlayer, MAX_CLIENTS)
@@ -330,6 +331,14 @@ void CPlayer::Snap(int SnappingClient)
 	int SnappingClientVersion = GameServer()->GetClientVersion(SnappingClient);
 	int Latency = SnappingClient == SERVER_DEMO_CLIENT ? m_Latency.m_Min : GameServer()->m_apPlayers[SnappingClient]->m_aCurLatency[m_ClientId];
 	int Score = GameServer()->m_pController->SnapPlayerScore(SnappingClient, this);
+	const bool MaWatchingSnappingClient = SnappingClient >= 0 &&
+		SnappingClient != SERVER_DEMO_CLIENT &&
+		m_ClientId != SnappingClient &&
+		m_EnableSpectatorCount &&
+		!m_Afk &&
+		(m_Paused || m_Team == TEAM_SPECTATORS) &&
+		m_SpectatorId == SnappingClient &&
+		!(Server()->IsRconAuthed(m_ClientId) && Server()->HasAuthHidden(m_ClientId));
 
 	if(!Server()->IsSixup(SnappingClient))
 	{
@@ -357,6 +366,8 @@ void CPlayer::Snap(int SnappingClient)
 		pPlayerInfo->m_PlayerFlags = PlayerFlags_SixToSeven(m_PlayerFlags);
 		if(SnappingClientVersion >= VERSION_DDRACE && (m_PlayerFlags & PLAYERFLAG_AIM))
 			pPlayerInfo->m_PlayerFlags |= protocol7::PLAYERFLAG_AIM;
+		if(MaWatchingSnappingClient)
+			pPlayerInfo->m_PlayerFlags |= protocol7::PLAYERFLAG_WATCHING;
 		if(Server()->IsRconAuthed(m_ClientId) && ((SnappingClient >= 0 && Server()->IsRconAuthed(SnappingClient)) || !Server()->HasAuthHidden(m_ClientId)))
 			pPlayerInfo->m_PlayerFlags |= protocol7::PLAYERFLAG_ADMIN;
 		pPlayerInfo->m_Score = Score;
@@ -391,7 +402,7 @@ void CPlayer::Snap(int SnappingClient)
 	if(m_ClientId == SnappingClient)
 	{
 		// send extended spectator info even when playing, this allows demo to record camera settings for local player
-		const int SpectatingClient = ((m_Team != TEAM_SPECTATORS && !m_Paused) || m_SpectatorId < 0 || m_SpectatorId >= MAX_CLIENTS) ? TranslatedId : m_SpectatorId;
+		const int SpectatingClient = ((m_Team != TEAM_SPECTATORS && !m_Paused) || m_SpectatorId < 0 || m_SpectatorId >= MAX_CLIENTS) ? m_ClientId : m_SpectatorId;
 		const CPlayer *pSpecPlayer = GameServer()->m_apPlayers[SpectatingClient];
 
 		if(pSpecPlayer)
@@ -405,7 +416,7 @@ void CPlayer::Snap(int SnappingClient)
 			pDDNetSpectatorInfo->m_Deadzone = pSpecPlayer->m_CameraInfo.m_Deadzone;
 			pDDNetSpectatorInfo->m_FollowFactor = pSpecPlayer->m_CameraInfo.m_FollowFactor;
 
-			if(pSpecPlayer->m_EnableSpectatorCount && SpectatingClient == TranslatedId && SnappingClient != SERVER_DEMO_CLIENT && m_Team != TEAM_SPECTATORS && !m_Paused)
+			if(pSpecPlayer->m_EnableSpectatorCount && SpectatingClient == m_ClientId && SnappingClient != SERVER_DEMO_CLIENT && m_Team != TEAM_SPECTATORS && !m_Paused)
 			{
 				CNetObj_SpectatorCount *pSpectatorCount = Server()->SnapNewItem<CNetObj_SpectatorCount>(0);
 				if(!pSpectatorCount)
@@ -415,24 +426,16 @@ void CPlayer::Snap(int SnappingClient)
 				int SpectatorCount = 0;
 				for(auto &pPlayer : GameServer()->m_apPlayers)
 				{
-					if(!pPlayer || !pPlayer->m_EnableSpectatorCount || pPlayer->m_ClientId == TranslatedId || pPlayer->m_Afk ||
+					if(!pPlayer || !pPlayer->m_EnableSpectatorCount || pPlayer->m_ClientId == m_ClientId || pPlayer->m_Afk ||
 						(Server()->IsRconAuthed(pPlayer->m_ClientId) && Server()->HasAuthHidden(pPlayer->m_ClientId)) ||
 						!(pPlayer->m_Paused || pPlayer->m_Team == TEAM_SPECTATORS))
 					{
 						continue;
 					}
 
-					if(pPlayer->m_SpectatorId == TranslatedId)
+					if(pPlayer->m_SpectatorId == m_ClientId)
 					{
 						SpectatorCount++;
-					}
-					else if(GameServer()->m_apPlayers[TranslatedId]->GetCharacter())
-					{
-						vec2 CheckPos = GameServer()->m_apPlayers[TranslatedId]->GetCharacter()->GetPos();
-						float dx = pPlayer->m_ViewPos.x - CheckPos.x;
-						float dy = pPlayer->m_ViewPos.y - CheckPos.y;
-						if(absolute(dx) < (pPlayer->m_ShowDistance.x / 2.5f) && absolute(dy) < (pPlayer->m_ShowDistance.y / 2.3f))
-							SpectatorCount++;
 					}
 				}
 				pDDNetSpectatorInfo->m_SpectatorCount = SpectatorCount;
@@ -457,6 +460,8 @@ void CPlayer::Snap(int SnappingClient)
 		pDDNetPlayer->m_Flags |= EXPLAYERFLAG_SPEC;
 	if(m_Paused == PAUSE_PAUSED)
 		pDDNetPlayer->m_Flags |= EXPLAYERFLAG_PAUSED;
+	if(MaWatchingSnappingClient)
+		pDDNetPlayer->m_Flags |= MA_EXPLAYERFLAG_WATCHING_LOCAL;
 
 	IGameController::CFinishTime PlayerTime = GameServer()->m_pController->SnapPlayerTime(SnappingClient, this);
 	pDDNetPlayer->m_FinishTimeSeconds = PlayerTime.m_Seconds;

@@ -160,7 +160,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	MainView.HSplitTop(15.0f, &TClientVersion, &MainView);
 	TClientVersion.VSplitRight(40.0f, &TClientVersion, nullptr);
 	char aTBuf[64];
-	str_copy(aTBuf, "M\316\233 \343\203\204 2.1.7");
+	str_format(aTBuf, sizeof(aTBuf), "%s %s", CLIENT_NAME, CLIENT_RELEASE_VERSION);
 	Ui()->DoLabel(&TClientVersion, aTBuf, 14.0f, TEXTALIGN_MR);
 #if defined(CONF_AUTOUPDATE)
 	CUIRect UpdateToDateText;
@@ -168,11 +168,11 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	UpdateToDateText.VSplitRight(40.0f, &UpdateToDateText, nullptr);
 	if(!GameClient()->m_TClient.NeedUpdate() && GameClient()->m_TClient.m_FetchedTClientInfo)
 	{
-		Ui()->DoLabel(&UpdateToDateText, TCLocalize("(On Latest)"), 14.0f, TEXTALIGN_MR);
+		Ui()->DoLabel(&UpdateToDateText, TCLocalize("(Actualizado)"), 14.0f, TEXTALIGN_MR);
 	}
 	else
 	{
-		Ui()->DoLabel(&UpdateToDateText, TCLocalize("(Fetching Update Info)"), 14.0f, TEXTALIGN_MR);
+		Ui()->DoLabel(&UpdateToDateText, TCLocalize("(Buscando actualizacion)"), 14.0f, TEXTALIGN_MR);
 	}
 #endif
 	static CButtonContainer s_ConsoleButton;
@@ -210,7 +210,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		static CButtonContainer s_VersionUpdate;
 		if(GameClient()->m_Menus.DoButton_Menu(&s_VersionUpdate, Localize("Restart"), 0, &UpdateButton, BUTTONFLAG_LEFT, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
 		{
-			Client()->Restart();
+			Updater()->ApplyUpdateAndRestart();
 		}
 	}
 	else if(State >= IUpdater::GETTING_MANIFEST && State < IUpdater::NEED_RESTART)
@@ -220,7 +220,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 
 	if(State == IUpdater::CLEAN && NeedUpdate)
 	{
-		str_format(aBuf, sizeof(aBuf), Localize("TClient %s is out!"), GameClient()->m_TClient.m_aVersionStr);
+		str_format(aBuf, sizeof(aBuf), TCLocalize("%s %s disponible!"), CLIENT_NAME, GameClient()->m_TClient.m_aVersionStr);
 		TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
 	}
 	else if(State == IUpdater::CLEAN)
@@ -231,16 +231,16 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	{
 		char aCurrentFile[64];
 		Updater()->GetCurrentFile(aCurrentFile, sizeof(aCurrentFile));
-		str_format(aBuf, sizeof(aBuf), Localize("Downloading %s:"), aCurrentFile);
+		str_format(aBuf, sizeof(aBuf), TCLocalize("Descargando %s:"), aCurrentFile);
 	}
 	else if(State == IUpdater::FAIL)
 	{
-		str_copy(aBuf, Localize("Update failed! Check log…"));
+		str_copy(aBuf, TCLocalize("Fallo la actualizacion. Revisa el log."));
 		TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
 	}
 	else if(State == IUpdater::NEED_RESTART)
 	{
-		str_copy(aBuf, Localize("DDNet Client updated!"));
+		str_copy(aBuf, TCLocalize("Actualizacion lista. Reinicia para aplicar."));
 		TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
 	}
 	Ui()->DoLabel(&VersionUpdate, aBuf, 14.0f, TEXTALIGN_ML);

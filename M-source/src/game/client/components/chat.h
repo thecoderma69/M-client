@@ -1,4 +1,4 @@
-/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
+﻿/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #ifndef GAME_CLIENT_COMPONENTS_CHAT_H
 #define GAME_CLIENT_COMPONENTS_CHAT_H
@@ -35,6 +35,8 @@ public:
 constexpr auto SAVES_FILE = "ddnet-saves.txt";
 
 class CHttpRequest;
+
+void DrawRoundedMediaPreview(IGraphics *pGraphics, const IGraphics::CTextureHandle &Texture, float X, float Y, float W, float H, float Rounding, float Alpha);
 
 class CChat : public CComponent
 {
@@ -110,7 +112,7 @@ class CChat : public CComponent
 
 		EMediaState m_MediaState;
 		EMediaKind m_MediaKind;
-		char m_aMediaUrl[512];
+		char m_aMediaUrl[1024];
 		char m_aMediaStatus[96];
 		std::vector<std::string> m_vMediaCandidates;
 		int m_MediaCandidateIndex;
@@ -130,6 +132,7 @@ class CChat : public CComponent
 		float m_aTextHeight[2];
 		float m_aMediaPreviewWidth[2];
 		float m_aMediaPreviewHeight[2];
+		bool m_ShowAboveHead;
 	};
 
 	bool m_PrevScoreBoardShowed;
@@ -269,6 +272,7 @@ class CChat : public CComponent
 	bool IsMediaUrlAllowed(const char *pUrl) const;
 	bool HasAllowedMediaCandidates(const CLine &Line) const;
 	bool ShouldDisplayMediaSlot(const CLine &Line) const;
+	bool ShouldHideNsfwMedia(const CLine &Line) const;
 	bool GetCurrentFrameTexture(CLine &Line, IGraphics::CTextureHandle &Texture) const;
 	vec2 ChatMousePos() const;
 	void OpenTranslateSettingsPopup(const CUIRect &ButtonRect);
@@ -283,6 +287,7 @@ class CChat : public CComponent
 	friend class CBindChat;
 	friend class CTranslate;
 	friend class CTClient;
+	friend class CGifBubbles;
 
 public:
 	CChat();

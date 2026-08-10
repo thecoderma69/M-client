@@ -1,4 +1,4 @@
-/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
+﻿/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #ifndef GAME_CLIENT_GAMECLIENT_H
 #define GAME_CLIENT_GAMECLIENT_H
@@ -85,6 +85,9 @@
 #include "components/tclient/warlist.h"
 #include "components/ma/ma.h"
 #include "components/ma/particles3d.h"
+#include "components/ma/cherry_gifs.h"
+#include "components/ma/gif_wheel.h"
+#include "components/ma/gif_bubbles.h"
 #include "components/ma/music_player.h"
 #include "components/ma/stream_chat.h"
 #include "components/ma/hud_editor.h"
@@ -241,6 +244,9 @@ public:
 	CMovingTiles m_MovingTilesForeground = CMovingTiles{ true };
 	CMa m_Ma;
 	CMa3DParticles m_Ma3DParticles;
+	CCherryGifs m_CherryGifs;
+	CGifWheel m_GifWheel;
+	CGifBubbles m_GifBubbles;
 	CMusicPlayer m_MusicPlayer;
 	CStreamChat m_StreamChat;
 	CHudEditor m_HudEditor;
@@ -567,6 +573,7 @@ public:
 		bool m_Afk;
 		bool m_Paused;
 		bool m_Spec;
+		bool m_MaWatchingLocal;
 
 		int m_FinishTimeSeconds;
 		int m_FinishTimeMillis;

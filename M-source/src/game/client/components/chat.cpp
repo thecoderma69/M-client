@@ -46,11 +46,10 @@ static constexpr int64_t CHAT_MEDIA_TEXTURE_UPLOAD_BUDGET_US = 2500;
 static constexpr int64_t CHAT_MEDIA_MAX_RESPONSE_SIZE = 64 * 1024 * 1024;
 static constexpr int CHAT_MEDIA_MAX_GIF_FRAMES = 360;
 static constexpr int CHAT_MEDIA_MAX_DIMENSION = 960;
-static constexpr int CHAT_MEDIA_MAX_RESOLVE_DEPTH = 2;
+static constexpr int CHAT_MEDIA_MAX_RESOLVE_DEPTH = 4;
 static constexpr int CHAT_MEDIA_MAX_VIDEO_ANIMATION_MS = 15000;
-static constexpr int CHAT_MEDIA_MAX_URL_LENGTH = 480;
+static constexpr int CHAT_MEDIA_MAX_URL_LENGTH = 1000;
 static constexpr int CHAT_MEDIA_MAX_HTML_CANDIDATES = 32;
-static constexpr int CHAT_MEDIA_DOWNLOAD_WATCHDOG_MS = 15000;
 static constexpr size_t CHAT_MEDIA_MAX_ANIMATED_MEMORY_BYTES = 48ull * 1024ull * 1024ull;
 static constexpr float CHAT_MEDIA_MAX_PREVIEW_HEIGHT = 70.0f;
 static constexpr float CHAT_MEDIA_MAX_PREVIEW_HEIGHT_SCOREBOARD = 56.0f;
@@ -58,6 +57,130 @@ static constexpr float CHAT_MEDIA_PREVIEW_SIZE_SCALE = 0.9f;
 static constexpr float CHAT_MEDIA_MIN_PREVIEW_SIDE = 28.0f;
 static constexpr float CHAT_MEDIA_COMPACT_EXPANDED_HEIGHT = 150.0f;
 static constexpr bool CHAT_MEDIA_ANIMATE_VIDEOS = true;
+
+static float NormalizeMediaPreviewCoord(float Value, float Start, float Length)
+{
+	if(Length <= 0.0f)
+		return 0.0f;
+	return std::clamp((Value - Start) / Length, 0.0f, 1.0f);
+}
+
+static void QuadsSetSubsetRelative(IGraphics *pGraphics, float X, float Y, float W, float H, float OriginX, float OriginY, float OriginW, float OriginH)
+{
+	pGraphics->QuadsSetSubset(
+		NormalizeMediaPreviewCoord(X, OriginX, OriginW),
+		NormalizeMediaPreviewCoord(Y, OriginY, OriginH),
+		NormalizeMediaPreviewCoord(X + W, OriginX, OriginW),
+		NormalizeMediaPreviewCoord(Y + H, OriginY, OriginH));
+}
+
+static void QuadsSetSubsetFreeRelative(IGraphics *pGraphics,
+	float X0, float Y0, float X1, float Y1, float X2, float Y2, float X3, float Y3,
+	float OriginX, float OriginY, float OriginW, float OriginH)
+{
+	pGraphics->QuadsSetSubsetFree(
+		NormalizeMediaPreviewCoord(X0, OriginX, OriginW),
+		NormalizeMediaPreviewCoord(Y0, OriginY, OriginH),
+		NormalizeMediaPreviewCoord(X1, OriginX, OriginW),
+		NormalizeMediaPreviewCoord(Y1, OriginY, OriginH),
+		NormalizeMediaPreviewCoord(X2, OriginX, OriginW),
+		NormalizeMediaPreviewCoord(Y2, OriginY, OriginH),
+		NormalizeMediaPreviewCoord(X3, OriginX, OriginW),
+		NormalizeMediaPreviewCoord(Y3, OriginY, OriginH));
+}
+
+void DrawRoundedMediaPreview(IGraphics *pGraphics, const IGraphics::CTextureHandle &Texture, float X, float Y, float W, float H, float Rounding, float Alpha)
+{
+	if(!Texture.IsValid() || W <= 0.0f || H <= 0.0f)
+		return;
+
+	const float ClampedRounding = minimum(Rounding, minimum(W, H) / 2.0f);
+	pGraphics->WrapClamp();
+	pGraphics->TextureSet(Texture);
+	pGraphics->QuadsBegin();
+	pGraphics->SetColor(1.0f, 1.0f, 1.0f, Alpha);
+
+	auto DrawQuad = [&](float QuadX, float QuadY, float QuadW, float QuadH) {
+		if(QuadW <= 0.0f || QuadH <= 0.0f)
+			return;
+
+		QuadsSetSubsetRelative(pGraphics, QuadX, QuadY, QuadW, QuadH, X, Y, W, H);
+		const IGraphics::CQuadItem QuadItem(QuadX, QuadY, QuadW, QuadH);
+		pGraphics->QuadsDrawTL(&QuadItem, 1);
+	};
+
+	if(ClampedRounding <= 0.0f)
+	{
+		DrawQuad(X, Y, W, H);
+	}
+	else
+	{
+		constexpr int NumSegments = 8;
+		const float SegmentAngle = pi / 2.0f / NumSegments;
+		for(int i = 0; i < NumSegments; i += 2)
+		{
+			const float A1 = i * SegmentAngle;
+			const float A2 = (i + 1) * SegmentAngle;
+			const float A3 = (i + 2) * SegmentAngle;
+			const float CosA1 = std::cos(A1);
+			const float CosA2 = std::cos(A2);
+			const float CosA3 = std::cos(A3);
+			const float SinA1 = std::sin(A1);
+			const float SinA2 = std::sin(A2);
+			const float SinA3 = std::sin(A3);
+
+			const IGraphics::CFreeformItem TopLeft(
+				X + ClampedRounding, Y + ClampedRounding,
+				X + (1.0f - CosA1) * ClampedRounding, Y + (1.0f - SinA1) * ClampedRounding,
+				X + (1.0f - CosA3) * ClampedRounding, Y + (1.0f - SinA3) * ClampedRounding,
+				X + (1.0f - CosA2) * ClampedRounding, Y + (1.0f - SinA2) * ClampedRounding);
+			QuadsSetSubsetFreeRelative(pGraphics,
+				TopLeft.m_X0, TopLeft.m_Y0, TopLeft.m_X1, TopLeft.m_Y1, TopLeft.m_X2, TopLeft.m_Y2, TopLeft.m_X3, TopLeft.m_Y3,
+				X, Y, W, H);
+			pGraphics->QuadsDrawFreeform(&TopLeft, 1);
+
+			const IGraphics::CFreeformItem TopRight(
+				X + W - ClampedRounding, Y + ClampedRounding,
+				X + W - ClampedRounding + CosA1 * ClampedRounding, Y + (1.0f - SinA1) * ClampedRounding,
+				X + W - ClampedRounding + CosA3 * ClampedRounding, Y + (1.0f - SinA3) * ClampedRounding,
+				X + W - ClampedRounding + CosA2 * ClampedRounding, Y + (1.0f - SinA2) * ClampedRounding);
+			QuadsSetSubsetFreeRelative(pGraphics,
+				TopRight.m_X0, TopRight.m_Y0, TopRight.m_X1, TopRight.m_Y1, TopRight.m_X2, TopRight.m_Y2, TopRight.m_X3, TopRight.m_Y3,
+				X, Y, W, H);
+			pGraphics->QuadsDrawFreeform(&TopRight, 1);
+
+			const IGraphics::CFreeformItem BottomLeft(
+				X + ClampedRounding, Y + H - ClampedRounding,
+				X + (1.0f - CosA1) * ClampedRounding, Y + H - ClampedRounding + SinA1 * ClampedRounding,
+				X + (1.0f - CosA3) * ClampedRounding, Y + H - ClampedRounding + SinA3 * ClampedRounding,
+				X + (1.0f - CosA2) * ClampedRounding, Y + H - ClampedRounding + SinA2 * ClampedRounding);
+			QuadsSetSubsetFreeRelative(pGraphics,
+				BottomLeft.m_X0, BottomLeft.m_Y0, BottomLeft.m_X1, BottomLeft.m_Y1, BottomLeft.m_X2, BottomLeft.m_Y2, BottomLeft.m_X3, BottomLeft.m_Y3,
+				X, Y, W, H);
+			pGraphics->QuadsDrawFreeform(&BottomLeft, 1);
+
+			const IGraphics::CFreeformItem BottomRight(
+				X + W - ClampedRounding, Y + H - ClampedRounding,
+				X + W - ClampedRounding + CosA1 * ClampedRounding, Y + H - ClampedRounding + SinA1 * ClampedRounding,
+				X + W - ClampedRounding + CosA3 * ClampedRounding, Y + H - ClampedRounding + SinA3 * ClampedRounding,
+				X + W - ClampedRounding + CosA2 * ClampedRounding, Y + H - ClampedRounding + SinA2 * ClampedRounding);
+			QuadsSetSubsetFreeRelative(pGraphics,
+				BottomRight.m_X0, BottomRight.m_Y0, BottomRight.m_X1, BottomRight.m_Y1, BottomRight.m_X2, BottomRight.m_Y2, BottomRight.m_X3, BottomRight.m_Y3,
+				X, Y, W, H);
+			pGraphics->QuadsDrawFreeform(&BottomRight, 1);
+		}
+
+		DrawQuad(X + ClampedRounding, Y + ClampedRounding, W - ClampedRounding * 2.0f, H - ClampedRounding * 2.0f);
+		DrawQuad(X + ClampedRounding, Y, W - ClampedRounding * 2.0f, ClampedRounding);
+		DrawQuad(X + ClampedRounding, Y + H - ClampedRounding, W - ClampedRounding * 2.0f, ClampedRounding);
+		DrawQuad(X, Y + ClampedRounding, ClampedRounding, H - ClampedRounding * 2.0f);
+		DrawQuad(X + W - ClampedRounding, Y + ClampedRounding, ClampedRounding, H - ClampedRounding * 2.0f);
+	}
+
+	pGraphics->QuadsEnd();
+	pGraphics->WrapNormal();
+	pGraphics->TextureClear();
+}
 
 CChat::CLine::CLine()
 {
@@ -82,6 +205,7 @@ CChat::CLine::CLine()
 	m_aMediaPreviewWidth[1] = 0.0f;
 	m_aMediaPreviewHeight[0] = 0.0f;
 	m_aMediaPreviewHeight[1] = 0.0f;
+	m_ShowAboveHead = false;
 }
 
 void CChat::CLine::Reset(CChat &This)
@@ -237,6 +361,84 @@ static std::string TrimAsciiWhitespaceCopy(std::string Value)
 	return Value;
 }
 
+static bool IsChatMediaCandidateUrl(const std::string &Url, const std::vector<std::string> &vMediaCandidates, const char *pCurrentMediaUrl)
+{
+	if(Url.empty() || !IsUrlStart(Url.c_str()))
+		return false;
+	if(pCurrentMediaUrl != nullptr && pCurrentMediaUrl[0] != '\0' && str_comp(Url.c_str(), pCurrentMediaUrl) == 0)
+		return true;
+	for(const std::string &Candidate : vMediaCandidates)
+	{
+		if(str_comp(Url.c_str(), Candidate.c_str()) == 0)
+			return true;
+	}
+	return false;
+}
+
+static std::string RemoveLoadedMediaLinksFromText(const char *pText, const std::vector<std::string> &vMediaCandidates, const char *pCurrentMediaUrl)
+{
+	if(pText == nullptr || pText[0] == '\0')
+		return {};
+
+	std::string Result;
+	bool RemovedUrl = false;
+	const char *pCur = pText;
+	while(*pCur)
+	{
+		if(!IsUrlStart(pCur))
+		{
+			Result.push_back(*pCur);
+			++pCur;
+			continue;
+		}
+
+		const char *pEnd = pCur;
+		while(!IsTokenEnd(*pEnd))
+			++pEnd;
+
+		std::string Url(pCur, pEnd - pCur);
+		while(!Url.empty() && IsTrimmedUrlChar(Url.back()))
+			Url.pop_back();
+
+		if(IsChatMediaCandidateUrl(Url, vMediaCandidates, pCurrentMediaUrl))
+		{
+			while(!Result.empty() && (Result.back() == '(' || Result.back() == '[' || Result.back() == '{' || Result.back() == '<'))
+				Result.pop_back();
+			RemovedUrl = true;
+			pCur = pEnd;
+			continue;
+		}
+
+		Result.append(pCur, pEnd - pCur);
+		pCur = pEnd;
+	}
+
+	if(!RemovedUrl)
+		return std::string(pText);
+
+	std::string Cleaned;
+	bool LastWasWhitespace = true;
+	for(char c : Result)
+	{
+		if(std::isspace((unsigned char)c))
+		{
+			if(!LastWasWhitespace)
+				Cleaned.push_back(' ');
+			LastWasWhitespace = true;
+		}
+		else
+		{
+			Cleaned.push_back(c);
+			LastWasWhitespace = false;
+		}
+	}
+	while(!Cleaned.empty() && Cleaned.back() == ' ')
+		Cleaned.pop_back();
+	if(Cleaned.empty())
+		Cleaned = " ";
+	return Cleaned;
+}
+
 static std::string ExtractUrlHostLower(const std::string &Url)
 {
 	const size_t SchemePos = Url.find("://");
@@ -318,7 +520,7 @@ static std::string NormalizeAllowedMediaDomain(std::string Domain)
 	return Domain;
 }
 
-static constexpr const char *s_pDefaultChatMediaAllowedDomains = "tenor.com; imgur.com; giphy.com; discordapp.com; discordapp.net";
+static constexpr const char *s_pDefaultChatMediaAllowedDomains = "tenor.com; media.tenor.com; media1.tenor.com; c.tenor.com; imgur.com; i.imgur.com; giphy.com; media.giphy.com; media1.giphy.com; gifs.teeworlds.xyz; discordapp.com; discordapp.net; cdn.discordapp.com; media.discordapp.net";
 
 static bool IsAllowedChatMediaHostByDomainList(const std::string &HostLower, const char *pList, bool &HasDomains)
 {
@@ -372,14 +574,26 @@ static bool IsAllowedChatMediaHost(const std::string &HostLower)
 
 static bool IsAllowedChatMediaUrl(const char *pUrl)
 {
-	if(!g_Config.m_MaChatMediaContentFilter)
-		return true;
 	if(pUrl == nullptr || pUrl[0] == '\0')
 		return false;
-	const std::string HostLower = ExtractUrlHostLower(pUrl);
-	if(HostIsOrEndsWith(HostLower, "tenor.com"))
+	if(!g_Config.m_MaChatMediaContentFilter)
 		return true;
-	return IsAllowedChatMediaHost(HostLower);
+
+	const std::string HostLower = ExtractUrlHostLower(pUrl);
+	if(IsAllowedChatMediaHost(HostLower))
+		return true;
+
+	// Allow general links too. The downloader only keeps bounded responses and the decoder
+	// still rejects non-image/non-video payloads before anything is rendered.
+	return !HostLower.empty();
+}
+static bool IsGifBubbleUrl(const char *pUrl)
+{
+	if(!g_Config.m_MaGifBubbleAboveHead || pUrl == nullptr || pUrl[0] == '\0')
+		return false;
+
+	bool HasDomains = false;
+	return IsAllowedChatMediaHostByDomainList(ExtractUrlHostLower(pUrl), g_Config.m_MaGifBubbleDomains, HasDomains);
 }
 
 static bool IsYouTubeUrl(const std::string &Url)
@@ -1449,7 +1663,7 @@ static bool IsStaticImageMediaUrl(const std::string &Url)
 static void ExtractMediaUrlsFromHtmlDocument(const unsigned char *pData, size_t DataSize, const char *pBaseUrl, std::vector<std::string> &vOutUrls)
 {
 	vOutUrls.clear();
-	if(!pData || DataSize == 0 || !pBaseUrl || !IsLikelyTextDocument(pData, DataSize))
+	if(!pData || DataSize == 0 || !pBaseUrl || !IsLikelyHtmlDocument(pData, DataSize))
 		return;
 
 	const size_t HtmlSize = minimum(DataSize, (size_t)(256 * 1024));
@@ -1562,9 +1776,6 @@ static void ExtractMediaUrlsFromHtmlDocument(const unsigned char *pData, size_t 
 			continue;
 		if(str_comp(Resolved.c_str(), pBaseUrl) == 0)
 			continue;
-		const std::string ResolvedLower = ToLowerAscii(Resolved);
-		if(LooksLikeDecorativeMediaUrl(ResolvedLower))
-			continue;
 
 		bool Exists = false;
 		for(const auto &Entry : vResolvedCandidates)
@@ -1583,22 +1794,10 @@ static void ExtractMediaUrlsFromHtmlDocument(const unsigned char *pData, size_t 
 		return A.first < B.first;
 	});
 
-	bool HasAnimatedOrVideoCandidate = false;
-	for(const auto &Entry : vResolvedCandidates)
-	{
-		if(IsAnimatedOrVideoMediaUrl(Entry.second))
-		{
-			HasAnimatedOrVideoCandidate = true;
-			break;
-		}
-	}
-
 	for(const auto &Entry : vResolvedCandidates)
 	{
 		if((int)vOutUrls.size() >= CHAT_MEDIA_MAX_HTML_CANDIDATES)
 			break;
-		if(HasAnimatedOrVideoCandidate && IsStaticImageMediaUrl(Entry.second))
-			continue;
 		vOutUrls.push_back(Entry.second);
 	}
 }
@@ -1844,15 +2043,11 @@ void CChat::ExtractMediaUrlsFromText(const char *pText, std::vector<std::string>
 		}
 
 		std::vector<std::string> vExpandedUrls;
-		const std::string UrlHostLower = ExtractUrlHostLower(Url);
-		const bool IsTenorUrl = HostIsOrEndsWith(UrlHostLower, "tenor.com");
-		if(IsTenorUrl)
+		if(MediaKindFromUrl(Url.c_str()) != EMediaKind::UNKNOWN)
 			vExpandedUrls.push_back(Url);
-
 		AddDirectGiphyCandidates(Url, vExpandedUrls);
 		AddDirectImgurCandidates(Url, vExpandedUrls);
-		if(!IsTenorUrl)
-			vExpandedUrls.push_back(Url);
+		vExpandedUrls.push_back(Url);
 
 		for(const std::string &ExpandedUrl : vExpandedUrls)
 		{
@@ -1931,6 +2126,7 @@ void CChat::ResetLineMedia(CLine &Line)
 	Line.m_aMediaPreviewWidth[1] = 0.0f;
 	Line.m_aMediaPreviewHeight[0] = 0.0f;
 	Line.m_aMediaPreviewHeight[1] = 0.0f;
+	Line.m_ShowAboveHead = false;
 }
 
 void CChat::SetMediaCandidates(CLine &Line, const std::vector<std::string> &vCandidates)
@@ -1968,7 +2164,10 @@ void CChat::SetMediaCandidates(CLine &Line, const std::vector<std::string> &vCan
 		Line.m_MediaCandidateIndex = 0;
 		str_copy(Line.m_aMediaUrl, Line.m_vMediaCandidates.front().c_str(), sizeof(Line.m_aMediaUrl));
 		Line.m_MediaKind = MediaKindFromUrl(Line.m_aMediaUrl);
+		Line.m_MediaState = EMediaState::QUEUED;
 		str_copy(Line.m_aMediaStatus, "Queued media...", sizeof(Line.m_aMediaStatus));
+		Line.m_aYOffset[0] = -1.0f;
+		Line.m_aYOffset[1] = -1.0f;
 	}
 }
 
@@ -2094,15 +2293,11 @@ void CChat::StartMediaDownload(CLine &Line)
 	}
 
 	const std::string HostLower = ExtractUrlHostLower(Line.m_aMediaUrl);
-	const EMediaKind UrlKind = MediaKindFromUrl(Line.m_aMediaUrl);
-	const bool DirectMediaUrl = UrlKind == EMediaKind::PHOTO || UrlKind == EMediaKind::ANIMATED || UrlKind == EMediaKind::VIDEO;
 	std::shared_ptr<CHttpRequest> pGet = HttpGet(Line.m_aMediaUrl);
-	pGet->Timeout(CTimeout{8000, DirectMediaUrl ? 12000 : 10000, 512, 8});
+	pGet->Timeout(CTimeout{8000, 0, 4096, 8});
 	pGet->MaxResponseSize(CHAT_MEDIA_MAX_RESPONSE_SIZE);
 	pGet->FailOnErrorStatus(false);
 	pGet->LogProgress(HTTPLOG::NONE);
-	pGet->Header("Accept: image/avif,image/webp,image/apng,image/*,video/mp4,video/webm,video/*,text/html,application/json,*/*;q=0.8");
-	pGet->Header("Connection: close");
 	if(HostIsOrEndsWith(HostLower, "tenor.com"))
 		pGet->Header("Referer: https://tenor.com/");
 	else if(HostIsOrEndsWith(HostLower, "imgur.com"))
@@ -2112,6 +2307,8 @@ void CChat::StartMediaDownload(CLine &Line)
 	Line.m_pMediaRequest = pGet;
 	Line.m_MediaRequestStart = time_get();
 	Line.m_MediaState = EMediaState::LOADING;
+	Line.m_aYOffset[0] = -1.0f;
+	Line.m_aYOffset[1] = -1.0f;
 	if(HostIsOrEndsWith(HostLower, "tenor.com"))
 		str_copy(Line.m_aMediaStatus, "Resolving Tenor...", sizeof(Line.m_aMediaStatus));
 	else
@@ -2168,7 +2365,13 @@ bool CChat::IsMediaKindAllowed(EMediaKind Kind) const
 
 bool CChat::IsMediaUrlAllowed(const char *pUrl) const
 {
-	return IsMediaKindAllowed(MediaKindFromUrl(pUrl)) && IsAllowedChatMediaUrl(pUrl);
+	if(!IsAllowedChatMediaUrl(pUrl))
+		return false;
+
+	const EMediaKind Kind = MediaKindFromUrl(pUrl);
+	if(Kind == EMediaKind::UNKNOWN)
+		return AnyMediaAllowed();
+	return IsMediaKindAllowed(Kind);
 }
 
 bool CChat::HasAllowedMediaCandidates(const CLine &Line) const
@@ -2187,9 +2390,20 @@ bool CChat::ShouldDisplayMediaSlot(const CLine &Line) const
 		return false;
 	if(Line.m_MediaState == EMediaState::FAILED)
 		return Line.m_aMediaStatus[0] != '\0';
-	if((Line.m_MediaState == EMediaState::READY || Line.m_MediaState == EMediaState::LOADING || Line.m_MediaState == EMediaState::DECODING || Line.m_MediaState == EMediaState::QUEUED) && Line.m_MediaKind != EMediaKind::UNKNOWN)
-		return IsMediaKindAllowed(Line.m_MediaKind);
+	if(Line.m_MediaState == EMediaState::QUEUED || Line.m_MediaState == EMediaState::LOADING || Line.m_MediaState == EMediaState::DECODING)
+		return Line.m_aMediaStatus[0] != '\0' || HasAllowedMediaCandidates(Line);
+	if(Line.m_MediaState == EMediaState::READY)
+		return IsMediaKindAllowed(Line.m_MediaKind) && Line.m_MediaWidth > 0 && Line.m_MediaHeight > 0 && !Line.m_vMediaFrames.empty();
 	return HasAllowedMediaCandidates(Line);
+}
+
+bool CChat::ShouldHideNsfwMedia(const CLine &Line) const
+{
+	if(g_Config.m_MaCherryGifsShowNsfw || Line.m_aMediaUrl[0] == '\0')
+		return false;
+
+	bool Nsfw = false;
+	return GameClient()->m_CherryGifs.TryGetNsfw(Line.m_aMediaUrl, Nsfw) && Nsfw;
 }
 
 bool CChat::GetCurrentFrameTexture(CLine &Line, IGraphics::CTextureHandle &Texture) const
@@ -2218,44 +2432,23 @@ bool CChat::GetCurrentFrameTexture(CLine &Line, IGraphics::CTextureHandle &Textu
 void CChat::UpdateMediaDownloads()
 {
 	if(!g_Config.m_MaChatMediaPreview || !AnyMediaAllowed())
-	{
-		for(auto &Line : m_aLines)
-		{
-			if(Line.m_MediaState != EMediaState::NONE)
-			{
-				ResetLineMedia(Line);
-				Line.m_aYOffset[0] = -1.0f;
-				Line.m_aYOffset[1] = -1.0f;
-			}
-		}
 		return;
-	}
 
 	int ActiveDownloads = 0;
-	const int64_t Now = time_get();
-	const auto MediaRequestTimedOut = [&](const CLine &Line) {
-		return Line.m_MediaRequestStart > 0 &&
-			((Now - Line.m_MediaRequestStart) * 1000) / time_freq() > CHAT_MEDIA_DOWNLOAD_WATCHDOG_MS;
-	};
 	for(auto &Line : m_aLines)
 	{
 		if(Line.m_MediaState == EMediaState::LOADING && Line.m_pMediaRequest && !Line.m_pMediaRequest->Done())
 		{
-			if(MediaRequestTimedOut(Line))
-				Line.m_pMediaRequest->Abort();
-			else
-			{
-				const int Progress = Line.m_pMediaRequest->Progress();
-				const double Current = Line.m_pMediaRequest->Current();
-				const double Size = Line.m_pMediaRequest->Size();
-				if(Progress > 0 && Progress < 100)
-					str_format(Line.m_aMediaStatus, sizeof(Line.m_aMediaStatus), "Downloading media... %d%%", Progress);
-				else if(Current > 0.0 && Size > 0.0)
-					str_format(Line.m_aMediaStatus, sizeof(Line.m_aMediaStatus), "Downloading media... %.0f/%.0f KB", Current / 1024.0, Size / 1024.0);
-				else if(Current > 0.0)
-					str_format(Line.m_aMediaStatus, sizeof(Line.m_aMediaStatus), "Downloading media... %.0f KB", Current / 1024.0);
-				ActiveDownloads++;
-			}
+			const int Progress = Line.m_pMediaRequest->Progress();
+			const double Current = Line.m_pMediaRequest->Current();
+			const double Size = Line.m_pMediaRequest->Size();
+			if(Progress > 0 && Progress < 100)
+				str_format(Line.m_aMediaStatus, sizeof(Line.m_aMediaStatus), "Downloading media... %d%%", Progress);
+			else if(Current > 0.0 && Size > 0.0)
+				str_format(Line.m_aMediaStatus, sizeof(Line.m_aMediaStatus), "Downloading media... %.0f/%.0f KB", Current / 1024.0, Size / 1024.0);
+			else if(Current > 0.0)
+				str_format(Line.m_aMediaStatus, sizeof(Line.m_aMediaStatus), "Downloading media... %.0f KB", Current / 1024.0);
+			ActiveDownloads++;
 		}
 	}
 
@@ -2283,21 +2476,15 @@ void CChat::UpdateMediaDownloads()
 	{
 		if(CompletedRequestsThisFrame >= CHAT_MEDIA_MAX_COMPLETED_PER_FRAME)
 			break;
-		const bool TimedOut = Line.m_MediaState == EMediaState::LOADING && Line.m_pMediaRequest && MediaRequestTimedOut(Line);
-		if(Line.m_MediaState != EMediaState::LOADING || !Line.m_pMediaRequest || (!Line.m_pMediaRequest->Done() && !TimedOut))
+		if(Line.m_MediaState != EMediaState::LOADING || !Line.m_pMediaRequest || !Line.m_pMediaRequest->Done())
 			continue;
 
 		bool StartedDecode = false;
 		bool SuppressedBySettings = false;
 		const char *pFailureReason = "download failed";
-		const bool HttpDone = !TimedOut && Line.m_pMediaRequest->State() == EHttpState::DONE;
+		const bool HttpDone = Line.m_pMediaRequest->State() == EHttpState::DONE;
 		const int StatusCode = HttpDone ? Line.m_pMediaRequest->StatusCode() : -1;
-		if(TimedOut)
-		{
-			Line.m_pMediaRequest->Abort();
-			pFailureReason = "timeout";
-		}
-		else if(HttpDone && StatusCode >= 200 && StatusCode < 400)
+		if(HttpDone && StatusCode >= 200 && StatusCode < 400)
 		{
 			unsigned char *pResult = nullptr;
 			size_t ResultSize = 0;
@@ -2317,7 +2504,7 @@ void CChat::UpdateMediaDownloads()
 					}
 				}
 
-				if(IsLikelyTextDocument(pResult, ResultSize))
+				if(IsLikelyHtmlDocument(pResult, ResultSize))
 				{
 					pFailureReason = "text response";
 				}
@@ -2347,10 +2534,7 @@ void CChat::UpdateMediaDownloads()
 					{
 						pFailureReason = "payload too small";
 					}
-					else if(MediaKind == EMediaKind::PHOTO && LooksLikeDecorativeMediaUrl(ToLowerAscii(Line.m_aMediaUrl)))
-					{
-						pFailureReason = "decorative image";
-					}
+
 					else if(!IsMediaKindAllowed(MediaKind))
 					{
 						SuppressedBySettings = true;
@@ -3496,7 +3680,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 	}
 	else if(CurrentLine.m_ClientId == CLIENT_MSG)
 	{
-		str_copy(CurrentLine.m_aName, "— ");
+        str_copy(CurrentLine.m_aName, "\xE2\x80\x94 ");
 	}
 	else
 	{
@@ -3518,7 +3702,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 
 		if(Team == TEAM_WHISPER_SEND)
 		{
-			str_copy(CurrentLine.m_aName, "→");
+            str_copy(CurrentLine.m_aName, "\xE2\x86\x92");
 			if(LineAuthor.m_Active)
 			{
 				str_append(CurrentLine.m_aName, " ");
@@ -3530,7 +3714,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 		}
 		else if(Team == TEAM_WHISPER_RECV)
 		{
-			str_copy(CurrentLine.m_aName, "←");
+            str_copy(CurrentLine.m_aName, "\xE2\x86\x90");
 			if(LineAuthor.m_Active)
 			{
 				str_append(CurrentLine.m_aName, " ");
@@ -3565,6 +3749,10 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 		}
 	}
 
+	CurrentLine.m_ShowAboveHead = ClientId >= 0 &&
+		CurrentLine.m_vMediaCandidates.size() == 1 &&
+		str_comp(CurrentLine.m_aText, CurrentLine.m_vMediaCandidates.front().c_str()) == 0 &&
+		IsGifBubbleUrl(CurrentLine.m_aText);
 	// TClient: Store in chat history
 	if(g_Config.m_TcChatHistory)
 	{
@@ -3729,20 +3917,32 @@ void CChat::OnPrepareLines(float x, float y)
 			str_format(aCount, sizeof(aCount), " [%d]", Line.m_TimesRepeated + 1);
 
 		const char *pText = Line.m_aText;
+		bool StreamerModeTextHidden = false;
 		if(Config()->m_ClStreamerMode && Line.m_ClientId == SERVER_MSG)
 		{
 			if(str_startswith(Line.m_aText, "Team save in progress. You'll be able to load with '/load ") && str_endswith(Line.m_aText, "'"))
 			{
 				pText = "Team save in progress. You'll be able to load with '/load *** *** ***'";
+				StreamerModeTextHidden = true;
 			}
 			else if(str_startswith(Line.m_aText, "Team save in progress. You'll be able to load with '/load") && str_endswith(Line.m_aText, "if it fails"))
 			{
 				pText = "Team save in progress. You'll be able to load with '/load *** *** ***' if save is successful or with '/load *** *** ***' if it fails";
+				StreamerModeTextHidden = true;
 			}
 			else if(str_startswith(Line.m_aText, "Team successfully saved by ") && str_endswith(Line.m_aText, " to continue"))
 			{
 				pText = "Team successfully saved by ***. Use '/load *** *** ***' to continue";
+				StreamerModeTextHidden = true;
 			}
+		}
+
+		const bool HideLoadedMediaLinks = Line.m_MediaState == EMediaState::READY && ShouldDisplayMediaSlot(Line);
+		std::string TextWithoutLoadedMediaLinks;
+		if(HideLoadedMediaLinks)
+		{
+			TextWithoutLoadedMediaLinks = RemoveLoadedMediaLinksFromText(pText, Line.m_vMediaCandidates, Line.m_aMediaUrl);
+			pText = TextWithoutLoadedMediaLinks.c_str();
 		}
 
 		const CColoredParts ColoredParts(pText, Line.m_ClientId == CLIENT_MSG);
@@ -3756,7 +3956,7 @@ void CChat::OnPrepareLines(float x, float y)
 		if(Line.m_pTranslateResponse != nullptr && Line.m_pTranslateResponse->m_Text[0])
 		{
 			// If hidden and there is translated text
-			if(pText != Line.m_aText)
+			if(StreamerModeTextHidden)
 			{
 				pTranslatedError = TCLocalize("Translated text hidden due to streamer mode");
 			}
@@ -3770,6 +3970,13 @@ void CChat::OnPrepareLines(float x, float y)
 				if(Line.m_pTranslateResponse->m_Language[0] != '\0')
 					pTranslatedLanguage = Line.m_pTranslateResponse->m_Language;
 			}
+		}
+
+		std::string TranslatedTextWithoutLoadedMediaLinks;
+		if(HideLoadedMediaLinks && pTranslatedText != nullptr)
+		{
+			TranslatedTextWithoutLoadedMediaLinks = RemoveLoadedMediaLinksFromText(pTranslatedText, Line.m_vMediaCandidates, Line.m_aMediaUrl);
+			pTranslatedText = TranslatedTextWithoutLoadedMediaLinks.c_str();
 		}
 
 		// get the y offset (calculate it if we haven't done that yet)
@@ -3787,7 +3994,7 @@ void CChat::OnPrepareLines(float x, float y)
 
 				if(Line.m_Friend && g_Config.m_ClMessageFriend)
 				{
-					TextRender()->TextEx(&MeasureCursor, "♥ ");
+					TextRender()->TextEx(&MeasureCursor, "\xE2\x99\xA5 ");
 				}
 			}
 
@@ -3905,7 +4112,7 @@ void CChat::OnPrepareLines(float x, float y)
 			if(Line.m_Friend && g_Config.m_ClMessageFriend)
 			{
 				TextRender()->TextColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageFriendColor)).WithAlpha(1.0f));
-				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, "♥ ");
+				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, "\xE2\x99\xA5 ");
 			}
 		}
 

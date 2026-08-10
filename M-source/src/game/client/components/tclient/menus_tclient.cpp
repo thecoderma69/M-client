@@ -4,6 +4,7 @@
 #include <base/types.h>
 
 #include <engine/font_icons.h>
+#include <engine/friends.h>
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
 #include <engine/shared/linereader.h>
@@ -56,7 +57,9 @@ enum
 enum
 {
 	MA_TAB_CONFIGURACION = 0,
+	MA_TAB_NICK_NAMES,
 	MA_TAB_VISUAL,
+	MA_TAB_GIF,
 	MA_TAB_LLUVIA,
 	MA_TAB_ANIMELOVE,
 	MA_TAB_KEYSTROKE,
@@ -112,6 +115,186 @@ static bool IsFlagSet(int32_t Flags, int n)
 	return (Flags & (1 << n)) != 0;
 }
 
+struct SMaNameEffectMenuEntry
+{
+	char m_aName[MAX_NAME_LENGTH] = "";
+	int m_Style = 0;
+	unsigned m_Color1 = 65425;
+	unsigned m_Color2 = 41131;
+	int m_Glow = 70;
+	int m_Moving = 0;
+};
+
+struct SMaNameEffectPlayerRow
+{
+	char m_aName[MAX_NAME_LENGTH] = "";
+	char m_aClan[MAX_CLAN_LENGTH] = "";
+	bool m_Online = false;
+	bool m_Configured = false;
+	int m_ClientId = -1;
+};
+
+static void MaNameEffectSanitizeName(char *pName)
+{
+	for(char *pCursor = pName; *pCursor; ++pCursor)
+	{
+		if(*pCursor == ';' || *pCursor == '|')
+			*pCursor = ' ';
+	}
+}
+
+static void MaNameEffectCopyTrimmedString(char *pDst, int DstSize, const std::string &Value)
+{
+	size_t Start = 0;
+	size_t End = Value.size();
+	while(Start < End && (Value[Start] == ' ' || Value[Start] == '\t'))
+		++Start;
+	while(End > Start && (Value[End - 1] == ' ' || Value[End - 1] == '\t'))
+		--End;
+	str_copy(pDst, Value.substr(Start, End - Start).c_str(), DstSize);
+	MaNameEffectSanitizeName(pDst);
+}
+
+static unsigned MaNameEffectParseMenuColor(const char *pText, unsigned DefaultColor)
+{
+	if(!pText || pText[0] == '\0')
+		return DefaultColor;
+	const int64_t Value = str_toint64_base(pText, 10);
+	return Value < 0 ? DefaultColor : (unsigned)Value;
+}
+
+static bool MaNameEffectDecodeRecord(const std::string &Record, SMaNameEffectMenuEntry &Entry)
+{
+	std::array<std::string, 6> Fields;
+	size_t Start = 0;
+	for(size_t i = 0; i < Fields.size(); ++i)
+	{
+		const size_t End = Record.find('|', Start);
+		Fields[i] = Record.substr(Start, End == std::string::npos ? std::string::npos : End - Start);
+		if(End == std::string::npos)
+			break;
+		Start = End + 1;
+	}
+
+	MaNameEffectCopyTrimmedString(Entry.m_aName, sizeof(Entry.m_aName), Fields[0]);
+	if(Entry.m_aName[0] == '\0')
+		return false;
+	Entry.m_Style = std::clamp(Fields[1].empty() ? g_Config.m_MaNameEffectsStyle : str_toint(Fields[1].c_str()), 0, 3);
+	Entry.m_Color1 = MaNameEffectParseMenuColor(Fields[2].c_str(), g_Config.m_MaNameEffectsColor1);
+	Entry.m_Color2 = MaNameEffectParseMenuColor(Fields[3].c_str(), g_Config.m_MaNameEffectsColor2);
+	Entry.m_Glow = std::clamp(Fields[4].empty() ? g_Config.m_MaNameEffectsGlow : str_toint(Fields[4].c_str()), 0, 100);
+	Entry.m_Moving = Fields[5].empty() ? g_Config.m_MaNameEffectsMoving : (str_toint(Fields[5].c_str()) != 0);
+	return true;
+}
+
+static void MaNameEffectDecodeEntries(std::vector<SMaNameEffectMenuEntry> &vEntries)
+{
+	vEntries.clear();
+	std::string Data(g_Config.m_MaNameEffectsEntries);
+	size_t Start = 0;
+	while(Start < Data.size())
+	{
+		const size_t End = Data.find(';', Start);
+		const std::string Record = Data.substr(Start, End == std::string::npos ? std::string::npos : End - Start);
+		SMaNameEffectMenuEntry Entry;
+		if(MaNameEffectDecodeRecord(Record, Entry))
+			vEntries.push_back(Entry);
+		if(End == std::string::npos)
+			break;
+		Start = End + 1;
+	}
+}
+
+static void MaNameEffectEncodeEntries(const std::vector<SMaNameEffectMenuEntry> &vEntries)
+{
+	std::string Out;
+	Out.reserve(sizeof(g_Config.m_MaNameEffectsEntries));
+	for(const SMaNameEffectMenuEntry &Entry : vEntries)
+	{
+		if(Entry.m_aName[0] == '\0')
+			continue;
+		char aRecord[256];
+		str_format(aRecord, sizeof(aRecord), "%s|%d|%u|%u|%d|%d", Entry.m_aName, std::clamp(Entry.m_Style, 0, 3), Entry.m_Color1, Entry.m_Color2, std::clamp(Entry.m_Glow, 0, 100), Entry.m_Moving ? 1 : 0);
+		if(!Out.empty())
+			Out += ';';
+		if(Out.size() + str_length(aRecord) + 1 >= sizeof(g_Config.m_MaNameEffectsEntries))
+			break;
+		Out += aRecord;
+	}
+	str_copy(g_Config.m_MaNameEffectsEntries, Out.c_str(), sizeof(g_Config.m_MaNameEffectsEntries));
+}
+
+static int MaNameEffectFindEntryIndex(const std::vector<SMaNameEffectMenuEntry> &vEntries, const char *pName)
+{
+	for(size_t i = 0; i < vEntries.size(); ++i)
+	{
+		if(str_comp_nocase(vEntries[i].m_aName, pName) == 0)
+			return (int)i;
+	}
+	return -1;
+}
+
+static void MaNameEffectSaveEntry(std::vector<SMaNameEffectMenuEntry> &vEntries, SMaNameEffectMenuEntry Entry)
+{
+	MaNameEffectSanitizeName(Entry.m_aName);
+	if(Entry.m_aName[0] == '\0')
+		return;
+	Entry.m_Style = std::clamp(Entry.m_Style, 0, 3);
+	Entry.m_Glow = std::clamp(Entry.m_Glow, 0, 100);
+	Entry.m_Moving = Entry.m_Moving ? 1 : 0;
+
+	g_Config.m_MaNameEffects = 1;
+
+	const int ExistingIndex = MaNameEffectFindEntryIndex(vEntries, Entry.m_aName);
+	if(ExistingIndex >= 0)
+		vEntries[ExistingIndex] = Entry;
+	else
+		vEntries.push_back(Entry);
+	MaNameEffectEncodeEntries(vEntries);
+}
+
+static SMaNameEffectMenuEntry MaNameEffectMakeEntry(const char *pName, int Style, unsigned Color1, unsigned Color2, int Glow, int Moving)
+{
+	SMaNameEffectMenuEntry Entry;
+	str_copy(Entry.m_aName, pName ? pName : "", sizeof(Entry.m_aName));
+	MaNameEffectSanitizeName(Entry.m_aName);
+	Entry.m_Style = std::clamp(Style, 0, 3);
+	Entry.m_Color1 = Color1;
+	Entry.m_Color2 = Color2;
+	Entry.m_Glow = std::clamp(Glow, 0, 100);
+	Entry.m_Moving = Moving ? 1 : 0;
+	return Entry;
+}
+
+
+static void MaNameEffectAddLegacyNames(std::vector<SMaNameEffectMenuEntry> &vEntries)
+{
+	if(g_Config.m_MaNameEffectsEntries[0] != '\0' || g_Config.m_MaNameEffectsNames[0] == '\0')
+		return;
+
+	const char *pCursor = g_Config.m_MaNameEffectsNames;
+	while(*pCursor)
+	{
+		while(*pCursor == ';' || *pCursor == ',' || *pCursor == '|' || *pCursor == ' ' || *pCursor == '\t' || *pCursor == '\n' || *pCursor == '\r')
+			++pCursor;
+		const char *pStart = pCursor;
+		while(*pCursor && *pCursor != ';' && *pCursor != ',' && *pCursor != '|' && *pCursor != '\n' && *pCursor != '\r')
+			++pCursor;
+		std::string Name(pStart, pCursor - pStart);
+		SMaNameEffectMenuEntry Entry;
+		MaNameEffectCopyTrimmedString(Entry.m_aName, sizeof(Entry.m_aName), Name);
+		if(Entry.m_aName[0] != '\0' && MaNameEffectFindEntryIndex(vEntries, Entry.m_aName) < 0)
+		{
+			Entry.m_Style = std::clamp(g_Config.m_MaNameEffectsStyle, 0, 3);
+			Entry.m_Color1 = g_Config.m_MaNameEffectsColor1;
+			Entry.m_Color2 = g_Config.m_MaNameEffectsColor2;
+			Entry.m_Glow = std::clamp(g_Config.m_MaNameEffectsGlow, 0, 100);
+			Entry.m_Moving = g_Config.m_MaNameEffectsMoving != 0;
+			vEntries.push_back(Entry);
+		}
+	}
+	MaNameEffectEncodeEntries(vEntries);
+}
 static int TClientSoundIdForPack(int Pack, int Event)
 {
 	static const int s_aaSoundPacks[4][3] = {
@@ -269,18 +452,38 @@ static int MaAudioPackScan(const char *pName, int IsDir, int DirType, void *pUse
 	return 0;
 }
 
-static const char *MaAudioPackDisplayName(const char *pName)
+
+static bool MaStringListContains(const std::vector<std::string> &vItems, const char *pName)
+{
+	for(const std::string &Item : vItems)
+	{
+		if(str_comp(Item.c_str(), pName) == 0)
+			return true;
+	}
+	return false;
+}
+
+static int MaKeystrokePackScan(const char *pName, int IsDir, int DirType, void *pUser)
+{
+	(void)DirType;
+	auto *pPacks = static_cast<std::vector<std::string> *>(pUser);
+	if(!IsDir || pName[0] == '.' || MaStringListContains(*pPacks, pName))
+		return 0;
+
+	pPacks->emplace_back(pName);
+	return 0;
+}static const char *MaAudioPackDisplayName(const char *pName)
 {
 	if(str_comp(pName, "ma_space_pulse") == 0 || str_comp(pName, "ma_fx") == 0)
-		return "MΛ ツ Space Pulse";
+		return "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Space Pulse";
 	if(str_comp(pName, "ma_retro_arcade") == 0)
-		return "MΛ ツ Retro Arcade";
+		return "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Retro Arcade";
 	if(str_comp(pName, "ma_demon_core") == 0)
-		return "MΛ ツ Demon Core";
+		return "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Demon Core";
 	if(str_comp(pName, "ma_magic_stars") == 0)
-		return "MΛ ツ Magic Stars";
+		return "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Magic Stars";
 	if(str_comp(pName, "ma_dark_void") == 0)
-		return "MΛ ツ Dark Void";
+		return "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Dark Void";
 	return pName;
 }
 
@@ -2630,7 +2833,7 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 
 	if(DoButtonLineSize_Menu(&s_GithubButton, TCLocalize("Github"), 0, &ButtonLeft, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
 		Client()->ViewLink("https://github.com/sjrc6/TaterClient-ddnet");
-	if(DoButtonLineSize_Menu(&s_SupportButton, TCLocalize("Support ♥"), 0, &ButtonRight, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+	if(DoButtonLineSize_Menu(&s_SupportButton, TCLocalize("Support ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢Ãƒâ€šÃ‚Â¥"), 0, &ButtonRight, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
 		Client()->ViewLink("https://ko-fi.com/Totar");
 
 	LeftView = LowerLeftView;
@@ -2686,10 +2889,10 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 	{
 		RightView.HSplitTop(CardSize, &DevCardRect, &RightView);
 		DevCardRect.VSplitLeft(CardSize, &TeeRect, &Label);
-		Label.VSplitLeft(TextRender()->TextWidth(LineSize, "MΛ ツ"), &Label, &Button);
+		Label.VSplitLeft(TextRender()->TextWidth(LineSize, "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾"), &Label, &Button);
 		Button.VSplitLeft(MarginSmall, nullptr, &Button);
 		Button.w = LineSize, Button.h = LineSize, Button.y = Label.y + (Label.h / 2.0f - Button.h / 2.0f);
-		Ui()->DoLabel(&Label, "MΛ ツ", LineSize, TEXTALIGN_ML);
+		Ui()->DoLabel(&Label, "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾", LineSize, TEXTALIGN_ML);
 		if(Ui()->DoButton_FontIcon(&s_LinkButton6, FontIcon::ARROW_UP_RIGHT_FROM_SQUARE, 0, &Button, IGraphics::CORNER_ALL))
 			Client()->ViewLink("https://github.com/thecoderma69");
 		RenderDevSkin(TeeRect.Center(), TeeSize, "ahl_blackbop", "default", false, 0, 0, 0, false, true);
@@ -2728,109 +2931,8 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 
 void CMenus::RenderSettingsTClientKeystroke(CUIRect MainView)
 {
-	CUIRect LeftView, RightView, Button, Label;
-	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-
-	MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
-	LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
-	RightView.VSplitRight(MarginSmall, &RightView, nullptr);
-
-	CUIRect LeftFrame = LeftView;
-	LeftFrame.Draw(TClientThemeAccentColor(), IGraphics::CORNER_ALL, 8.0f);
-	CUIRect LeftInner = LeftView;
-	LeftInner.Margin(2.0f, &LeftInner);
-	LeftInner.Draw(TClientThemePanelColor(), IGraphics::CORNER_ALL, 6.0f);
-	LeftView.Margin(8.0f, &LeftView);
-
-	CUIRect RightFrame = RightView;
-	RightFrame.Draw(TClientThemeAccentColor(), IGraphics::CORNER_ALL, 8.0f);
-	CUIRect RightInner = RightView;
-	RightInner.Margin(2.0f, &RightInner);
-	RightInner.Draw(TClientThemePanelColor(), IGraphics::CORNER_ALL, 6.0f);
-	RightView.Margin(8.0f, &RightView);
-
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	{
-		CUIRect TitleLabel, EditorButton;
-		Label.VSplitRight(HeadlineHeight, &TitleLabel, &EditorButton);
-		EditorButton.Margin(1.0f, &EditorButton);
-		static CButtonContainer s_HudEditorTitleButtonSettings;
-		const bool CanOpenHudEditor = Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK;
-		if(Ui()->DoButton_FontIcon(&s_HudEditorTitleButtonSettings, FontIcon::ARROW_UP_RIGHT_FROM_SQUARE, CanOpenHudEditor ? 0 : -1, &EditorButton, BUTTONFLAG_LEFT, IGraphics::CORNER_ALL, CanOpenHudEditor) && CanOpenHudEditor)
-		{
-			SetActive(false);
-			GameClient()->m_HudEditor.Activate();
-		}
-		Ui()->DoLabel(&TitleLabel, TCLocalize("Keystroke HUD"), HeadlineFontSize, TEXTALIGN_ML);
-	}
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHud, TCLocalize("Enable keystroke overlay"), &g_Config.m_TcKeystrokeHud, &LeftView, LineSize);
-
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-	{
-		static std::vector<const char *> s_KeyModelDropDownNames;
-		s_KeyModelDropDownNames = {TCLocalize("Normal"), TCLocalize("Redondo"), TCLocalize("Diamante"), TCLocalize("Hexagonal")};
-		static CUi::SDropDownState s_KeyModelDropDownState;
-		static CScrollRegion s_KeyModelDropDownScrollRegion;
-		s_KeyModelDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_KeyModelDropDownScrollRegion;
-		CUIRect ModelDropDown;
-		LeftView.HSplitTop(LineSize, &ModelDropDown, &LeftView);
-		ModelDropDown.VSplitLeft(120.0f, &Label, &ModelDropDown);
-		Ui()->DoLabel(&Label, TCLocalize("Modelo teclado"), FontSize, TEXTALIGN_ML);
-		g_Config.m_TcKeystrokeHudStyle = Ui()->DoDropDown(&ModelDropDown, std::clamp(g_Config.m_TcKeystrokeHudStyle, 0, 3), s_KeyModelDropDownNames.data(), s_KeyModelDropDownNames.size(), s_KeyModelDropDownState);
-	}
-
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("Colors"), HeadlineFontSize, TEXTALIGN_ML);
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	static CButtonContainer s_KeyColorPressed, s_KeyColorUnpressed;
-
-	DoLine_ColorPicker(&s_KeyColorPressed, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Pressed key color"), &g_Config.m_TcKeystrokeHudColorPressed, ColorRGBA(1.0f, 1.0f, 1.0f), false);
-	DoLine_ColorPicker(&s_KeyColorUnpressed, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Unpressed key color"), &g_Config.m_TcKeystrokeHudColorUnpressed, ColorRGBA(0.0f, 0.0f, 0.0f), false);
-
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("Options"), HeadlineFontSize, TEXTALIGN_ML);
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudShowText, TCLocalize("Show key labels (A, D, SPACE)"), &g_Config.m_TcKeystrokeHudShowText, &LeftView, LineSize);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudShowSpace, TCLocalize("Show space bar"), &g_Config.m_TcKeystrokeHudShowSpace, &LeftView, LineSize);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudOnlyOnPress, TCLocalize("Only show when keys pressed"), &g_Config.m_TcKeystrokeHudOnlyOnPress, &LeftView, LineSize);
-
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudEditMode, TCLocalize("Edit mode (drag to move)"), &g_Config.m_TcKeystrokeHudEditMode, &LeftView, LineSize);
-
-	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("Mouse Buttons"), HeadlineFontSize, TEXTALIGN_ML);
-	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudShowMouse, TCLocalize("Show mouse clicks (LMB/RMB)"), &g_Config.m_TcKeystrokeHudShowMouse, &RightView, LineSize);
-
-	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-	{
-		static std::vector<const char *> s_MouseModelDropDownNames;
-		s_MouseModelDropDownNames = {TCLocalize("Normal"), TCLocalize("Redondo"), TCLocalize("Diamante"), TCLocalize("Hexagonal")};
-		static CUi::SDropDownState s_MouseModelDropDownState;
-		static CScrollRegion s_MouseModelDropDownScrollRegion;
-		s_MouseModelDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_MouseModelDropDownScrollRegion;
-		CUIRect ModelDropDown;
-		RightView.HSplitTop(LineSize, &ModelDropDown, &RightView);
-		ModelDropDown.VSplitLeft(120.0f, &Label, &ModelDropDown);
-		Ui()->DoLabel(&Label, TCLocalize("Modelo mouse"), FontSize, TEXTALIGN_ML);
-		g_Config.m_TcKeystrokeHudMouseStyle = Ui()->DoDropDown(&ModelDropDown, std::clamp(g_Config.m_TcKeystrokeHudMouseStyle, 0, 3), s_MouseModelDropDownNames.data(), s_MouseModelDropDownNames.size(), s_MouseModelDropDownState);
-	}
-
-	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("Preview"), HeadlineFontSize, TEXTALIGN_ML);
-	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-
-	RightView.HSplitTop(FontSize, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("A, D = move keys. Space = jump. LMB = fire, RMB = hook. Open edit mode to drag the overlay into position."), FontSize, TEXTALIGN_ML);
+	RenderMaKeystroke(MainView);
 }
-
 void CMenus::RenderSettingsTClientProfiles(CUIRect MainView)
 {
 	int *pCurrentUseCustomColor = m_Dummy ? &g_Config.m_ClDummyUseCustomColor : &g_Config.m_ClPlayerUseCustomColor;
@@ -3594,7 +3696,9 @@ void CMenus::RenderSettingsTClientMa(CUIRect MainView)
 	static CButtonContainer s_aPageTabs[NUMBER_OF_MA_TABS] = {};
 	const char *apTabNames[] = {
 		TCLocalize("Settings"),
+		"Nicks Names",
 		TCLocalize("Visual"),
+		TCLocalize("GIF"),
 		TCLocalize("Lluvia"),
 		TCLocalize("Anime Love"),
 		TCLocalize("Keystroke HUD"),
@@ -3618,8 +3722,12 @@ void CMenus::RenderSettingsTClientMa(CUIRect MainView)
 
 	if(s_CurMaTab == MA_TAB_CONFIGURACION)
 		RenderMaConfiguracion(MainView);
+	if(s_CurMaTab == MA_TAB_NICK_NAMES)
+		RenderMaNickNames(MainView);
 	if(s_CurMaTab == MA_TAB_VISUAL)
 		RenderMaVisual(MainView);
+	if(s_CurMaTab == MA_TAB_GIF)
+		RenderMaGif(MainView);
 	if(s_CurMaTab == MA_TAB_LLUVIA)
 		RenderMaLluvia(MainView);
 	if(s_CurMaTab == MA_TAB_ANIMELOVE)
@@ -3630,6 +3738,445 @@ void CMenus::RenderSettingsTClientMa(CUIRect MainView)
 		RenderMaEditorSkins(MainView);
 }
 
+void CMenus::RenderMaGif(CUIRect MainView)
+{
+	CCherryGifs &CherryGifs = GameClient()->m_CherryGifs;
+	CGifWheel &GifWheel = GameClient()->m_GifWheel;
+	GifWheel.EnsureThumbnails();
+
+	CUIRect LeftView, RightView, Panel, Label, Row, Button;
+	static CScrollRegion s_ScrollRegion;
+	vec2 ScrollOffset(0.0f, 0.0f);
+	CScrollRegionParams ScrollParams;
+	ScrollParams.m_ScrollUnit = 60.0f;
+	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
+	ScrollParams.m_ScrollbarMargin = 5.0f;
+	s_ScrollRegion.Begin(&MainView, &ScrollOffset, &ScrollParams);
+
+	MainView.y += ScrollOffset.y;
+	MainView.VSplitRight(5.0f, &MainView, nullptr);
+	MainView.VSplitLeft(5.0f, nullptr, &MainView);
+	MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+	LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
+	RightView.VSplitRight(MarginSmall, &RightView, nullptr);
+
+	auto BeginPanel = [&](CUIRect &Column, float Height, const char *pTitle, CUIRect &Content) {
+		Column.HSplitTop(Margin, nullptr, &Column);
+		Column.HSplitTop(Height, &Panel, &Column);
+		Panel.Draw(TClientThemeAccentColor(), IGraphics::CORNER_ALL, 8.0f);
+		Panel.Margin(2.0f, &Content);
+		Content.Draw(TClientThemePanelColor(), IGraphics::CORNER_ALL, 6.0f);
+		Content.Margin(8.0f, &Content);
+		Content.HSplitTop(HeadlineHeight, &Label, &Content);
+		Ui()->DoLabel(&Label, TCLocalize(pTitle), HeadlineFontSize, TEXTALIGN_ML);
+		Content.HSplitTop(MarginSmall, nullptr, &Content);
+	};
+
+	CUIRect ChatMedia;
+	BeginPanel(LeftView, 215.0f, "Chat Media / GIFs", ChatMedia);
+	CChat &Chat = GameClient()->m_Chat;
+	if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaChatMediaPreview, TCLocalize("Render media previews from chat links"), &g_Config.m_MaChatMediaPreview, &ChatMedia, LineSize))
+		Chat.RebuildChat();
+	if(g_Config.m_MaChatMediaPreview)
+	{
+		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaChatMediaPhotos, TCLocalize("Show photos in chat media"), &g_Config.m_MaChatMediaPhotos, &ChatMedia, LineSize))
+			Chat.RebuildChat();
+		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaChatMediaGifs, TCLocalize("Show GIFs in chat media"), &g_Config.m_MaChatMediaGifs, &ChatMedia, LineSize))
+			Chat.RebuildChat();
+		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaChatMediaContentFilter, TCLocalize("Content filtering"), &g_Config.m_MaChatMediaContentFilter, &ChatMedia, LineSize))
+			Chat.RebuildChat();
+
+		if(g_Config.m_MaChatMediaContentFilter)
+		{
+			ChatMedia.HSplitTop(LineSize, &Row, &ChatMedia);
+			Ui()->DoLabel(&Row, TCLocalize("Allowed media domains"), 12.0f, TEXTALIGN_ML);
+			ChatMedia.HSplitTop(LineSize, &Row, &ChatMedia);
+			static CLineInput s_ChatMediaAllowedDomains(g_Config.m_MaChatMediaAllowedDomains, sizeof(g_Config.m_MaChatMediaAllowedDomains));
+			s_ChatMediaAllowedDomains.SetEmptyText("tenor.com; imgur.com; giphy.com; gifs.teeworlds.xyz");
+			if(Ui()->DoClearableEditBox(&s_ChatMediaAllowedDomains, &Row, 14.0f))
+				Chat.RebuildChat();
+			GameClient()->m_Tooltips.DoToolTip(&s_ChatMediaAllowedDomains, &Row, TCLocalize("Semicolon-separated allowlist, for example: tenor.com; imgur.com; giphy.com; gifs.teeworlds.xyz; cdn.discordapp.com"));
+		}
+
+		ChatMedia.HSplitTop(LineSize, &Row, &ChatMedia);
+		if(Ui()->DoScrollbarOption(&g_Config.m_MaChatMediaPreviewMaxWidth, &g_Config.m_MaChatMediaPreviewMaxWidth, &Row, TCLocalize("Media preview width"), 120, 400))
+			Chat.RebuildChat();
+	}
+
+	CUIRect CherryPanel;
+	BeginPanel(LeftView, 560.0f, "Buscador GIF", CherryPanel);
+	static CLineInputBuffered<64> s_SearchInput;
+	CherryPanel.HSplitTop(LineSize, &Row, &CherryPanel);
+	Ui()->DoEditBox_Search(&s_SearchInput, &Row, 14.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive());
+
+	CherryPanel.HSplitTop(MarginSmall, nullptr, &CherryPanel);
+	if(g_Config.m_MaGifApiSource != 0 && g_Config.m_MaGifApiSource != 1)
+		g_Config.m_MaGifApiSource = 1;
+
+	CherryPanel.HSplitTop(LineSize, &Row, &CherryPanel);
+	CUIRect SourceLocal, SourceGiphy;
+	Row.VSplitMid(&SourceLocal, &SourceGiphy, MarginSmall);
+	static CButtonContainer s_GifSourceLocal;
+	static CButtonContainer s_GifSourceGiphy;
+	if(DoButton_Menu(&s_GifSourceLocal, TCLocalize("Local"), g_Config.m_MaGifApiSource == 0, &SourceLocal, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
+	{
+		g_Config.m_MaGifApiSource = 0;
+		CherryGifs.ReloadLocalDatabase();
+	}
+	if(DoButton_Menu(&s_GifSourceGiphy, "GIPHY", g_Config.m_MaGifApiSource == 1, &SourceGiphy, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+	{
+		g_Config.m_MaGifApiSource = 1;
+		CherryGifs.ReloadLocalDatabase();
+	}
+
+	CherryPanel.HSplitTop(MarginSmall, nullptr, &CherryPanel);
+	if(g_Config.m_MaGifApiSource == 1)
+	{
+		CherryPanel.HSplitTop(LineSize, &Row, &CherryPanel);
+		Ui()->DoLabel(&Row, "GIPHY API key", 12.0f, TEXTALIGN_ML);
+		CherryPanel.HSplitTop(LineSize, &Row, &CherryPanel);
+		static CLineInput s_GiphyApiKey(g_Config.m_MaGiphyApiKey, sizeof(g_Config.m_MaGiphyApiKey));
+		s_GiphyApiKey.SetHidden(true);
+		s_GiphyApiKey.SetEmptyText("Pega tu key de GIPHY");
+		Ui()->DoClearableEditBox(&s_GiphyApiKey, &Row, 14.0f);
+	}
+	CherryPanel.HSplitTop(MarginSmall, nullptr, &CherryPanel);
+	CherryPanel.HSplitTop(LineSize, &Row, &CherryPanel);
+	CUIRect SortToggle, NsfwToggle;
+	Row.VSplitMid(&SortToggle, &NsfwToggle, MarginSmall);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaCherryGifsSortTop, TCLocalize("Sort by top"), &g_Config.m_MaCherryGifsSortTop, &SortToggle, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaCherryGifsShowNsfw, TCLocalize("Show NSFW"), &g_Config.m_MaCherryGifsShowNsfw, &NsfwToggle, LineSize);
+
+	CherryPanel.HSplitTop(MarginSmall, nullptr, &CherryPanel);
+	CherryPanel.HSplitTop(LineSize, &Row, &CherryPanel);
+	CUIRect FolderButton, ReloadButton;
+	Row.VSplitMid(&FolderButton, &ReloadButton, MarginSmall);
+	static CButtonContainer s_GifDatabaseFolderButton;
+	static CButtonContainer s_GifDatabaseReloadButton;
+	if(DoButton_Menu(&s_GifDatabaseFolderButton, TCLocalize("Carpeta base GIF"), 0, &FolderButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f))
+	{
+		Storage()->CreateFolder("ma", IStorage::TYPE_SAVE);
+		Storage()->CreateFolder("ma/gifs", IStorage::TYPE_SAVE);
+		char aBuf[IO_MAX_PATH_LENGTH];
+		Storage()->GetCompletePath(IStorage::TYPE_SAVE, "ma/gifs", aBuf, sizeof(aBuf));
+		Client()->ViewFile(aBuf);
+	}
+	if(DoButton_Menu(&s_GifDatabaseReloadButton, TCLocalize("Recargar"), 0, &ReloadButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f))
+		CherryGifs.ReloadLocalDatabase();
+
+	CherryGifs.SetFilters(s_SearchInput.GetString(), g_Config.m_MaCherryGifsSortTop != 0, g_Config.m_MaCherryGifsShowNsfw != 0);
+
+	static bool s_DragActive = false;
+	static char s_aDragGifId[32] = "";
+	static char s_aDragUrl[256] = "";
+	static char s_aDragCaption[128] = "";
+	static IGraphics::CTextureHandle s_DragThumbnail;
+	static int s_DragFromWheelIndex = -1;
+
+	CUIRect StatusRow;
+	CherryPanel.HSplitBottom(LineSize, &CherryPanel, &StatusRow);
+	CherryPanel.HSplitBottom(MarginSmall, &CherryPanel, nullptr);
+	CherryPanel.HSplitTop(MarginSmall, nullptr, &CherryPanel);
+	CUIRect Grid = CherryPanel;
+
+	const std::vector<SCherryGif> &vResults = CherryGifs.Results();
+	static CListBox s_ListBox;
+	constexpr float CardSize = 84.0f;
+	constexpr float CardMargin = 8.0f;
+	const int ItemsPerRow = std::max(1, (int)(Grid.w / (CardSize + CardMargin)));
+
+	if(vResults.empty() && CherryGifs.IsLoading())
+	{
+		const int PlaceholderRows = (int)std::ceil(Grid.h / (CardSize + 20.0f)) + 1;
+		CUIRect PlaceholderGrid = Grid;
+		for(int PlaceholderRow = 0; PlaceholderRow < PlaceholderRows; PlaceholderRow++)
+		{
+			CUIRect RowRect, RowRemaining;
+			PlaceholderGrid.HSplitTop(CardSize + 20.0f, &RowRect, &PlaceholderGrid);
+			RowRemaining = RowRect;
+			for(int Col = 0; Col < ItemsPerRow; Col++)
+			{
+				CUIRect CardRect;
+				RowRemaining.VSplitLeft(CardSize + CardMargin, &CardRect, &RowRemaining);
+				CardRect.Margin(CardMargin / 2.0f, &CardRect);
+				CardRect.HSplitBottom(14.0f, &CardRect, nullptr);
+				Graphics()->DrawRect(CardRect.x, CardRect.y, CardRect.w, CardRect.h, ColorRGBA(0.15f, 0.15f, 0.15f, 0.35f), IGraphics::CORNER_ALL, 6.0f);
+			}
+		}
+	}
+	else if(vResults.empty())
+	{
+		CUIRect Help = Grid;
+		Help.Margin(12.0f, &Help);
+		const char *pHelpText = CherryGifs.HasError() ? CherryGifs.ErrorText() : TCLocalize("No hay GIFs para mostrar");
+		Ui()->DoLabel(&Help, pHelpText, 14.0f, TEXTALIGN_MC);
+	}
+	else
+	{
+		s_ListBox.DoStart(CardSize + 20.0f, (int)vResults.size(), ItemsPerRow, 1, -1, &Grid, false);
+		bool LastItemVisible = false;
+		for(int i = 0; i < (int)vResults.size(); i++)
+		{
+			const SCherryGif &Gif = vResults[i];
+			const CListboxItem Item = s_ListBox.DoNextItem(&Gif, false);
+			if(!Item.m_Visible)
+				continue;
+			if(i == (int)vResults.size() - 1)
+				LastItemVisible = true;
+
+			CUIRect CardRect = Item.m_Rect;
+			CardRect.Margin(CardMargin / 2.0f, &CardRect);
+			CUIRect Thumb, Caption;
+			CardRect.HSplitBottom(14.0f, &Thumb, &Caption);
+			CherryGifs.RequestThumbnail(i);
+
+			IGraphics::CTextureHandle ThumbnailTexture;
+			if(CherryGifs.GetThumbnailTexture(Gif, ThumbnailTexture))
+			{
+				Graphics()->WrapClamp();
+				Graphics()->TextureSet(ThumbnailTexture);
+				Graphics()->QuadsSetSubset(0, 0, 1, 1);
+				Graphics()->QuadsBegin();
+				Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+				IGraphics::CQuadItem QuadItem(Thumb.x, Thumb.y, Thumb.w, Thumb.h);
+				Graphics()->QuadsDrawTL(&QuadItem, 1);
+				Graphics()->QuadsEnd();
+				Graphics()->WrapNormal();
+			}
+			else
+			{
+				Graphics()->DrawRect(Thumb.x, Thumb.y, Thumb.w, Thumb.h, ColorRGBA(0.15f, 0.15f, 0.15f, 0.5f), IGraphics::CORNER_ALL, 6.0f);
+			}
+
+			char aCaptionText[64];
+			if(Gif.m_aCaption[0] != '\0')
+				str_copy(aCaptionText, Gif.m_aCaption, sizeof(aCaptionText));
+			else if(!Gif.m_vTags.empty())
+				str_copy(aCaptionText, Gif.m_vTags.front().c_str(), sizeof(aCaptionText));
+			else
+				str_format(aCaptionText, sizeof(aCaptionText), "%d %s", Gif.m_Likes, TCLocalize("likes"));
+			Ui()->DoLabel(&Caption, aCaptionText, 9.0f, TEXTALIGN_MC);
+
+			if(!s_DragActive && Ui()->MouseButton(0) && !Ui()->MouseButtonClicked(0) && Ui()->MouseInside(&Thumb))
+			{
+				s_DragActive = true;
+				str_copy(s_aDragGifId, Gif.m_aId, sizeof(s_aDragGifId));
+				str_copy(s_aDragUrl, Gif.m_aUrl, sizeof(s_aDragUrl));
+				str_copy(s_aDragCaption, Gif.m_aCaption, sizeof(s_aDragCaption));
+				s_DragThumbnail = ThumbnailTexture;
+			}
+		}
+		s_ListBox.DoEnd();
+
+		if(LastItemVisible && CherryGifs.HasMore() && !CherryGifs.IsLoading())
+			CherryGifs.LoadMore();
+	}
+
+	if(CherryGifs.HasError())
+	{
+		TextRender()->TextColor(ColorRGBA(1.0f, 0.4f, 0.4f, 1.0f));
+		Ui()->DoLabel(&StatusRow, CherryGifs.ErrorText(), 12.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+	else if(CherryGifs.IsLoading() && !vResults.empty())
+	{
+		Ui()->DoLabel(&StatusRow, TCLocalize("Loading..."), 12.0f, TEXTALIGN_ML);
+	}
+	else if(vResults.empty())
+	{
+		Ui()->DoLabel(&StatusRow, TCLocalize("Search gifs to add them to the wheel"), 12.0f, TEXTALIGN_ML);
+	}
+
+	CUIRect WheelPanel;
+	BeginPanel(RightView, 475.0f, "Gif Wheel", WheelPanel);
+	WheelPanel.HSplitTop(LineSize, &Row, &WheelPanel);
+	Ui()->DoScrollbarOption(&g_Config.m_MaGifWheelScale, &g_Config.m_MaGifWheelScale, &Row, TCLocalize("Wheel scale"), 50, 200, &CUi::ms_LinearScrollbarScale, 0, "%");
+	WheelPanel.HSplitTop(MarginSmall, nullptr, &WheelPanel);
+
+	CUIRect WheelControls;
+	WheelPanel.HSplitBottom(LineSize * 4.0f + MarginSmall * 3.0f, &WheelPanel, &WheelControls);
+	const float Radius = std::min(WheelPanel.w, WheelPanel.h) / 2.0f;
+	const vec2 Center = WheelPanel.Center();
+
+	Graphics()->TextureClear();
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(0.0f, 0.0f, 0.0f, 0.3f);
+	Graphics()->DrawCircle(Center.x, Center.y, Radius, 64);
+	Graphics()->QuadsEnd();
+
+	static int s_SelectedSlotIndex = -1;
+	constexpr int PreviewSlotCount = 8;
+	int SegmentCount = std::clamp(std::max(PreviewSlotCount, (int)GifWheel.m_vSlots.size()), 1, (int)GIFWHEEL_MAX_SLOTS);
+	const float MouseDist = distance(Center, Ui()->MousePos());
+	auto SlotIndexAt = [&](vec2 Pos) -> int {
+		const float Dist = distance(Center, Pos);
+		if(Dist >= Radius || Dist <= Radius * 0.20f)
+			return -1;
+		const float SegmentAngle = 2.0f * pi / SegmentCount;
+		float HoveringAngle = angle(Pos - Center) + SegmentAngle / 2.0f;
+		if(HoveringAngle < 0.0f)
+			HoveringAngle += 2.0f * pi;
+		return std::clamp((int)(HoveringAngle / (2.0f * pi) * SegmentCount), 0, SegmentCount - 1);
+	};
+	auto SlotHasGif = [&](int Index) -> bool {
+		return Index >= 0 && Index < (int)GifWheel.m_vSlots.size() && !GifWheel.m_vSlots[Index].IsEmpty();
+	};
+	const int HoveringIndex = SlotIndexAt(Ui()->MousePos());
+
+	if(!s_DragActive)
+	{
+		if(HoveringIndex >= 0)
+		{
+			if(Ui()->MouseButtonClicked(0))
+				s_SelectedSlotIndex = HoveringIndex;
+			else if(Ui()->MouseButtonClicked(1) && SlotHasGif(HoveringIndex))
+			{
+				GifWheel.RemoveSlot(HoveringIndex);
+				s_SelectedSlotIndex = -1;
+			}
+		}
+		else if(MouseDist < Radius && Ui()->MouseButtonClicked(0))
+		{
+			s_SelectedSlotIndex = -1;
+		}
+	}
+	if(s_SelectedSlotIndex >= SegmentCount)
+		s_SelectedSlotIndex = -1;
+	const bool SelectedSlotHasGif = SlotHasGif(s_SelectedSlotIndex);
+	const bool HasAnyWheelGif = std::any_of(GifWheel.m_vSlots.begin(), GifWheel.m_vSlots.end(), [](const CGifWheel::CSlot &Slot) { return !Slot.IsEmpty(); });
+
+	const float Theta = pi * 2.0f / std::max(1, SegmentCount);
+	for(int i = 0; i < SegmentCount; i++)
+	{
+		const bool HasSlot = SlotHasGif(i);
+		const CGifWheel::CSlot *pSlot = HasSlot ? &GifWheel.m_vSlots[i] : nullptr;
+		const float Angle = Theta * i;
+		const vec2 Pos = Center + direction(Angle) * (Radius * 0.72f);
+		const float Size = i == s_SelectedSlotIndex ? 62.0f : (i == HoveringIndex ? 56.0f : 46.0f);
+		CUIRect SlotRect{Pos.x - Size / 2.0f, Pos.y - Size / 2.0f, Size, Size};
+
+		if(i == s_SelectedSlotIndex)
+			Graphics()->DrawRect(SlotRect.x - 4.0f, SlotRect.y - 4.0f, SlotRect.w + 8.0f, SlotRect.h + 8.0f, ColorRGBA(0.5f, 1.0f, 0.75f, 0.9f), IGraphics::CORNER_ALL, (Size + 8.0f) * 0.15f);
+		else if(s_DragActive && i == HoveringIndex)
+			Graphics()->DrawRect(SlotRect.x - 5.0f, SlotRect.y - 5.0f, SlotRect.w + 10.0f, SlotRect.h + 10.0f, ColorRGBA(1.0f, 0.35f, 0.35f, 0.9f), IGraphics::CORNER_ALL, (Size + 10.0f) * 0.15f);
+
+		if(pSlot && pSlot->m_Thumbnail.IsValid())
+		{
+			Graphics()->WrapClamp();
+			Graphics()->TextureSet(pSlot->m_Thumbnail);
+			Graphics()->QuadsSetSubset(0, 0, 1, 1);
+			Graphics()->QuadsBegin();
+			Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+			IGraphics::CQuadItem QuadItem(SlotRect.x, SlotRect.y, SlotRect.w, SlotRect.h);
+			Graphics()->QuadsDrawTL(&QuadItem, 1);
+			Graphics()->QuadsEnd();
+			Graphics()->WrapNormal();
+		}
+		else
+		{
+			Graphics()->DrawRect(SlotRect.x, SlotRect.y, SlotRect.w, SlotRect.h, ColorRGBA(0.12f, 0.12f, 0.12f, HasSlot ? 0.65f : 0.28f), IGraphics::CORNER_ALL, Size * 0.15f);
+			Graphics()->DrawRect(SlotRect.x + 3.0f, SlotRect.y + 3.0f, SlotRect.w - 6.0f, SlotRect.h - 6.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.10f), IGraphics::CORNER_ALL, Size * 0.12f);
+		}
+
+		if(!s_DragActive && HasSlot && Ui()->MouseButton(0) && !Ui()->MouseButtonClicked(0) && Ui()->MouseInside(&SlotRect))
+		{
+			s_DragActive = true;
+			str_copy(s_aDragGifId, pSlot->m_aGifId, sizeof(s_aDragGifId));
+			str_copy(s_aDragUrl, pSlot->m_aUrl, sizeof(s_aDragUrl));
+			str_copy(s_aDragCaption, pSlot->m_aCaption, sizeof(s_aDragCaption));
+			s_DragThumbnail = pSlot->m_Thumbnail;
+			s_DragFromWheelIndex = i;
+		}
+	}
+
+	if(!HasAnyWheelGif)
+	{
+		CUIRect EmptyLabel{Center.x - 140.0f, Center.y - 8.0f, 280.0f, 16.0f};
+		Ui()->DoLabel(&EmptyLabel, TCLocalize("Arrastra un GIF al hueco que quieras"), 12.0f, TEXTALIGN_MC);
+	}
+
+	if(s_DragActive && !Ui()->MouseButton(0))
+	{
+		const int DropIndex = SlotIndexAt(Ui()->MousePos());
+		if(DropIndex >= 0)
+		{
+			GifWheel.SetSlot(DropIndex, s_aDragGifId, s_aDragUrl, s_aDragCaption);
+			if(s_DragFromWheelIndex >= 0 && s_DragFromWheelIndex != DropIndex)
+				GifWheel.RemoveSlot(s_DragFromWheelIndex);
+			s_SelectedSlotIndex = DropIndex;
+		}
+		s_DragActive = false;
+		s_DragFromWheelIndex = -1;
+	}
+	WheelControls.HSplitTop(LineSize, &Row, &WheelControls);
+	Ui()->DoLabel(&Row, TCLocalize("Drag a gif onto the wheel to assign it"), 12.0f, TEXTALIGN_MC);
+	WheelControls.HSplitTop(MarginSmall, nullptr, &WheelControls);
+	WheelControls.HSplitTop(LineSize, &Row, &WheelControls);
+	CUIRect SendButton, RemoveButton;
+	Row.VSplitMid(&SendButton, &RemoveButton, MarginSmall);
+	static CButtonContainer s_SendSelectedGifButton;
+	static CButtonContainer s_RemoveSelectedGifButton;
+	if(DoButton_Menu(&s_SendSelectedGifButton, TCLocalize("Send selected"), SelectedSlotHasGif ? 0 : -1, &SendButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f) && SelectedSlotHasGif)
+		GifWheel.ExecuteSlot(s_SelectedSlotIndex);
+	if(DoButton_Menu(&s_RemoveSelectedGifButton, TCLocalize("Remove selected"), SelectedSlotHasGif ? 0 : -1, &RemoveButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f) && SelectedSlotHasGif)
+	{
+		GifWheel.RemoveSlot(s_SelectedSlotIndex);
+		s_SelectedSlotIndex = -1;
+	}
+	WheelControls.HSplitTop(MarginSmall, nullptr, &WheelControls);
+	WheelControls.HSplitTop(LineSize, &Row, &WheelControls);
+	static CButtonContainer s_ClearGifWheelButton;
+	if(DoButton_Menu(&s_ClearGifWheelButton, TCLocalize("Clear wheel"), HasAnyWheelGif ? 0 : -1, &Row, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f) && HasAnyWheelGif)
+	{
+		GifWheel.RemoveAllSlots();
+		s_SelectedSlotIndex = -1;
+	}
+
+	if(s_DragActive)
+	{
+		constexpr float DragSize = 54.0f;
+		const float DragX = Ui()->MouseX() + 12.0f;
+		const float DragY = Ui()->MouseY() + 12.0f;
+		if(s_DragThumbnail.IsValid())
+		{
+			Graphics()->WrapClamp();
+			Graphics()->TextureSet(s_DragThumbnail);
+			Graphics()->QuadsSetSubset(0, 0, 1, 1);
+			Graphics()->QuadsBegin();
+			Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.9f);
+			IGraphics::CQuadItem QuadItem(DragX, DragY, DragSize, DragSize);
+			Graphics()->QuadsDrawTL(&QuadItem, 1);
+			Graphics()->QuadsEnd();
+			Graphics()->WrapNormal();
+		}
+		else
+		{
+			Graphics()->DrawRect(DragX, DragY, DragSize, DragSize, ColorRGBA(0.2f, 0.2f, 0.2f, 0.85f), IGraphics::CORNER_ALL, 6.0f);
+		}
+	}
+
+	CUIRect BubblePanel;
+	BeginPanel(RightView, 220.0f, "Burbuja GIF sobre el tee", BubblePanel);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaGifBubbleAboveHead, TCLocalize("Mostrar burbuja GIF sobre el tee"), &g_Config.m_MaGifBubbleAboveHead, &BubblePanel, LineSize);
+	BubblePanel.HSplitTop(LineSize, &Row, &BubblePanel);
+	Ui()->DoScrollbarOption(&g_Config.m_MaGifBubbleDurationMs, &g_Config.m_MaGifBubbleDurationMs, &Row, TCLocalize("Duracion"), 1000, 15000, &CUi::ms_LinearScrollbarScale, 0, "ms");
+	BubblePanel.HSplitTop(LineSize, &Row, &BubblePanel);
+	Ui()->DoScrollbarOption(&g_Config.m_MaGifBubbleOffsetY, &g_Config.m_MaGifBubbleOffsetY, &Row, TCLocalize("Altura sobre el tee"), 0, 300);
+	BubblePanel.HSplitTop(LineSize, &Row, &BubblePanel);
+	Ui()->DoLabel(&Row, TCLocalize("Dominios de burbuja"), 12.0f, TEXTALIGN_ML);
+	BubblePanel.HSplitTop(LineSize, &Row, &BubblePanel);
+	static CLineInput s_GifBubbleDomains(g_Config.m_MaGifBubbleDomains, sizeof(g_Config.m_MaGifBubbleDomains));
+	s_GifBubbleDomains.SetEmptyText("gifs.teeworlds.xyz");
+	Ui()->DoClearableEditBox(&s_GifBubbleDomains, &Row, 14.0f);
+
+	CUIRect ScrollRegion;
+	ScrollRegion.x = MainView.x;
+	ScrollRegion.w = MainView.w;
+	ScrollRegion.y = maximum(LeftView.y, RightView.y) + MarginSmall * 2.0f;
+	ScrollRegion.h = 0.0f;
+	s_ScrollRegion.AddRect(ScrollRegion);
+	s_ScrollRegion.End();
+}
 void CMenus::RenderMaVisual(CUIRect MainView)
 {
 	CUIRect LeftView, RightView, Column, Button, Label, Row;
@@ -3828,46 +4375,6 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 	s_SectionBoxes.back().h = Column.y - s_SectionBoxes.back().y;
 	LeftView = Column;
 
-	// ***** Chat Media ***** //
-	LeftView.HSplitTop(MarginBetweenSections, nullptr, &LeftView);
-	s_SectionBoxes.push_back(LeftView);
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("Chat Media"), HeadlineFontSize, TEXTALIGN_ML);
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	CChat &Chat = GameClient()->m_Chat;
-	if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaChatMediaPreview, TCLocalize("Render media previews from chat links"), &g_Config.m_MaChatMediaPreview, &LeftView, LineSize))
-		Chat.RebuildChat();
-
-	if(g_Config.m_MaChatMediaPreview)
-	{
-		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaChatMediaPhotos, TCLocalize("Show photos in chat media"), &g_Config.m_MaChatMediaPhotos, &LeftView, LineSize))
-			Chat.RebuildChat();
-		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaChatMediaGifs, TCLocalize("Show GIFs in chat media"), &g_Config.m_MaChatMediaGifs, &LeftView, LineSize))
-			Chat.RebuildChat();
-		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaChatMediaContentFilter, TCLocalize("Content filtering"), &g_Config.m_MaChatMediaContentFilter, &LeftView, LineSize))
-			Chat.RebuildChat();
-
-		if(g_Config.m_MaChatMediaContentFilter)
-		{
-			LeftView.HSplitTop(LineSize, &Row, &LeftView);
-			Ui()->DoLabel(&Row, TCLocalize("Allowed media domains"), 12.0f, TEXTALIGN_ML);
-
-			LeftView.HSplitTop(LineSize, &Row, &LeftView);
-			static CLineInput s_ChatMediaAllowedDomains(g_Config.m_MaChatMediaAllowedDomains, sizeof(g_Config.m_MaChatMediaAllowedDomains));
-			s_ChatMediaAllowedDomains.SetEmptyText("tenor.com; imgur.com; giphy.com");
-			if(Ui()->DoClearableEditBox(&s_ChatMediaAllowedDomains, &Row, 14.0f))
-				Chat.RebuildChat();
-			GameClient()->m_Tooltips.DoToolTip(&s_ChatMediaAllowedDomains, &Row, TCLocalize("Semicolon-separated allowlist, for example: tenor.com; imgur.com; giphy.com; discordapp.net"));
-		}
-
-		LeftView.HSplitTop(LineSize, &Row, &LeftView);
-		if(Ui()->DoScrollbarOption(&g_Config.m_MaChatMediaPreviewMaxWidth, &g_Config.m_MaChatMediaPreviewMaxWidth, &Row, TCLocalize("Media preview width"), 120, 400))
-			Chat.RebuildChat();
-	}
-
-	s_SectionBoxes.back().h = LeftView.y - s_SectionBoxes.back().y;
-
 	// ***** Stream Chat ***** //
 	LeftView.HSplitTop(MarginBetweenSections, nullptr, &LeftView);
 	s_SectionBoxes.push_back(LeftView);
@@ -4047,6 +4554,42 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 		Ui()->DoLabel(&Row, TCLocalize("YouTube y Kick requieren API/token para datos reales."), 10.5f, TEXTALIGN_ML);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
+
+	s_SectionBoxes.back().h = LeftView.y - s_SectionBoxes.back().y;
+
+	// ***** Team Stats ***** //
+	LeftView.HSplitTop(MarginBetweenSections, nullptr, &LeftView);
+	s_SectionBoxes.push_back(LeftView);
+	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
+	Ui()->DoLabel(&Label, TCLocalize("Estadisticas de team"), HeadlineFontSize, TEXTALIGN_ML);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaTeamStatsPanel, TCLocalize("Mostrar estadisticas de team"), &g_Config.m_MaTeamStatsPanel, &LeftView, LineSize);
+	if(g_Config.m_MaTeamStatsPanel)
+	{
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaTeamStatsPanelOnlyInTeam, TCLocalize("Solo al estar en team"), &g_Config.m_MaTeamStatsPanelOnlyInTeam, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaTeamStatsPanelShowSelf, TCLocalize("Mostrar mi puntuacion"), &g_Config.m_MaTeamStatsPanelShowSelf, &LeftView, LineSize);
+		LeftView.HSplitTop(LineSize, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaTeamStatsPanelMaxPlayers, &g_Config.m_MaTeamStatsPanelMaxPlayers, &Button, TCLocalize("Jugadores mostrados"), 1, 12);
+		LeftView.HSplitTop(LineSize, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaTeamStatsPanelOpacity, &g_Config.m_MaTeamStatsPanelOpacity, &Button, TCLocalize("Opacidad fondo"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		LeftView.HSplitTop(LineSize, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_MaTeamStatsPanelTextOpacity, &g_Config.m_MaTeamStatsPanelTextOpacity, &Button, TCLocalize("Opacidad letras"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		
+		static CButtonContainer s_TeamStatsTitleColor, s_TeamStatsTextColor, s_TeamStatsHighlightColor;
+		DoLine_ColorPicker(&s_TeamStatsTitleColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Color titulo"), &g_Config.m_MaTeamStatsPanelTitleColor, ColorRGBA(0.58f, 0.95f, 1.0f), false);
+		DoLine_ColorPicker(&s_TeamStatsTextColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Color texto"), &g_Config.m_MaTeamStatsPanelTextColor, ColorRGBA(1.0f, 1.0f, 1.0f), false);
+		DoLine_ColorPicker(&s_TeamStatsHighlightColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Color destacado"), &g_Config.m_MaTeamStatsPanelHighlightColor, ColorRGBA(0.72f, 1.0f, 0.72f), false);
+		LeftView.HSplitTop(LineSize + 6.0f, &Button, &LeftView);
+		static CButtonContainer s_MaTeamStatsHudEditorButton;
+		if(DoButton_Menu(&s_MaTeamStatsHudEditorButton, TCLocalize("Abrir editor HUD"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f) && (Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK))
+		{
+			SetActive(false);
+			GameClient()->m_HudEditor.Activate();
+		}
+	}
+	else
+		LeftView.HSplitTop(LineSize * 2.0f, nullptr, &LeftView);
 
 	s_SectionBoxes.back().h = LeftView.y - s_SectionBoxes.back().y;
 	// ***** 3D Particles ***** //
@@ -4780,6 +5323,514 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 	s_ScrollRegion.End();
 }
 
+void CMenus::RenderMaNickNames(CUIRect MainView)
+{
+	CUIRect LeftView, RightView, Button, Label;
+
+	static CScrollRegion s_ScrollRegion;
+	vec2 ScrollOffset(0.0f, 0.0f);
+	CScrollRegionParams ScrollParams;
+	ScrollParams.m_ScrollUnit = 60.0f;
+	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
+	ScrollParams.m_ScrollbarMargin = 5.0f;
+	s_ScrollRegion.Begin(&MainView, &ScrollOffset, &ScrollParams);
+
+	static std::vector<CUIRect> s_SectionBoxes;
+	static vec2 s_PrevScrollOffset(0.0f, 0.0f);
+
+	MainView.y += ScrollOffset.y;
+	MainView.VSplitRight(5.0f, &MainView, nullptr);
+	MainView.VSplitLeft(5.0f, nullptr, &MainView);
+	MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+	LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
+	RightView.VSplitRight(MarginSmall, &RightView, nullptr);
+
+	for(CUIRect &Section : s_SectionBoxes)
+	{
+		float Padding = MarginBetweenViews * 0.6666f;
+		Section.w += Padding;
+		Section.h += Padding;
+		Section.x -= Padding * 0.5f;
+		Section.y -= Padding * 0.5f;
+		Section.y -= s_PrevScrollOffset.y - ScrollOffset.y;
+		Section.Draw(TClientThemeAccentColor(), IGraphics::CORNER_ALL, 8.0f);
+		CUIRect Inner = Section;
+		Inner.Margin(2.0f, &Inner);
+		Inner.Draw(TClientThemePanelColor(), IGraphics::CORNER_ALL, 6.0f);
+	}
+	s_PrevScrollOffset = ScrollOffset;
+	s_SectionBoxes.clear();
+
+	// ***** Efectos de nombres por jugador ***** //
+	{
+		std::vector<SMaNameEffectMenuEntry> vNameEffectEntries;
+		MaNameEffectDecodeEntries(vNameEffectEntries);
+		MaNameEffectAddLegacyNames(vNameEffectEntries);
+
+		static char s_aNameEffectEditName[MAX_NAME_LENGTH] = "";
+		static int s_NameEffectEditStyle = 0;
+		static unsigned s_NameEffectEditColor1 = 65425;
+		static unsigned s_NameEffectEditColor2 = 41131;
+		static int s_NameEffectEditGlow = 70;
+		static int s_NameEffectEditMoving = 0;
+		static bool s_NameEffectEditLoaded = false;
+		static bool s_NameEffectEditOwn = false;
+		static char s_aNameEffectSavedName[MAX_NAME_LENGTH] = "";
+		static int s_NameEffectSavedStyle = 0;
+		static unsigned s_NameEffectSavedColor1 = 0;
+		static unsigned s_NameEffectSavedColor2 = 0;
+		static int s_NameEffectSavedGlow = 0;
+		static int s_NameEffectSavedMoving = 0;
+		static bool s_NameEffectSavedOwn = false;
+
+		auto RememberNameEffectSaved = [&]() {
+			str_copy(s_aNameEffectSavedName, s_aNameEffectEditName, sizeof(s_aNameEffectSavedName));
+			s_NameEffectSavedStyle = s_NameEffectEditStyle;
+			s_NameEffectSavedColor1 = s_NameEffectEditColor1;
+			s_NameEffectSavedColor2 = s_NameEffectEditColor2;
+			s_NameEffectSavedGlow = s_NameEffectEditGlow;
+			s_NameEffectSavedMoving = s_NameEffectEditMoving ? 1 : 0;
+			s_NameEffectSavedOwn = s_NameEffectEditOwn;
+		};
+
+		auto FindOnlineClientId = [&](const char *pName) -> int {
+			for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+			{
+				if(GameClient()->m_Snap.m_apPlayerInfos[ClientId] && str_comp(GameClient()->m_aClients[ClientId].m_aName, pName) == 0)
+					return ClientId;
+			}
+			return -1;
+		};
+
+		auto LoadNameEffectPlayer = [&](const char *pName, bool Own) {
+			str_copy(s_aNameEffectEditName, pName, sizeof(s_aNameEffectEditName));
+			MaNameEffectSanitizeName(s_aNameEffectEditName);
+			s_NameEffectEditOwn = Own;
+			if(Own)
+			{
+				s_NameEffectEditStyle = std::clamp(g_Config.m_MaNameEffectsOwnStyle, 0, 3);
+				s_NameEffectEditColor1 = g_Config.m_MaNameEffectsOwnColor1;
+				s_NameEffectEditColor2 = g_Config.m_MaNameEffectsOwnColor2;
+				s_NameEffectEditGlow = std::clamp(g_Config.m_MaNameEffectsOwnGlow, 0, 100);
+				s_NameEffectEditMoving = g_Config.m_MaNameEffectsOwnMoving != 0;
+			}
+			else
+			{
+				const int EntryIndex = MaNameEffectFindEntryIndex(vNameEffectEntries, s_aNameEffectEditName);
+				if(EntryIndex >= 0)
+				{
+					const SMaNameEffectMenuEntry &Entry = vNameEffectEntries[EntryIndex];
+					s_NameEffectEditStyle = std::clamp(Entry.m_Style, 0, 3);
+					s_NameEffectEditColor1 = Entry.m_Color1;
+					s_NameEffectEditColor2 = Entry.m_Color2;
+					s_NameEffectEditGlow = std::clamp(Entry.m_Glow, 0, 100);
+					s_NameEffectEditMoving = Entry.m_Moving ? 1 : 0;
+				}
+				else
+				{
+					s_NameEffectEditStyle = std::clamp(g_Config.m_MaNameEffectsStyle, 0, 3);
+					s_NameEffectEditColor1 = g_Config.m_MaNameEffectsColor1;
+					s_NameEffectEditColor2 = g_Config.m_MaNameEffectsColor2;
+					s_NameEffectEditGlow = std::clamp(g_Config.m_MaNameEffectsGlow, 0, 100);
+					s_NameEffectEditMoving = g_Config.m_MaNameEffectsMoving != 0;
+				}
+			}
+			s_NameEffectEditLoaded = true;
+			RememberNameEffectSaved();
+		};
+
+		auto SaveCurrentNameEffect = [&]() {
+			MaNameEffectSanitizeName(s_aNameEffectEditName);
+			if(s_aNameEffectEditName[0] == '\0')
+				return;
+			g_Config.m_MaNameEffects = 1;
+			if(s_NameEffectEditOwn)
+			{
+				g_Config.m_MaNameEffectsOwn = 1;
+				g_Config.m_MaNameEffectsOwnStyle = std::clamp(s_NameEffectEditStyle, 0, 3);
+				g_Config.m_MaNameEffectsOwnColor1 = s_NameEffectEditColor1;
+				g_Config.m_MaNameEffectsOwnColor2 = s_NameEffectEditColor2;
+				g_Config.m_MaNameEffectsOwnGlow = std::clamp(s_NameEffectEditGlow, 0, 100);
+				g_Config.m_MaNameEffectsOwnMoving = s_NameEffectEditMoving ? 1 : 0;
+
+				const int ExistingIndex = MaNameEffectFindEntryIndex(vNameEffectEntries, s_aNameEffectEditName);
+				if(ExistingIndex >= 0)
+				{
+					vNameEffectEntries.erase(vNameEffectEntries.begin() + ExistingIndex);
+					MaNameEffectEncodeEntries(vNameEffectEntries);
+				}
+			}
+			else
+			{
+				MaNameEffectSaveEntry(vNameEffectEntries, MaNameEffectMakeEntry(s_aNameEffectEditName, s_NameEffectEditStyle, s_NameEffectEditColor1, s_NameEffectEditColor2, s_NameEffectEditGlow, s_NameEffectEditMoving));
+			}
+			RememberNameEffectSaved();
+		};
+
+		auto NameEffectEditChangedSinceSaved = [&]() {
+			return s_NameEffectSavedOwn != s_NameEffectEditOwn ||
+			       str_comp(s_aNameEffectSavedName, s_aNameEffectEditName) != 0 ||
+			       s_NameEffectSavedStyle != s_NameEffectEditStyle ||
+			       s_NameEffectSavedColor1 != s_NameEffectEditColor1 ||
+			       s_NameEffectSavedColor2 != s_NameEffectEditColor2 ||
+			       s_NameEffectSavedGlow != s_NameEffectEditGlow ||
+			       s_NameEffectSavedMoving != (s_NameEffectEditMoving ? 1 : 0);
+		};
+
+		if(!s_NameEffectEditLoaded)
+		{
+			const int LocalClientId = GameClient()->m_Snap.m_LocalClientId;
+			if(LocalClientId >= 0 && LocalClientId < MAX_CLIENTS && GameClient()->m_Snap.m_apPlayerInfos[LocalClientId])
+				LoadNameEffectPlayer(GameClient()->m_aClients[LocalClientId].m_aName, true);
+			else if(!vNameEffectEntries.empty())
+				LoadNameEffectPlayer(vNameEffectEntries[0].m_aName, false);
+			else
+			{
+				const char *pOwnName = g_Config.m_PlayerName[0] ? g_Config.m_PlayerName : Client()->PlayerName();
+				LoadNameEffectPlayer(pOwnName, true);
+			}
+		}
+
+		std::vector<SMaNameEffectPlayerRow> vRows;
+		auto AddPlayerRow = [&](const char *pName, const char *pClan, bool Configured) {
+			if(!pName || pName[0] == '\0')
+				return;
+			for(SMaNameEffectPlayerRow &RowData : vRows)
+			{
+				if(str_comp_nocase(RowData.m_aName, pName) == 0)
+				{
+					RowData.m_Configured = RowData.m_Configured || Configured;
+					return;
+				}
+			}
+			SMaNameEffectPlayerRow RowData;
+			str_copy(RowData.m_aName, pName, sizeof(RowData.m_aName));
+			str_copy(RowData.m_aClan, pClan ? pClan : "", sizeof(RowData.m_aClan));
+			RowData.m_ClientId = FindOnlineClientId(RowData.m_aName);
+			RowData.m_Online = RowData.m_ClientId >= 0;
+			RowData.m_Configured = Configured;
+			if(RowData.m_Online && RowData.m_aClan[0] == '\0')
+				str_copy(RowData.m_aClan, GameClient()->m_aClients[RowData.m_ClientId].m_aClan, sizeof(RowData.m_aClan));
+			vRows.push_back(RowData);
+		};
+
+		for(const SMaNameEffectMenuEntry &Entry : vNameEffectEntries)
+			AddPlayerRow(Entry.m_aName, "", true);
+		if(GameClient()->Friends())
+		{
+			for(int FriendIndex = 0; FriendIndex < GameClient()->Friends()->NumFriends(); ++FriendIndex)
+			{
+				const CFriendInfo *pFriend = GameClient()->Friends()->GetFriend(FriendIndex);
+				if(pFriend && pFriend->m_aName[0] != '\0')
+					AddPlayerRow(pFriend->m_aName, pFriend->m_aClan, MaNameEffectFindEntryIndex(vNameEffectEntries, pFriend->m_aName) >= 0);
+			}
+		}
+		std::stable_sort(vRows.begin(), vRows.end(), [](const SMaNameEffectPlayerRow &A, const SMaNameEffectPlayerRow &B) {
+			if(A.m_Configured != B.m_Configured)
+				return A.m_Configured > B.m_Configured;
+			if(A.m_Online != B.m_Online)
+				return A.m_Online > B.m_Online;
+			return str_comp_nocase(A.m_aName, B.m_aName) < 0;
+		});
+
+		LeftView.HSplitTop(Margin, nullptr, &LeftView);
+		RightView.HSplitTop(Margin, nullptr, &RightView);
+
+		s_SectionBoxes.push_back(LeftView);
+		LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
+		Ui()->DoLabel(&Label, TCLocalize("Jugadores"), HeadlineFontSize, TEXTALIGN_ML);
+		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaNameEffects, TCLocalize("Activar efectos de nombres"), &g_Config.m_MaNameEffects, &LeftView, LineSize);
+
+		CUIRect PlayerList, PlayerSearch;
+		LeftView.HSplitTop(220.0f, &PlayerList, &LeftView);
+		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+		LeftView.HSplitTop(25.0f, &PlayerSearch, &LeftView);
+		static CLineInputBuffered<128> s_NameEffectsPlayerSearchInput;
+		Ui()->DoEditBox_Search(&s_NameEffectsPlayerSearchInput, &PlayerSearch, 14.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive());
+
+		std::vector<SMaNameEffectPlayerRow> vFilteredRows;
+		for(const SMaNameEffectPlayerRow &RowData : vRows)
+		{
+			const char *pSearch = s_NameEffectsPlayerSearchInput.GetString();
+			if(pSearch[0] != '\0' && !str_find_nocase(RowData.m_aName, pSearch) && !str_find_nocase(RowData.m_aClan, pSearch))
+				continue;
+			vFilteredRows.push_back(RowData);
+		}
+
+		int SelectedOldPlayer = -1;
+		for(size_t i = 0; i < vFilteredRows.size(); ++i)
+		{
+			if(str_comp_nocase(vFilteredRows[i].m_aName, s_aNameEffectEditName) == 0)
+			{
+				SelectedOldPlayer = (int)i;
+				break;
+			}
+		}
+		static CListBox s_NameEffectsPlayerListBox;
+		s_NameEffectsPlayerListBox.DoStart(36.0f, vFilteredRows.size(), 1, 2, SelectedOldPlayer, &PlayerList, true, IGraphics::CORNER_ALL, true);
+		static std::vector<unsigned char> s_vNameEffectPlayerItemIds;
+		s_vNameEffectPlayerItemIds.resize(std::max<size_t>(1, vFilteredRows.size()));
+		for(size_t i = 0; i < vFilteredRows.size(); ++i)
+		{
+			const SMaNameEffectPlayerRow &RowData = vFilteredRows[i];
+			const CListboxItem Item = s_NameEffectsPlayerListBox.DoNextItem(&s_vNameEffectPlayerItemIds[i], SelectedOldPlayer == (int)i);
+			if(!Item.m_Visible)
+				continue;
+
+			CUIRect RowRect, IconRect, TextRect, StatusRect;
+			Item.m_Rect.Margin(2.0f, &RowRect);
+			RowRect.VSplitLeft(28.0f, &IconRect, &RowRect);
+			RowRect.VSplitRight(54.0f, &TextRect, &StatusRect);
+			if(RowData.m_Online && RowData.m_ClientId >= 0)
+			{
+				CTeeRenderInfo TeeInfo = GameClient()->m_aClients[RowData.m_ClientId].m_RenderInfo;
+				TeeInfo.m_Size = 24.0f;
+				RenderTeeCute(CAnimState::GetIdle(), &TeeInfo, 0, vec2(1.0f, 0.0f), IconRect.Center() + vec2(-1.0f, 2.0f), true);
+			}
+			else
+				RenderDevSkin(IconRect.Center(), 24.0f, "default", "default", false, 0, 0, 0, false, false);
+
+			CUIRect NameRect, ClanRect;
+			TextRect.HSplitMid(&NameRect, &ClanRect, 0.0f);
+			Ui()->DoLabel(&NameRect, RowData.m_aName, StandardFontSize, TEXTALIGN_ML);
+			TextRender()->TextColor(RowData.m_Configured ? ColorRGBA(1.0f, 0.65f, 1.0f, 1.0f) : ColorRGBA(0.8f, 0.8f, 0.8f, 0.78f));
+			Ui()->DoLabel(&ClanRect, RowData.m_Configured ? TCLocalize("personalizado") : RowData.m_aClan, 11.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(RowData.m_Online ? ColorRGBA(0.25f, 1.0f, 0.35f, 1.0f) : ColorRGBA(0.55f, 0.55f, 0.55f, 0.9f));
+			RenderFontIcon(StatusRect, FontIcon::CIRCLE, 10.0f, TEXTALIGN_MC);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
+		const int NewSelectedPlayer = s_NameEffectsPlayerListBox.DoEnd();
+		if(NewSelectedPlayer >= 0 && NewSelectedPlayer < (int)vFilteredRows.size() && NewSelectedPlayer != SelectedOldPlayer)
+			LoadNameEffectPlayer(vFilteredRows[NewSelectedPlayer].m_aName, false);
+		LeftView.HSplitTop(MarginExtraSmall, nullptr, &LeftView);
+		s_SectionBoxes.back().h = LeftView.y - s_SectionBoxes.back().y;
+
+		// Bloque rapido para seleccionar el jugador local que usa el cliente.
+		LeftView.HSplitTop(MarginBetweenSections * 0.45f, nullptr, &LeftView);
+		s_SectionBoxes.push_back(LeftView);
+		LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
+		Ui()->DoLabel(&Label, TCLocalize("Yo"), HeadlineFontSize, TEXTALIGN_ML);
+		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+		CUIRect OwnRow;
+		LeftView.HSplitTop(46.0f, &OwnRow, &LeftView);
+		OwnRow.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.22f), IGraphics::CORNER_ALL, 6.0f);
+		OwnRow.Margin(5.0f, &OwnRow);
+		CUIRect OwnIcon, OwnText, OwnButton;
+		OwnRow.VSplitLeft(38.0f, &OwnIcon, &OwnRow);
+		OwnRow.VSplitRight(150.0f, &OwnText, &OwnButton);
+
+		const int LocalClientId = GameClient()->m_Snap.m_LocalClientId;
+		if(LocalClientId >= 0 && LocalClientId < MAX_CLIENTS && GameClient()->m_Snap.m_apPlayerInfos[LocalClientId])
+		{
+			CTeeRenderInfo TeeInfo = GameClient()->m_aClients[LocalClientId].m_RenderInfo;
+			TeeInfo.m_Size = 30.0f;
+			RenderTeeCute(CAnimState::GetIdle(), &TeeInfo, 0, vec2(1.0f, 0.0f), OwnIcon.Center() + vec2(-1.0f, 2.5f), true);
+		}
+		else
+			RenderDevSkin(OwnIcon.Center(), 30.0f, "default", "default", false, 0, 0, 0, false, false);
+
+		CUIRect OwnName, OwnInfo;
+		OwnText.HSplitMid(&OwnName, &OwnInfo, 0.0f);
+		const char *pOwnName = g_Config.m_PlayerName[0] ? g_Config.m_PlayerName : Client()->PlayerName();
+		Ui()->DoLabel(&OwnName, pOwnName, StandardFontSize, TEXTALIGN_ML);
+		TextRender()->TextColor(ColorRGBA(0.85f, 0.85f, 0.85f, 0.78f));
+		Ui()->DoLabel(&OwnInfo, TCLocalize("jugador local"), 11.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+		static CButtonContainer s_NameEffectOwnSelectButton;
+		if(DoButton_Menu(&s_NameEffectOwnSelectButton, TCLocalize("Seleccionar mi nick"), 0, &OwnButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f))
+			LoadNameEffectPlayer(pOwnName, true);
+
+		LeftView.HSplitTop(MarginExtraSmall, nullptr, &LeftView);
+		s_SectionBoxes.back().h = LeftView.y - s_SectionBoxes.back().y;
+
+		s_SectionBoxes.push_back(RightView);
+		RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
+		Ui()->DoLabel(&Label, TCLocalize("Mi nombre personal"), HeadlineFontSize, TEXTALIGN_ML);
+		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+
+		static CLineInput s_MaPersonalNameInput;
+		s_MaPersonalNameInput.SetBuffer(g_Config.m_PlayerName, sizeof(g_Config.m_PlayerName));
+		s_MaPersonalNameInput.SetEmptyText(Client()->PlayerName());
+		RightView.HSplitTop(LineSize, &Button, &RightView);
+		Button.VSplitLeft(110.0f, &Label, &Button);
+		Ui()->DoLabel(&Label, TCLocalize("Nombre"), FontSize, TEXTALIGN_ML);
+		if(Ui()->DoEditBox(&s_MaPersonalNameInput, &Button, EditBoxFontSize))
+		{
+			SetNeedSendInfo();
+			if(s_NameEffectEditOwn)
+			{
+				const char *pUpdatedOwnName = g_Config.m_PlayerName[0] ? g_Config.m_PlayerName : Client()->PlayerName();
+				str_copy(s_aNameEffectEditName, pUpdatedOwnName, sizeof(s_aNameEffectEditName));
+				MaNameEffectSanitizeName(s_aNameEffectEditName);
+				RememberNameEffectSaved();
+			}
+		}
+
+		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+		RightView.HSplitTop(LineSize, &Button, &RightView);
+		static CButtonContainer s_NameEffectLoadOwnButton;
+		if(DoButton_Menu(&s_NameEffectLoadOwnButton, TCLocalize("Editar efectos de mi nick"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f))
+		{
+			const char *pOwnName = g_Config.m_PlayerName[0] ? g_Config.m_PlayerName : Client()->PlayerName();
+			LoadNameEffectPlayer(pOwnName, true);
+		}
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaNameEffectsOwn, TCLocalize("Activar efectos en mi nick"), &g_Config.m_MaNameEffectsOwn, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClNamePlatesOwn, TCLocalize("Mostrar mi nombre sobre el tee"), &g_Config.m_ClNamePlatesOwn, &RightView, LineSize);
+
+		RightView.HSplitTop(MarginBetweenSections * 0.45f, nullptr, &RightView);
+		RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
+		Ui()->DoLabel(&Label, TCLocalize("Editar jugador"), HeadlineFontSize, TEXTALIGN_ML);
+		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+
+		static CLineInput s_NameEffectNameInput;
+		s_NameEffectNameInput.SetBuffer(s_aNameEffectEditName, sizeof(s_aNameEffectEditName));
+		s_NameEffectNameInput.SetEmptyText(TCLocalize("Jugador"));
+		RightView.HSplitTop(LineSize, &Button, &RightView);
+		bool NameEffectNameInputActive = false;
+		if(s_NameEffectEditOwn)
+		{
+			Button.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.22f), IGraphics::CORNER_ALL, 5.0f);
+			Ui()->DoLabel(&Button, s_aNameEffectEditName[0] ? s_aNameEffectEditName : TCLocalize("Mi nick local"), EditBoxFontSize, TEXTALIGN_MC);
+		}
+		else
+		{
+			Ui()->DoEditBox(&s_NameEffectNameInput, &Button, EditBoxFontSize);
+			MaNameEffectSanitizeName(s_aNameEffectEditName);
+			NameEffectNameInputActive = s_NameEffectNameInput.IsActive();
+		}
+
+		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+		RightView.HSplitTop(LineSize, &Button, &RightView);
+		Button.VSplitLeft(120.0f, &Label, &Button);
+		Ui()->DoLabel(&Label, TCLocalize("Estilo"), FontSize, TEXTALIGN_ML);
+		static std::vector<const char *> s_NameEffectStyleNames;
+		s_NameEffectStyleNames = {TCLocalize("Letras arcoiris"), TCLocalize("Neon"), TCLocalize("Estrellas"), TCLocalize("Neon + estrellas")};
+		static CUi::SDropDownState s_NameEffectStyleState;
+		static CScrollRegion s_NameEffectStyleScrollRegion;
+		s_NameEffectStyleState.m_SelectionPopupContext.m_pScrollRegion = &s_NameEffectStyleScrollRegion;
+		s_NameEffectEditStyle = Ui()->DoDropDown(&Button, std::clamp(s_NameEffectEditStyle, 0, 3), s_NameEffectStyleNames.data(), s_NameEffectStyleNames.size(), s_NameEffectStyleState);
+
+		DoButton_CheckBoxAutoVMarginAndSet(&s_NameEffectEditMoving, TCLocalize("Movimiento de colores"), &s_NameEffectEditMoving, &RightView, LineSize);
+		RightView.HSplitTop(LineSize, &Button, &RightView);
+		Ui()->DoScrollbarOption(&s_NameEffectEditGlow, &s_NameEffectEditGlow, &Button, TCLocalize("Intensidad neon"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
+
+		static CButtonContainer s_NameEffectEditColor1Picker, s_NameEffectEditColor2Picker;
+		DoLine_ColorPicker(&s_NameEffectEditColor1Picker, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, TCLocalize("Color principal"), &s_NameEffectEditColor1, ColorRGBA(0.5f, 1.0f, 1.0f), false, nullptr, true);
+		DoLine_ColorPicker(&s_NameEffectEditColor2Picker, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, TCLocalize("Color efecto"), &s_NameEffectEditColor2, ColorRGBA(1.0f, 0.4f, 1.0f), false, nullptr, true);
+
+		if(!NameEffectNameInputActive && s_aNameEffectEditName[0] != '\0' && NameEffectEditChangedSinceSaved())
+		{
+			SaveCurrentNameEffect();
+		}
+
+		RightView.HSplitTop(LineSize + MarginSmall, &Button, &RightView);
+		Button.VSplitMid(&Button, &Label, MarginSmall);
+		static CButtonContainer s_NameEffectSaveButton, s_NameEffectDeleteButton;
+		if(DoButton_Menu(&s_NameEffectSaveButton, s_NameEffectEditOwn ? TCLocalize("Guardar mi nick") : TCLocalize("Guardar jugador"), s_aNameEffectEditName[0] ? 0 : -1, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f) && s_aNameEffectEditName[0])
+		{
+			SaveCurrentNameEffect();
+		}
+		const int DeleteEnabled = s_NameEffectEditOwn ? g_Config.m_MaNameEffectsOwn : (MaNameEffectFindEntryIndex(vNameEffectEntries, s_aNameEffectEditName) >= 0 ? 1 : 0);
+		if(DoButton_Menu(&s_NameEffectDeleteButton, s_NameEffectEditOwn ? TCLocalize("Desactivar") : TCLocalize("Eliminar"), DeleteEnabled ? 0 : -1, &Label, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f))
+		{
+			if(s_NameEffectEditOwn)
+			{
+				g_Config.m_MaNameEffectsOwn = 0;
+				RememberNameEffectSaved();
+			}
+			else
+			{
+				const int ExistingIndex = MaNameEffectFindEntryIndex(vNameEffectEntries, s_aNameEffectEditName);
+				if(ExistingIndex >= 0)
+				{
+					vNameEffectEntries.erase(vNameEffectEntries.begin() + ExistingIndex);
+					MaNameEffectEncodeEntries(vNameEffectEntries);
+					RememberNameEffectSaved();
+				}
+			}
+		}
+
+		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+		RightView.HSplitTop(LineSize, &Button, &RightView);
+		Button.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.22f), IGraphics::CORNER_ALL, 5.0f);
+		TextRender()->TextColor(color_cast<ColorRGBA>(ColorHSLA(s_NameEffectEditColor1, true)));
+		char aPreview[96];
+		str_format(aPreview, sizeof(aPreview), "%s%s%s", (s_NameEffectEditStyle == 2 || s_NameEffectEditStyle == 3) ? "* " : "", s_aNameEffectEditName[0] ? s_aNameEffectEditName : TCLocalize("Jugador"), (s_NameEffectEditStyle == 2 || s_NameEffectEditStyle == 3) ? " *" : "");
+		Ui()->DoLabel(&Button, aPreview, FontSize, TEXTALIGN_MC);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+		RightView.HSplitTop(MarginBetweenSections * 0.45f, nullptr, &RightView);
+		RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
+		Ui()->DoLabel(&Label, TCLocalize("Jugadores en linea"), HeadlineFontSize, TEXTALIGN_ML);
+		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+
+		CUIRect OnlineList, OnlineSearch;
+		RightView.HSplitTop(105.0f, &OnlineList, &RightView);
+		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+		RightView.HSplitTop(25.0f, &OnlineSearch, &RightView);
+		static CLineInputBuffered<128> s_NameEffectsOnlineSearchInput;
+		Ui()->DoEditBox_Search(&s_NameEffectsOnlineSearchInput, &OnlineSearch, 14.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive());
+
+		std::vector<int> vOnlineClientIds;
+		for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+		{
+			if(!GameClient()->m_Snap.m_apPlayerInfos[ClientId])
+				continue;
+			const auto &Client = GameClient()->m_aClients[ClientId];
+			const char *pSearch = s_NameEffectsOnlineSearchInput.GetString();
+			if(pSearch[0] != '\0' && !str_find_nocase(Client.m_aName, pSearch) && !str_find_nocase(Client.m_aClan, pSearch))
+				continue;
+			vOnlineClientIds.push_back(ClientId);
+		}
+
+		static CListBox s_NameEffectsOnlineListBox;
+		s_NameEffectsOnlineListBox.DoStart(30.0f, vOnlineClientIds.size(), 1, 2, -1, &OnlineList, true, IGraphics::CORNER_ALL, true);
+		static std::vector<unsigned char> s_vNameEffectOnlineItemIds;
+		static std::vector<CButtonContainer> s_vNameEffectOnlineButtons;
+		s_vNameEffectOnlineItemIds.resize(std::max<size_t>(1, vOnlineClientIds.size()));
+		s_vNameEffectOnlineButtons.resize(MAX_CLIENTS);
+		for(size_t i = 0; i < vOnlineClientIds.size(); ++i)
+		{
+			const int ClientId = vOnlineClientIds[i];
+			const auto &Client = GameClient()->m_aClients[ClientId];
+			const CListboxItem Item = s_NameEffectsOnlineListBox.DoNextItem(&s_vNameEffectOnlineItemIds[i], false);
+			if(!Item.m_Visible)
+				continue;
+
+			CUIRect RowRect, TeeRect, NameRect, TagRect;
+			Item.m_Rect.Margin(2.0f, &RowRect);
+			RowRect.VSplitLeft(28.0f, &TeeRect, &RowRect);
+			RowRect.VSplitRight(80.0f, &NameRect, &TagRect);
+			const ColorRGBA ButtonColor = Ui()->HotItem() == &s_vNameEffectOnlineButtons[ClientId] ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.22f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.0f);
+			RowRect.Draw(ButtonColor, IGraphics::CORNER_ALL, 5.0f);
+			if(Ui()->DoButtonLogic(&s_vNameEffectOnlineButtons[ClientId], false, &RowRect, BUTTONFLAG_LEFT))
+				LoadNameEffectPlayer(Client.m_aName, false);
+
+			CTeeRenderInfo TeeInfo = Client.m_RenderInfo;
+			TeeInfo.m_Size = 24.0f;
+			RenderTeeCute(CAnimState::GetIdle(), &TeeInfo, 0, vec2(1.0f, 0.0f), TeeRect.Center() + vec2(-1.0f, 2.0f), true);
+			Ui()->DoLabel(&NameRect, Client.m_aName, StandardFontSize, TEXTALIGN_ML);
+			TextRender()->TextColor(MaNameEffectFindEntryIndex(vNameEffectEntries, Client.m_aName) >= 0 ? ColorRGBA(1.0f, 0.65f, 1.0f, 1.0f) : ColorRGBA(0.75f, 0.75f, 0.75f, 0.75f));
+			Ui()->DoLabel(&TagRect, MaNameEffectFindEntryIndex(vNameEffectEntries, Client.m_aName) >= 0 ? TCLocalize("listo") : TCLocalize("agregar"), 11.0f, TEXTALIGN_MR);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
+		s_NameEffectsOnlineListBox.DoEnd();
+
+		RightView.HSplitTop(MarginExtraSmall, nullptr, &RightView);
+		s_SectionBoxes.back().h = RightView.y - s_SectionBoxes.back().y;
+	}
+
+	CUIRect ScrollRegion;
+	ScrollRegion.x = MainView.x;
+	ScrollRegion.w = MainView.w;
+	ScrollRegion.y = maximum(LeftView.y, RightView.y) + MarginSmall * 2.0f;
+	ScrollRegion.h = 0.0f;
+	s_ScrollRegion.AddRect(ScrollRegion);
+	s_ScrollRegion.End();
+}
 void CMenus::RenderMaConfiguracion(CUIRect MainView)
 {
 	CUIRect LeftView, RightView, Button, Label;
@@ -4979,6 +6030,7 @@ void CMenus::RenderMaConfiguracion(CUIRect MainView)
 
 	LeftView.HSplitTop(MarginExtraSmall, nullptr, &LeftView);
 	s_SectionBoxes.back().h = LeftView.y - s_SectionBoxes.back().y;
+
 
 	// ===== RIGHT COLUMN =====
 
@@ -5364,7 +6416,7 @@ void CMenus::RenderMaAnimeLove(CUIRect MainView)
 
 void CMenus::RenderMaKeystroke(CUIRect MainView)
 {
-	CUIRect LeftView, RightView, Button, Label;
+	CUIRect LeftView, RightView, Button, Label, Row;
 
 	static CScrollRegion s_ScrollRegion;
 	vec2 ScrollOffset(0.0f, 0.0f);
@@ -5382,7 +6434,6 @@ void CMenus::RenderMaKeystroke(CUIRect MainView)
 	LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
 	RightView.VSplitRight(MarginSmall, &RightView, nullptr);
 
-	// Left frame
 	CUIRect LeftFrame = LeftView;
 	LeftFrame.Draw(TClientThemeAccentColor(), IGraphics::CORNER_ALL, 8.0f);
 	CUIRect LeftInner = LeftView;
@@ -5390,7 +6441,6 @@ void CMenus::RenderMaKeystroke(CUIRect MainView)
 	LeftInner.Draw(TClientThemePanelColor(), IGraphics::CORNER_ALL, 6.0f);
 	LeftView.Margin(8.0f, &LeftView);
 
-	// Right frame
 	CUIRect RightFrame = RightView;
 	RightFrame.Draw(TClientThemeAccentColor(), IGraphics::CORNER_ALL, 8.0f);
 	CUIRect RightInner = RightView;
@@ -5398,7 +6448,27 @@ void CMenus::RenderMaKeystroke(CUIRect MainView)
 	RightInner.Draw(TClientThemePanelColor(), IGraphics::CORNER_ALL, 6.0f);
 	RightView.Margin(8.0f, &RightView);
 
-	// Left column - Keyboard
+	auto DrawSectionTitle = [&](CUIRect &Column, const char *pTitle) {
+		Column.HSplitTop(HeadlineHeight, &Label, &Column);
+		Ui()->DoLabel(&Label, pTitle, HeadlineFontSize, TEXTALIGN_ML);
+		Column.HSplitTop(MarginSmall, nullptr, &Column);
+	};
+
+	auto DoModelDropDown = [&](CUIRect &Column, const char *pLabel, int &Value, CUi::SDropDownState &State, CScrollRegion &DropDownScrollRegion) {
+		static std::vector<const char *> s_vModelNames;
+		s_vModelNames = {TCLocalize("Normal"), TCLocalize("Redondo"), TCLocalize("Diamante"), TCLocalize("Hexagonal"), TCLocalize("Personalizado")};
+		State.m_SelectionPopupContext.m_pScrollRegion = &DropDownScrollRegion;
+		Column.HSplitTop(LineSize, &Row, &Column);
+		Row.VSplitLeft(124.0f, &Label, &Row);
+		Ui()->DoLabel(&Label, pLabel, FontSize, TEXTALIGN_ML);
+		Value = Ui()->DoDropDown(&Row, std::clamp(Value, 0, 4), s_vModelNames.data(), s_vModelNames.size(), State);
+	};
+
+	auto DoOpacitySlider = [&](CUIRect &Column, const char *pLabel, int &Value) {
+		Column.HSplitTop(LineSize, &Button, &Column);
+		Ui()->DoScrollbarOption(&Value, &Value, &Button, pLabel, 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
+	};
+
 	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
 	{
 		CUIRect TitleLabel, EditorButton;
@@ -5411,82 +6481,122 @@ void CMenus::RenderMaKeystroke(CUIRect MainView)
 			SetActive(false);
 			GameClient()->m_HudEditor.Activate();
 		}
-		Ui()->DoLabel(&TitleLabel, TCLocalize("Keystroke HUD"), HeadlineFontSize, TEXTALIGN_ML);
+		Ui()->DoLabel(&TitleLabel, TCLocalize("HUD de teclas"), HeadlineFontSize, TEXTALIGN_ML);
 	}
 	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
 
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHud, TCLocalize("Enable keystroke overlay"), &g_Config.m_TcKeystrokeHud, &LeftView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHud, TCLocalize("Activar overlay de teclas"), &g_Config.m_TcKeystrokeHud, &LeftView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudOnlyOnPress, TCLocalize("Solo mostrar al presionar"), &g_Config.m_TcKeystrokeHudOnlyOnPress, &LeftView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudShowText, TCLocalize("Mostrar etiquetas"), &g_Config.m_TcKeystrokeHudShowText, &LeftView, LineSize);
 
 	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-	{
-		static std::vector<const char *> s_KeyModelDropDownNames;
-		s_KeyModelDropDownNames = {TCLocalize("Normal"), TCLocalize("Redondo"), TCLocalize("Diamante"), TCLocalize("Hexagonal")};
-		static CUi::SDropDownState s_KeyModelDropDownState;
-		static CScrollRegion s_KeyModelDropDownScrollRegion;
-		s_KeyModelDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_KeyModelDropDownScrollRegion;
-		CUIRect ModelDropDown;
-		LeftView.HSplitTop(LineSize, &ModelDropDown, &LeftView);
-		ModelDropDown.VSplitLeft(120.0f, &Label, &ModelDropDown);
-		Ui()->DoLabel(&Label, TCLocalize("Modelo teclado"), FontSize, TEXTALIGN_ML);
-		g_Config.m_TcKeystrokeHudStyle = Ui()->DoDropDown(&ModelDropDown, std::clamp(g_Config.m_TcKeystrokeHudStyle, 0, 3), s_KeyModelDropDownNames.data(), s_KeyModelDropDownNames.size(), s_KeyModelDropDownState);
-	}
-
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("Colors"), HeadlineFontSize, TEXTALIGN_ML);
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
+	DrawSectionTitle(LeftView, TCLocalize("Teclas A / D"));
+	static CUi::SDropDownState s_KeyModelDropDownState;
+	static CScrollRegion s_KeyModelDropDownScrollRegion;
+	DoModelDropDown(LeftView, TCLocalize("Modelo"), g_Config.m_TcKeystrokeHudStyle, s_KeyModelDropDownState, s_KeyModelDropDownScrollRegion);
+	DoOpacitySlider(LeftView, TCLocalize("Transparencia A/D"), g_Config.m_TcKeystrokeHudAlpha);
 	static CButtonContainer s_KeyColorPressed, s_KeyColorUnpressed;
-	DoLine_ColorPicker(&s_KeyColorPressed, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Pressed key color"), &g_Config.m_TcKeystrokeHudColorPressed, ColorRGBA(1.0f, 1.0f, 1.0f), false);
-	DoLine_ColorPicker(&s_KeyColorUnpressed, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Unpressed key color"), &g_Config.m_TcKeystrokeHudColorUnpressed, ColorRGBA(0.0f, 0.0f, 0.0f), false);
-
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("Options"), HeadlineFontSize, TEXTALIGN_ML);
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudShowText, TCLocalize("Show key labels (A, D, SPACE)"), &g_Config.m_TcKeystrokeHudShowText, &LeftView, LineSize);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudShowSpace, TCLocalize("Show space bar"), &g_Config.m_TcKeystrokeHudShowSpace, &LeftView, LineSize);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudOnlyOnPress, TCLocalize("Only show when keys pressed"), &g_Config.m_TcKeystrokeHudOnlyOnPress, &LeftView, LineSize);
+	DoLine_ColorPicker(&s_KeyColorPressed, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Color presionada A/D"), &g_Config.m_TcKeystrokeHudColorPressed, ColorRGBA(1.0f, 1.0f, 1.0f), false, nullptr, true);
+	DoLine_ColorPicker(&s_KeyColorUnpressed, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Color normal A/D"), &g_Config.m_TcKeystrokeHudColorUnpressed, ColorRGBA(0.0f, 0.0f, 0.0f), false, nullptr, true);
 
 	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudEditMode, TCLocalize("Edit mode (drag to move)"), &g_Config.m_TcKeystrokeHudEditMode, &LeftView, LineSize);
+	DrawSectionTitle(LeftView, TCLocalize("Espacio"));
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudShowSpace, TCLocalize("Mostrar espacio"), &g_Config.m_TcKeystrokeHudShowSpace, &LeftView, LineSize);
+	static CUi::SDropDownState s_SpaceModelDropDownState;
+	static CScrollRegion s_SpaceModelDropDownScrollRegion;
+	DoModelDropDown(LeftView, TCLocalize("Modelo"), g_Config.m_TcKeystrokeHudSpaceStyle, s_SpaceModelDropDownState, s_SpaceModelDropDownScrollRegion);
+	DoOpacitySlider(LeftView, TCLocalize("Transparencia espacio"), g_Config.m_TcKeystrokeHudSpaceAlpha);
+	static CButtonContainer s_SpaceColorPressed, s_SpaceColorUnpressed;
+	DoLine_ColorPicker(&s_SpaceColorPressed, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Color presionado espacio"), &g_Config.m_TcKeystrokeHudSpaceColorPressed, ColorRGBA(1.0f, 1.0f, 1.0f), false, nullptr, true);
+	DoLine_ColorPicker(&s_SpaceColorUnpressed, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Color normal espacio"), &g_Config.m_TcKeystrokeHudSpaceColorUnpressed, ColorRGBA(0.0f, 0.0f, 0.0f), false, nullptr, true);
 
 	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
 	LeftView.HSplitTop(LineSize + 6.0f, &Button, &LeftView);
 	static CButtonContainer s_HudEditorButton;
-	if(DoButton_Menu(&s_HudEditorButton, TCLocalize("Open HUD Editor"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f) && (Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK))
+	if(DoButton_Menu(&s_HudEditorButton, TCLocalize("Abrir editor HUD"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f) && (Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK))
 	{
 		SetActive(false);
 		GameClient()->m_HudEditor.Activate();
 	}
 
-	// Right column - Mouse Buttons
-	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("Mouse Buttons"), HeadlineFontSize, TEXTALIGN_ML);
-	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	DrawSectionTitle(RightView, TCLocalize("Modelos personalizados"));
+	Storage()->CreateFolder("ma", IStorage::TYPE_SAVE);
+	Storage()->CreateFolder("ma/keystrokes", IStorage::TYPE_SAVE);
 
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudShowMouse, TCLocalize("Show mouse clicks (LMB/RMB)"), &g_Config.m_TcKeystrokeHudShowMouse, &RightView, LineSize);
+	static std::vector<std::string> s_vKeystrokePackValues;
+	static std::vector<const char *> s_vKeystrokePackNames;
+	s_vKeystrokePackValues.clear();
+	s_vKeystrokePackValues.emplace_back("");
+	Storage()->ListDirectory(IStorage::TYPE_ALL, "ma/keystrokes", MaKeystrokePackScan, &s_vKeystrokePackValues);
+	std::sort(s_vKeystrokePackValues.begin() + 1, s_vKeystrokePackValues.end());
 
-	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	int SelectedPack = 0;
+	bool FoundPack = g_Config.m_TcKeystrokeHudCustomPack[0] == '\0';
+	for(int i = 1; i < (int)s_vKeystrokePackValues.size(); ++i)
 	{
-		static std::vector<const char *> s_MouseModelDropDownNames;
-		s_MouseModelDropDownNames = {TCLocalize("Normal"), TCLocalize("Redondo"), TCLocalize("Diamante"), TCLocalize("Hexagonal")};
-		static CUi::SDropDownState s_MouseModelDropDownState;
-		static CScrollRegion s_MouseModelDropDownScrollRegion;
-		s_MouseModelDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_MouseModelDropDownScrollRegion;
-		CUIRect ModelDropDown;
-		RightView.HSplitTop(LineSize, &ModelDropDown, &RightView);
-		ModelDropDown.VSplitLeft(120.0f, &Label, &ModelDropDown);
-		Ui()->DoLabel(&Label, TCLocalize("Modelo mouse"), FontSize, TEXTALIGN_ML);
-		g_Config.m_TcKeystrokeHudMouseStyle = Ui()->DoDropDown(&ModelDropDown, std::clamp(g_Config.m_TcKeystrokeHudMouseStyle, 0, 3), s_MouseModelDropDownNames.data(), s_MouseModelDropDownNames.size(), s_MouseModelDropDownState);
+		if(str_comp(g_Config.m_TcKeystrokeHudCustomPack, s_vKeystrokePackValues[i].c_str()) == 0)
+		{
+			SelectedPack = i;
+			FoundPack = true;
+			break;
+		}
+	}
+	if(!FoundPack)
+	{
+		SelectedPack = (int)s_vKeystrokePackValues.size();
+		s_vKeystrokePackValues.emplace_back(g_Config.m_TcKeystrokeHudCustomPack);
+	}
+
+	s_vKeystrokePackNames.clear();
+	for(const std::string &Pack : s_vKeystrokePackValues)
+		s_vKeystrokePackNames.push_back(Pack.empty() ? TCLocalize("Ninguno") : Pack.c_str());
+
+	static CUi::SDropDownState s_CustomPackDropDownState;
+	static CScrollRegion s_CustomPackDropDownScrollRegion;
+	s_CustomPackDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_CustomPackDropDownScrollRegion;
+	RightView.HSplitTop(LineSize, &Row, &RightView);
+	Row.VSplitLeft(116.0f, &Label, &Row);
+	Ui()->DoLabel(&Label, TCLocalize("Pack"), FontSize, TEXTALIGN_ML);
+	const int NewSelectedPack = Ui()->DoDropDown(&Row, SelectedPack, s_vKeystrokePackNames.data(), s_vKeystrokePackNames.size(), s_CustomPackDropDownState);
+	if(NewSelectedPack != SelectedPack && NewSelectedPack >= 0 && NewSelectedPack < (int)s_vKeystrokePackValues.size())
+	{
+		str_copy(g_Config.m_TcKeystrokeHudCustomPack, s_vKeystrokePackValues[NewSelectedPack].c_str(), sizeof(g_Config.m_TcKeystrokeHudCustomPack));
+		GameClient()->m_KeystrokeHud.ReloadCustomTextures();
 	}
 
 	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("Preview"), HeadlineFontSize, TEXTALIGN_ML);
-	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	RightView.HSplitTop(LineSize + 6.0f, &Row, &RightView);
+	CUIRect FolderButton, ReloadButton;
+	Row.VSplitMid(&FolderButton, &ReloadButton, MarginSmall);
+	static CButtonContainer s_CustomFolderButton, s_CustomReloadButton;
+	if(DoButton_Menu(&s_CustomFolderButton, TCLocalize("Carpeta modelos"), 0, &FolderButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f))
+	{
+		Storage()->CreateFolder("ma", IStorage::TYPE_SAVE);
+		Storage()->CreateFolder("ma/keystrokes", IStorage::TYPE_SAVE);
+		char aBuf[IO_MAX_PATH_LENGTH];
+		Storage()->GetCompletePath(IStorage::TYPE_SAVE, "ma/keystrokes", aBuf, sizeof(aBuf));
+		Client()->ViewFile(aBuf);
+	}
+	if(DoButton_Menu(&s_CustomReloadButton, TCLocalize("Recargar"), 0, &ReloadButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f))
+	{
+		GameClient()->m_KeystrokeHud.ReloadCustomTextures();
+	}
 
-	RightView.HSplitTop(FontSize, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("A, D = move keys. Space = jump. LMB = fire, RMB = hook. Open edit mode to drag the overlay into position."), FontSize, TEXTALIGN_ML);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	DrawSectionTitle(RightView, TCLocalize("Mouse"));
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcKeystrokeHudShowMouse, TCLocalize("Mostrar LMB/RMB"), &g_Config.m_TcKeystrokeHudShowMouse, &RightView, LineSize);
+	static CUi::SDropDownState s_MouseModelDropDownState;
+	static CScrollRegion s_MouseModelDropDownScrollRegion;
+	DoModelDropDown(RightView, TCLocalize("Modelo"), g_Config.m_TcKeystrokeHudMouseStyle, s_MouseModelDropDownState, s_MouseModelDropDownScrollRegion);
+	DoOpacitySlider(RightView, TCLocalize("Transparencia mouse"), g_Config.m_TcKeystrokeHudMouseAlpha);
+	static CButtonContainer s_MouseColorPressed, s_MouseColorUnpressed;
+	DoLine_ColorPicker(&s_MouseColorPressed, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, TCLocalize("Color presionado mouse"), &g_Config.m_TcKeystrokeHudMouseColorPressed, ColorRGBA(1.0f, 1.0f, 1.0f), false, nullptr, true);
+	DoLine_ColorPicker(&s_MouseColorUnpressed, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, TCLocalize("Color normal mouse"), &g_Config.m_TcKeystrokeHudMouseColorUnpressed, ColorRGBA(0.0f, 0.0f, 0.0f), false, nullptr, true);
+
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	DrawSectionTitle(RightView, TCLocalize("Vista previa"));
+	RightView.HSplitTop(FontSize * 2.0f, &Label, &RightView);
+	Ui()->DoLabel(&Label, TCLocalize("Usa el editor HUD para mover A/D, espacio y mouse por separado."), FontSize, TEXTALIGN_ML);
 
 	CUIRect ScrollRegion;
 	ScrollRegion.w = MainView.w;
@@ -5494,7 +6604,6 @@ void CMenus::RenderMaKeystroke(CUIRect MainView)
 	s_ScrollRegion.AddRect(ScrollRegion);
 	s_ScrollRegion.End();
 }
-
 void CMenus::RenderMaAudio(CUIRect MainView)
 {
 	CUIRect LeftView, RightView, Label, List, BottomBar, SearchRow, ButtonRow, SearchBox, DirectoryButton, GeneralFolderButton, ReloadButton, PackFolderButton, TestButton, Row;
@@ -5770,3 +6879,14 @@ void CMenus::RenderMaEditorSkins(CUIRect MainView)
 	s_ScrollRegion.AddRect(ScrollRegion);
 	s_ScrollRegion.End();
 }
+
+
+
+
+
+
+
+
+
+
+

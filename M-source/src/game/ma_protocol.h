@@ -1,0 +1,9 @@
+#ifndef GAME_MA_PROTOCOL_H
+#define GAME_MA_PROTOCOL_H
+
+enum
+{
+	MA_EXPLAYERFLAG_WATCHING_LOCAL = 1 << 3,
+};
+
+#endif

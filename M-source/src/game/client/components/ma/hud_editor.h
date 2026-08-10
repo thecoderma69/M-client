@@ -21,7 +21,7 @@ public:
 	bool IsActive() const { return m_Active; }
 
 private:
-	static constexpr int MAX_MODULE_VISUALS = 26;
+	static constexpr int MAX_MODULE_VISUALS = 32;
 	enum class EResizeHandle
 	{
 		NONE = 0,

@@ -42,6 +42,8 @@ namespace HudLayout
 			{370.0f, 72.0f, 100, 0, true, true, 0xAA050510U},
 			{6.0f, 96.0f, 100, 0, true, true, 0xAA050510U},
 			{190.0f, 96.0f, 100, 0, true, true, 0xAA050510U},
+			{25.0f, 255.0f, 100, 0, true, false, 0x66000000U},
+			{248.0f, 92.0f, 100, 0, true, true, 0xAA050510U},
 		};
 
 		static SModuleLayout gs_aRuntimeModuleLayouts[MODULE_COUNT];
@@ -101,6 +103,8 @@ namespace HudLayout
 			"Espectadores",
 			"Chat de stream",
 			"Fuente de actividad",
+			"Space",
+			"Estadisticas de team",
 		};
 
 		SModuleLayout ConfigLayout(EModule Module)
@@ -149,6 +153,8 @@ namespace HudLayout
 				return Runtime;
 			case MODULE_KEYSTROKES_KEYBOARD:
 				return Runtime;
+			case MODULE_KEYSTROKES_SPACE:
+				return Runtime;
 			case MODULE_KEYSTROKES_MOUSE:
 				return Runtime;
 			case MODULE_MA_SPECTATORS:
@@ -171,6 +177,13 @@ namespace HudLayout
 				Runtime.m_X = (float)g_Config.m_MaStreamActivityHudX;
 				Runtime.m_Y = (float)g_Config.m_MaStreamActivityHudY;
 				Runtime.m_Scale = g_Config.m_MaStreamActivityHudScale;
+				return Runtime;
+			case MODULE_MA_TEAM_STATS:
+				if(HasRuntimeOverrideInternal(Module))
+					return Runtime;
+				Runtime.m_X = (float)g_Config.m_MaTeamStatsPanelHudX;
+				Runtime.m_Y = (float)g_Config.m_MaTeamStatsPanelHudY;
+				Runtime.m_Scale = g_Config.m_MaTeamStatsPanelHudScale;
 				return Runtime;
 			default:
 				return Runtime;
@@ -196,6 +209,10 @@ namespace HudLayout
 				g_Config.m_TcKeystrokeHudPosX = (int)(Layout.m_X / HudLayout::CANVAS_WIDTH * 100.0f);
 				g_Config.m_TcKeystrokeHudPosY = (int)(Layout.m_Y / HudLayout::CANVAS_HEIGHT * 100.0f);
 				break;
+			case MODULE_KEYSTROKES_SPACE:
+				g_Config.m_TcKeystrokeHudSpacePosX = (int)(Layout.m_X / HudLayout::CANVAS_WIDTH * 100.0f);
+				g_Config.m_TcKeystrokeHudSpacePosY = (int)(Layout.m_Y / HudLayout::CANVAS_HEIGHT * 100.0f);
+				break;
 			case MODULE_KEYSTROKES_MOUSE:
 				g_Config.m_TcKeystrokeHudMousePosX = (int)(Layout.m_X / HudLayout::CANVAS_WIDTH * 100.0f);
 				g_Config.m_TcKeystrokeHudMousePosY = (int)(Layout.m_Y / HudLayout::CANVAS_HEIGHT * 100.0f);
@@ -214,6 +231,11 @@ namespace HudLayout
 				g_Config.m_MaStreamActivityHudX = round_to_int(Layout.m_X);
 				g_Config.m_MaStreamActivityHudY = round_to_int(Layout.m_Y);
 				g_Config.m_MaStreamActivityHudScale = Layout.m_Scale;
+				break;
+			case MODULE_MA_TEAM_STATS:
+				g_Config.m_MaTeamStatsPanelHudX = round_to_int(Layout.m_X);
+				g_Config.m_MaTeamStatsPanelHudY = round_to_int(Layout.m_Y);
+				g_Config.m_MaTeamStatsPanelHudScale = Layout.m_Scale;
 				break;
 			default:
 				break;

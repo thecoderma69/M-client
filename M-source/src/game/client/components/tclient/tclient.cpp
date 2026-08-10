@@ -30,9 +30,11 @@
 #include <generated/protocol.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <vector>
 
-static constexpr const char *TCLIENT_INFO_URL = "https://update.tclient.app/info.json";
+static constexpr const char *TCLIENT_INFO_URL = "https://api.github.com/repos/thecoderma69/M-client/releases/latest";
 
 enum
 {
@@ -1220,9 +1222,12 @@ void CTClient::OnRender()
 {
 	if(m_pTClientInfoTask)
 	{
-		if(m_pTClientInfoTask->State() == EHttpState::DONE)
+		if(m_pTClientInfoTask->Done())
 		{
-			FinishTClientInfo();
+			if(m_pTClientInfoTask->State() == EHttpState::DONE && m_pTClientInfoTask->StatusCode() < 400)
+				FinishTClientInfo();
+			else
+				m_FetchedTClientInfo = true;
 			ResetTClientInfoTask();
 		}
 	}
@@ -1269,65 +1274,117 @@ void CTClient::FetchTClientInfo()
 	if(m_pTClientInfoTask && !m_pTClientInfoTask->Done())
 		return;
 	char aUrl[256];
-	str_copy(aUrl, TCLIENT_INFO_URL);
+	str_format(aUrl, sizeof(aUrl), "%s?t=%lld", TCLIENT_INFO_URL, (long long)time_timestamp());
 	m_pTClientInfoTask = HttpGet(aUrl);
+	m_pTClientInfoTask->HeaderString("Accept", "application/vnd.github+json");
+	m_pTClientInfoTask->HeaderString("User-Agent", CLIENT_NAME);
+	m_pTClientInfoTask->HeaderString("X-GitHub-Api-Version", "2022-11-28");
+	m_pTClientInfoTask->HeaderString("Cache-Control", "no-cache");
+	m_pTClientInfoTask->HeaderString("Pragma", "no-cache");
 	m_pTClientInfoTask->Timeout(CTimeout{10000, 0, 500, 10});
 	m_pTClientInfoTask->IpResolve(IPRESOLVE::V4);
 	Http()->Run(m_pTClientInfoTask);
 }
 
-typedef std::tuple<int, int, int> TVersion;
-static const TVersion gs_InvalidTCVersion = std::make_tuple(-1, -1, -1);
-
-static TVersion ToTCVersion(char *pStr)
+static std::vector<int> MaExtractVersionNumbers(const char *pVersion)
 {
-	int aVersion[3] = {0, 0, 0};
-	const char *p = strtok(pStr, ".");
+	std::vector<int> vNumbers;
+	if(!pVersion)
+		return vNumbers;
 
-	for(int i = 0; i < 3 && p; ++i)
+	int Current = -1;
+	for(const unsigned char *p = reinterpret_cast<const unsigned char *>(pVersion); *p != '\0'; ++p)
 	{
-		if(!str_isallnum(p))
-			return gs_InvalidTCVersion;
+		if(std::isdigit(*p))
+		{
+			if(Current < 0)
+				Current = 0;
+			Current = Current * 10 + (*p - '0');
+		}
+		else if(Current >= 0)
+		{
+			vNumbers.push_back(Current);
+			Current = -1;
+		}
+	}
+	if(Current >= 0)
+		vNumbers.push_back(Current);
 
-		aVersion[i] = str_toint(p);
-		p = strtok(NULL, ".");
+	return vNumbers;
+}
+
+static int MaCompareVersionStrings(const char *pLeft, const char *pRight)
+{
+	const std::vector<int> vLeft = MaExtractVersionNumbers(pLeft);
+	const std::vector<int> vRight = MaExtractVersionNumbers(pRight);
+	const size_t Count = std::max(vLeft.size(), vRight.size());
+	for(size_t i = 0; i < Count; ++i)
+	{
+		const int Left = i < vLeft.size() ? vLeft[i] : 0;
+		const int Right = i < vRight.size() ? vRight[i] : 0;
+		if(Left != Right)
+			return Left < Right ? -1 : 1;
+	}
+	return 0;
+}
+
+static void MaExtractDisplayVersion(const char *pVersion, char *pBuf, int BufSize)
+{
+	if(BufSize <= 0)
+		return;
+	pBuf[0] = '\0';
+	if(!pVersion)
+		return;
+
+	const char *pStart = pVersion;
+	while(*pStart != '\0' && !std::isdigit(static_cast<unsigned char>(*pStart)))
+		++pStart;
+	if(*pStart == '\0')
+	{
+		str_copy(pBuf, pVersion, BufSize);
+		return;
 	}
 
-	if(p)
-		return gs_InvalidTCVersion;
+	const char *pEnd = pStart;
+	while(*pEnd != '\0' && (std::isdigit(static_cast<unsigned char>(*pEnd)) || *pEnd == '.'))
+		++pEnd;
 
-	return std::make_tuple(aVersion[0], aVersion[1], aVersion[2]);
+	const int Len = std::min<int>(pEnd - pStart, BufSize - 1);
+	mem_copy(pBuf, pStart, Len);
+	pBuf[Len] = '\0';
 }
 
 void CTClient::FinishTClientInfo()
 {
 	json_value *pJson = m_pTClientInfoTask->ResultJson();
 	if(!pJson)
-		return;
-	const json_value &Json = *pJson;
-	const json_value &CurrentVersion = Json["version"];
-
-	if(CurrentVersion.type == json_string)
 	{
-		char aNewVersionStr[64];
-		str_copy(aNewVersionStr, CurrentVersion);
-		char aCurVersionStr[64];
-		str_copy(aCurVersionStr, TCLIENT_VERSION);
-		if(ToTCVersion(aNewVersionStr) > ToTCVersion(aCurVersionStr))
+		m_FetchedTClientInfo = true;
+		return;
+	}
+
+	const char *pVersion = json_string_get(json_object_get(pJson, "tag_name"));
+	if(!pVersion)
+		pVersion = json_string_get(json_object_get(pJson, "name"));
+
+	if(pVersion)
+	{
+		char aDisplayVersion[64];
+		MaExtractDisplayVersion(pVersion, aDisplayVersion, sizeof(aDisplayVersion));
+		if(MaCompareVersionStrings(pVersion, CLIENT_RELEASE_VERSION) > 0)
 		{
-			str_copy(m_aVersionStr, CurrentVersion);
+			str_copy(m_aVersionStr, aDisplayVersion[0] ? aDisplayVersion : pVersion, sizeof(m_aVersionStr));
 		}
 		else
 		{
 			m_aVersionStr[0] = '0';
 			m_aVersionStr[1] = '\0';
 		}
-		m_FetchedTClientInfo = true;
 	}
+	m_FetchedTClientInfo = true;
 
 	json_value_free(pJson);
 }
-
 void CTClient::SetForcedAspect()
 {
 	if(!m_pGraphics)

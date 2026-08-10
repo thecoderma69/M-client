@@ -146,10 +146,12 @@ public:
 	int Sizeof() const override { return sizeof(*this); }
 
 	CUIRect GetKeystrokesKeyboardHudEditorRect(float Width, float Height) const;
+	CUIRect GetKeystrokesSpaceHudEditorRect(float Width, float Height) const;
 	CUIRect GetKeystrokesMouseHudEditorRect(float Width, float Height) const;
 	CUIRect GetScoreHudEditorRect(float Width, float Height) const;
 	void RenderScoreHudPreview();
 	void RenderKeystrokesKeyboardPreview();
+	void RenderKeystrokesSpacePreview();
 	void RenderKeystrokesMousePreview();
 	CUIRect GetSpectatorCountHudEditorRect(float Width, float Height);
 	void RenderSpectatorCountPreview();

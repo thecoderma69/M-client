@@ -1,6 +1,7 @@
 #include "nameplates.h"
 
 #include <base/str.h>
+#include <base/system.h>
 
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
@@ -53,6 +54,174 @@ public:
 	float m_FontSizeHookStrongWeak;
 };
 
+struct SMaNameEffectSettings
+{
+	bool m_Active = false;
+	int m_Style = 0;
+	unsigned m_Color1 = 65425;
+	unsigned m_Color2 = 41131;
+	int m_Glow = 70;
+	bool m_Moving = false;
+};
+
+static void MaNameEffectFillGlobal(SMaNameEffectSettings &Settings)
+{
+	Settings.m_Active = true;
+	Settings.m_Style = std::clamp(g_Config.m_MaNameEffectsStyle, 0, 3);
+	Settings.m_Color1 = g_Config.m_MaNameEffectsColor1;
+	Settings.m_Color2 = g_Config.m_MaNameEffectsColor2;
+	Settings.m_Glow = std::clamp(g_Config.m_MaNameEffectsGlow, 0, 100);
+	Settings.m_Moving = g_Config.m_MaNameEffectsMoving != 0;
+}
+
+static void MaNameEffectFillOwn(SMaNameEffectSettings &Settings)
+{
+	Settings.m_Active = true;
+	Settings.m_Style = std::clamp(g_Config.m_MaNameEffectsOwnStyle, 0, 3);
+	Settings.m_Color1 = g_Config.m_MaNameEffectsOwnColor1;
+	Settings.m_Color2 = g_Config.m_MaNameEffectsOwnColor2;
+	Settings.m_Glow = std::clamp(g_Config.m_MaNameEffectsOwnGlow, 0, 100);
+	Settings.m_Moving = g_Config.m_MaNameEffectsOwnMoving != 0;
+}
+
+static void MaNameEffectCopyTrimmedField(const char *pStart, const char *pEnd, char *pDst, int DstSize)
+{
+	while(pStart < pEnd && (*pStart == ' ' || *pStart == '\t'))
+		++pStart;
+	while(pEnd > pStart && (*(pEnd - 1) == ' ' || *(pEnd - 1) == '\t'))
+		--pEnd;
+
+	const int CopyLen = minimum<int>((int)(pEnd - pStart), DstSize - 1);
+	for(int i = 0; i < CopyLen; ++i)
+		pDst[i] = pStart[i];
+	pDst[CopyLen] = '\0';
+}
+
+static unsigned MaNameEffectParseColor(const char *pText, unsigned DefaultColor)
+{
+	if(!pText || pText[0] == '\0')
+		return DefaultColor;
+	const int64_t Value = str_toint64_base(pText, 10);
+	return Value < 0 ? DefaultColor : (unsigned)Value;
+}
+
+static bool MaNameEffectNameListContains(const char *pList, const char *pName)
+{
+	const char *pCursor = pList;
+	while(*pCursor)
+	{
+		while(*pCursor == ';' || *pCursor == ',' || *pCursor == '|' || *pCursor == ' ' || *pCursor == '\t' || *pCursor == '\n' || *pCursor == '\r')
+			++pCursor;
+
+		const char *pStart = pCursor;
+		while(*pCursor && *pCursor != ';' && *pCursor != ',' && *pCursor != '|' && *pCursor != '\n' && *pCursor != '\r')
+			++pCursor;
+
+		char aToken[MAX_NAME_LENGTH];
+		MaNameEffectCopyTrimmedField(pStart, pCursor, aToken, sizeof(aToken));
+		if(aToken[0] != '\0' && str_comp_nocase(aToken, pName) == 0)
+			return true;
+	}
+	return false;
+}
+
+static bool MaNameEffectParseEntryRecord(const char *pStart, const char *pEnd, const char *pName, SMaNameEffectSettings &Settings)
+{
+	char aaFields[6][MAX_NAME_LENGTH] = {{0}};
+	int Field = 0;
+	const char *pFieldStart = pStart;
+	for(const char *pCursor = pStart; pCursor <= pEnd && Field < 6; ++pCursor)
+	{
+		if(pCursor == pEnd || *pCursor == '|')
+		{
+			MaNameEffectCopyTrimmedField(pFieldStart, pCursor, aaFields[Field], sizeof(aaFields[Field]));
+			++Field;
+			pFieldStart = pCursor + 1;
+		}
+	}
+
+	if(aaFields[0][0] == '\0' || str_comp_nocase(aaFields[0], pName) != 0)
+		return false;
+
+	Settings.m_Active = true;
+	Settings.m_Style = std::clamp(aaFields[1][0] ? str_toint(aaFields[1]) : g_Config.m_MaNameEffectsStyle, 0, 3);
+	Settings.m_Color1 = MaNameEffectParseColor(aaFields[2], g_Config.m_MaNameEffectsColor1);
+	Settings.m_Color2 = MaNameEffectParseColor(aaFields[3], g_Config.m_MaNameEffectsColor2);
+	Settings.m_Glow = std::clamp(aaFields[4][0] ? str_toint(aaFields[4]) : g_Config.m_MaNameEffectsGlow, 0, 100);
+	Settings.m_Moving = aaFields[5][0] ? str_toint(aaFields[5]) != 0 : g_Config.m_MaNameEffectsMoving != 0;
+	return true;
+}
+
+static bool MaNameEffectFindConfiguredEntry(const char *pName, SMaNameEffectSettings &Settings)
+{
+	const char *pCursor = g_Config.m_MaNameEffectsEntries;
+	while(*pCursor)
+	{
+		while(*pCursor == ';' || *pCursor == '\n' || *pCursor == '\r')
+			++pCursor;
+		const char *pStart = pCursor;
+		while(*pCursor && *pCursor != ';' && *pCursor != '\n' && *pCursor != '\r')
+			++pCursor;
+		if(pCursor > pStart && MaNameEffectParseEntryRecord(pStart, pCursor, pName, Settings))
+			return true;
+	}
+	return false;
+}
+
+static bool MaNameEffectApplies(CGameClient &This, const CNamePlateData &Data, SMaNameEffectSettings &Settings)
+{
+	if(!g_Config.m_MaNameEffects || !Data.m_ShowName || Data.m_aName[0] == '\0')
+		return false;
+	if(g_Config.m_MaNameEffectsOwn && Data.m_Local)
+	{
+		MaNameEffectFillOwn(Settings);
+		return true;
+	}
+	if(MaNameEffectFindConfiguredEntry(Data.m_aName, Settings))
+		return true;
+
+	return false;
+}
+
+static ColorRGBA MaNameEffectConfigColor(unsigned ConfigColor, float Alpha)
+{
+	ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(ConfigColor, true));
+	Color.a = std::clamp(Color.a, 0.25f, 1.0f) * Alpha;
+	return Color;
+}
+
+static ColorRGBA MaNameEffectMixColors(ColorRGBA A, ColorRGBA B, float Amount)
+{
+	Amount = std::clamp(Amount, 0.0f, 1.0f);
+	return ColorRGBA(
+		A.r + (B.r - A.r) * Amount,
+		A.g + (B.g - A.g) * Amount,
+		A.b + (B.b - A.b) * Amount,
+		A.a + (B.a - A.a) * Amount);
+}
+
+static ColorRGBA MaNameEffectLetterColor(int LetterIndex, float Alpha, const SMaNameEffectSettings &Settings, int MotionTick)
+{
+	const int Style = std::clamp(Settings.m_Style, 0, 3);
+	if(Style == 0)
+	{
+		const int HueOffset = Settings.m_Moving ? MotionTick * 8 : 0;
+		const float Hue = (float)(((LetterIndex * 89 + HueOffset) % 360 + 360) % 360) / 360.0f;
+		ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(Hue, 1.0f, 0.62f));
+		Color.a = Alpha;
+		return Color;
+	}
+
+	ColorRGBA Primary = MaNameEffectConfigColor(Settings.m_Color1, Alpha);
+	ColorRGBA Accent = MaNameEffectConfigColor(Settings.m_Color2, Alpha);
+	if(Settings.m_Moving)
+	{
+		const int Phase = (LetterIndex * 37 + MotionTick * 9) % 120;
+		const float Mix = Phase < 60 ? Phase / 60.0f : (120 - Phase) / 60.0f;
+		return MaNameEffectMixColors(Primary, Accent, Mix);
+	}
+	return Primary;
+}
 // Part Types
 
 static constexpr float DEFAULT_PADDING = 5.0f;
@@ -345,6 +514,13 @@ class CNamePlatePartName : public CNamePlatePartText
 private:
 	char m_aText[std::max<size_t>(MAX_NAME_LENGTH, protocol7::MAX_NAME_ARRAY_SIZE)] = "";
 	float m_FontSize = -INFINITY;
+	bool m_EffectActive = false;
+	int m_EffectStyle = -1;
+	unsigned m_EffectColor1 = 0;
+	unsigned m_EffectColor2 = 0;
+	int m_EffectGlow = 0;
+	bool m_EffectMoving = false;
+	int m_EffectMotionTick = 0;
 
 protected:
 	bool UpdateNeeded(CGameClient &This, const CNamePlateData &Data) override
@@ -352,27 +528,114 @@ protected:
 		m_Visible = Data.m_ShowName;
 		if(!m_Visible)
 			return false;
-		m_Color = Data.m_Color;
-		// TClient
+
+		ColorRGBA BaseColor = Data.m_Color;
 		if(g_Config.m_TcWarList)
 		{
 			if(This.m_WarList.GetWarData(Data.m_ClientId).m_WarName)
-				m_Color = This.m_WarList.GetNameplateColor(Data.m_ClientId).WithAlpha(Data.m_Color.a);
+				BaseColor = This.m_WarList.GetNameplateColor(Data.m_ClientId).WithAlpha(Data.m_Color.a);
 			else if(This.m_WarList.GetWarData(Data.m_ClientId).m_WarClan)
-				m_Color = This.m_WarList.GetClanColor(Data.m_ClientId).WithAlpha(Data.m_Color.a);
+				BaseColor = This.m_WarList.GetClanColor(Data.m_ClientId).WithAlpha(Data.m_Color.a);
 		}
-		return m_FontSize != Data.m_FontSize || str_comp(m_aText, Data.m_aName) != 0;
+
+		SMaNameEffectSettings EffectSettings;
+		const bool EffectActive = MaNameEffectApplies(This, Data, EffectSettings);
+		const int EffectStyle = EffectActive ? std::clamp(EffectSettings.m_Style, 0, 3) : -1;
+		const unsigned EffectColor1 = EffectActive ? EffectSettings.m_Color1 : 0;
+		const unsigned EffectColor2 = EffectActive ? EffectSettings.m_Color2 : 0;
+		const int EffectGlow = EffectActive ? EffectSettings.m_Glow : 0;
+		const bool EffectMoving = EffectActive && EffectSettings.m_Moving;
+		const int EffectMotionTick = EffectMoving ? (int)((time_get() * 12) / time_freq()) : 0;
+		const bool NeedsUpdate = m_FontSize != Data.m_FontSize || str_comp(m_aText, Data.m_aName) != 0 ||
+		                         m_EffectActive != EffectActive || m_EffectStyle != EffectStyle ||
+		                         m_EffectColor1 != EffectColor1 || m_EffectColor2 != EffectColor2 ||
+		                         m_EffectGlow != EffectGlow || m_EffectMoving != EffectMoving ||
+		                         m_EffectMotionTick != EffectMotionTick;
+
+		m_EffectActive = EffectActive;
+		m_EffectStyle = EffectStyle;
+		m_EffectColor1 = EffectColor1;
+		m_EffectColor2 = EffectColor2;
+		m_EffectGlow = EffectGlow;
+		m_EffectMoving = EffectMoving;
+		m_EffectMotionTick = EffectMotionTick;
+		m_Color = EffectActive ? ColorRGBA(1.0f, 1.0f, 1.0f, Data.m_Color.a) : BaseColor;
+		return NeedsUpdate;
 	}
 	void UpdateText(CGameClient &This, const CNamePlateData &Data) override
 	{
 		m_FontSize = Data.m_FontSize;
 		str_copy(m_aText, Data.m_aName, sizeof(m_aText));
+
 		CTextCursor Cursor;
 		Cursor.m_FontSize = m_FontSize;
-		This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, m_aText);
+		if(!m_EffectActive)
+		{
+			This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, m_aText);
+			return;
+		}
+
+		SMaNameEffectSettings EffectSettings;
+		EffectSettings.m_Active = true;
+		EffectSettings.m_Style = m_EffectStyle;
+		EffectSettings.m_Color1 = m_EffectColor1;
+		EffectSettings.m_Color2 = m_EffectColor2;
+		EffectSettings.m_Glow = m_EffectGlow;
+		EffectSettings.m_Moving = m_EffectMoving;
+
+		const bool Stars = m_EffectStyle == 2 || m_EffectStyle == 3;
+		if(Stars)
+		{
+			This.TextRender()->TextColor(MaNameEffectConfigColor(m_EffectColor2, Data.m_Color.a));
+			This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, "\xE2\x9C\xA6 ");
+		}
+
+		const char *pChar = m_aText;
+		int LetterIndex = 0;
+		while(*pChar)
+		{
+			const char *pNext = pChar;
+			str_utf8_decode(&pNext);
+			const int CharLen = maximum<int>(1, (int)(pNext - pChar));
+			This.TextRender()->TextColor(MaNameEffectLetterColor(LetterIndex, Data.m_Color.a, EffectSettings, m_EffectMotionTick));
+			This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, pChar, CharLen);
+			pChar += CharLen;
+			++LetterIndex;
+		}
+
+		if(Stars)
+		{
+			This.TextRender()->TextColor(MaNameEffectConfigColor(m_EffectColor2, Data.m_Color.a));
+			This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, " \xE2\x9C\xA6");
+		}
+		This.TextRender()->TextColor(This.TextRender()->DefaultTextColor());
 	}
 
 public:
+	void Render(CGameClient &This, vec2 Pos) const override
+	{
+		if(!m_TextContainerIndex.Valid())
+			return;
+		if(!m_EffectActive || (m_EffectStyle != 1 && m_EffectStyle != 3))
+		{
+			CNamePlatePartText::Render(This, Pos);
+			return;
+		}
+
+		const float X = Pos.x - Size().x / 2.0f;
+		const float Y = Pos.y - Size().y / 2.0f;
+		const float Glow = std::clamp(m_EffectGlow / 100.0f, 0.0f, 1.0f);
+		const ColorRGBA Accent = MaNameEffectConfigColor(m_EffectColor2, m_Color.a);
+		const ColorRGBA GlowText(Accent.r, Accent.g, Accent.b, 0.18f * Glow * m_Color.a);
+		const ColorRGBA GlowOutline(Accent.r, Accent.g, Accent.b, 0.55f * Glow * m_Color.a);
+		const float Offset = std::clamp(m_FontSize * 0.045f, 0.8f, 2.0f);
+		This.TextRender()->RenderTextContainer(m_TextContainerIndex, GlowText, GlowOutline, X - Offset, Y);
+		This.TextRender()->RenderTextContainer(m_TextContainerIndex, GlowText, GlowOutline, X + Offset, Y);
+		This.TextRender()->RenderTextContainer(m_TextContainerIndex, GlowText, GlowOutline, X, Y - Offset);
+		This.TextRender()->RenderTextContainer(m_TextContainerIndex, GlowText, GlowOutline, X, Y + Offset);
+		This.TextRender()->RenderTextContainer(m_TextContainerIndex, ColorRGBA(1.0f, 1.0f, 1.0f, m_Color.a), ColorRGBA(Accent.r, Accent.g, Accent.b, 0.7f * Glow * m_Color.a), X, Y);
+	}
+
 	CNamePlatePartName(CGameClient &This) :
 		CNamePlatePartText(This) {}
 };
@@ -1133,3 +1396,6 @@ CNamePlates::~CNamePlates()
 {
 	delete m_pData;
 }
+
+
+

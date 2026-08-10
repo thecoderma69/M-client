@@ -1,4 +1,4 @@
-/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
+﻿/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 
 #include "gameclient.h"
@@ -62,6 +62,7 @@
 #include <engine/shared/config.h>
 #include <engine/shared/csv.h>
 #include <engine/shared/protocol_ex.h>
+#include <game/ma_protocol.h>
 #include <engine/sound.h>
 #include <engine/storage.h>
 #include <engine/textrender.h>
@@ -147,6 +148,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Items,
 					      &m_Trails, // TClient
 					      &m_Translate, // TClient
+					      &m_CherryGifs, // MΛ ツ GIF
 					      &m_Ghost,
 					      &m_TClient, // TClient (Must be before chat and players)
 					      &m_Players,
@@ -160,6 +162,7 @@ void CGameClient::OnConsoleInit()
 					      &m_MusicPlayer, // MΛ ツ Music Player
 					      &m_Particles.m_RenderExplosions,
 					      &m_NamePlates,
+					      &m_GifBubbles, // MΛ ツ GIF bubbles
 					      &m_Particles.m_RenderExtra,
 					      &m_Particles.m_RenderGeneral,
 					      &m_FreezeBars,
@@ -172,6 +175,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Emoticon,
 					      &m_BindChat, // TClient
 					      &m_BindWheel, // TClient
+						      &m_GifWheel, // MΛ ツ GIF wheel
 					      &m_WarList, // TClient
 					      &m_KeystrokeHud, // TClient
 					      &m_StatusBar, // TClient
@@ -203,6 +207,7 @@ void CGameClient::OnConsoleInit()
 						  &m_Motd, // for pressing esc to remove it
 						  &m_Spectator,
 						  &m_BindWheel, // TClient
+						      &m_GifWheel, // MΛ ツ GIF wheel
 						  &m_Emoticon,
 						  &m_ImportantAlert,
 						  &m_Menus,
@@ -1881,6 +1886,7 @@ void CGameClient::OnNewSnapshot()
 					m_aClients[Item.m_Id].m_Afk = pInfo->m_Flags & EXPLAYERFLAG_AFK;
 					m_aClients[Item.m_Id].m_Paused = pInfo->m_Flags & EXPLAYERFLAG_PAUSED;
 					m_aClients[Item.m_Id].m_Spec = pInfo->m_Flags & EXPLAYERFLAG_SPEC;
+					m_aClients[Item.m_Id].m_MaWatchingLocal = (pInfo->m_Flags & MA_EXPLAYERFLAG_WATCHING_LOCAL) != 0;
 					m_aClients[Item.m_Id].m_FinishTimeSeconds = pInfo->m_FinishTimeSeconds;
 					m_aClients[Item.m_Id].m_FinishTimeMillis = pInfo->m_FinishTimeMillis;
 
@@ -2340,7 +2346,7 @@ void CGameClient::OnNewSnapshot()
 		m_aShowOthers[g_Config.m_ClDummy] = g_Config.m_ClShowOthers;
 	}
 
-	const int SpectatorCountEnabled = g_Config.m_MaEnabled && g_Config.m_MaSpectatorPanel;
+	const int SpectatorCountEnabled = g_Config.m_ClShowhudSpectatorCount || g_Config.m_MaSpectatorPanel;
 	if(m_aEnableSpectatorCount[0] == -1 || m_aEnableSpectatorCount[0] != SpectatorCountEnabled)
 	{
 		CNetMsg_Cl_EnableSpectatorCount Msg;
@@ -3696,6 +3702,7 @@ void CGameClient::CClientData::Reset()
 	m_Afk = false;
 	m_Paused = false;
 	m_Spec = false;
+	m_MaWatchingLocal = false;
 
 	std::fill(std::begin(m_aSwitchStates), std::end(m_aSwitchStates), 0);
 

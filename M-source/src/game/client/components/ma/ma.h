@@ -44,6 +44,12 @@ class CMa : public CComponent
 	CUIRect GetSpectatorPanelRect(float Width, float Height, bool ForcePreview) const;
 	void RenderMusicVideoEffect(bool ForcePreview);
 	void RenderSpectatorPanel(bool ForcePreview);
+	void ResetTeamStats();
+	void FinishTeamStatsRun(int FinishTick);
+	void UpdateTeamStats();
+	int BuildTeamStatsPanelLines(bool ForcePreview, char aaLines[MAX_CLIENTS + 8][MAX_NAME_LENGTH + 96], bool aHighlight[MAX_CLIENTS + 8]) const;
+	CUIRect GetTeamStatsPanelRect(float Width, float Height, bool ForcePreview) const;
+	void RenderTeamStatsPanel(bool ForcePreview);
 
 	class IEngineGraphics *m_pGraphics = nullptr;
 
@@ -82,6 +88,31 @@ class CMa : public CComponent
 	char m_aMusicVideoCenterImageLoadedPath[IO_MAX_PATH_LENGTH] = "";
 	char m_aMusicVideoCenterImageStatus[128] = "No image.";
 
+	struct STeamStatsPlayer
+	{
+		bool m_Active = false;
+		bool m_WasAlive = false;
+		bool m_WasFrozen = false;
+		int m_Team = -1;
+		int m_AliveStartTick = 0;
+		int m_BestAliveTicks = 0;
+		int m_Saves = 0;
+		int m_LastHookedBy = -1;
+		int m_LastHookedTick = 0;
+		int m_LastHammerBy = -1;
+		int m_LastHammerTick = 0;
+		int m_LastAttackTick = 0;
+		int m_LastRescueTick = 0;
+	};
+	STeamStatsPlayer m_aTeamStats[MAX_CLIENTS];
+	int m_TeamStatsLastTick = -1;
+	int m_TeamStatsLastLocalTeam = -999;
+	int m_TeamStatsRaceStartTick = -1;
+	int m_TeamStatsFinishedRaceStartTick = -1;
+	int m_TeamStatsFinishTick = -1;
+	bool m_TeamStatsRunActive = false;
+	bool m_TeamStatsRunFinished = false;
+
 public:
 	CMa();
 	int Sizeof() const override { return sizeof(*this); }
@@ -90,6 +121,7 @@ public:
 	void OnRender() override;
 	void OnShutdown() override;
 	void OnNewSnapshot() override;
+	void OnMessage(int MsgType, void *pRawMsg) override;
 	bool OnInput(const IInput::CEvent &Event) override;
 	void OnReset() override;
 
@@ -99,6 +131,8 @@ public:
 	void RenderMusicVideoEffectHudEditor(bool ForcePreview);
 	CUIRect GetSpectatorPanelHudEditorRect(bool ForcePreview) const;
 	void RenderSpectatorPanelHudEditor(bool ForcePreview);
+	CUIRect GetTeamStatsPanelHudEditorRect(bool ForcePreview) const;
+	void RenderTeamStatsPanelHudEditor(bool ForcePreview);
 	void RenderMusicVideoEffectBackground();
 	void RestartStartupMusic();
 	void StopStartupMusic();

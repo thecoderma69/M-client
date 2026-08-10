@@ -62,7 +62,7 @@ namespace
 
 	void DrawKeystrokeHudModel(IGraphics *pGraphics, float X, float Y, float W, float H, ColorRGBA Color, int Style, float Rounding, float Scale)
 	{
-		const int SafeStyle = std::clamp(Style, 0, 3);
+		const int SafeStyle = std::clamp(Style, 0, 4) == 4 ? 0 : std::clamp(Style, 0, 3);
 		const float Thin = std::max(1.0f, 1.35f * Scale);
 		const float Glow = std::max(2.0f, 3.0f * Scale);
 
@@ -183,6 +183,182 @@ namespace
 
 		State.m_ShowHud = ForcePreview || (g_Config.m_TcShowFrozenHud > 0 && !pGameClient->m_Scoreboard.IsActive() && !(State.m_LocalTeamId == 0 && g_Config.m_TcFrozenHudTeamOnly));
 		return State;
+	}
+
+	struct SMaHudNameEffectSettings
+	{
+		int m_Style = 0;
+		unsigned m_Color1 = 65425;
+		unsigned m_Color2 = 41131;
+		int m_Glow = 70;
+		bool m_Moving = false;
+	};
+
+	void MaHudNameEffectFillOwn(SMaHudNameEffectSettings &Settings)
+	{
+		Settings.m_Style = std::clamp(g_Config.m_MaNameEffectsOwnStyle, 0, 3);
+		Settings.m_Color1 = g_Config.m_MaNameEffectsOwnColor1;
+		Settings.m_Color2 = g_Config.m_MaNameEffectsOwnColor2;
+		Settings.m_Glow = std::clamp(g_Config.m_MaNameEffectsOwnGlow, 0, 100);
+		Settings.m_Moving = g_Config.m_MaNameEffectsOwnMoving != 0;
+	}
+
+	void MaHudNameEffectCopyTrimmedField(const char *pStart, const char *pEnd, char *pDst, int DstSize)
+	{
+		while(pStart < pEnd && (*pStart == ' ' || *pStart == '\t'))
+			++pStart;
+		while(pEnd > pStart && (*(pEnd - 1) == ' ' || *(pEnd - 1) == '\t'))
+			--pEnd;
+
+		const int CopyLen = minimum<int>((int)(pEnd - pStart), DstSize - 1);
+		for(int i = 0; i < CopyLen; ++i)
+			pDst[i] = pStart[i];
+		pDst[CopyLen] = '\0';
+	}
+
+	unsigned MaHudNameEffectParseColor(const char *pText, unsigned DefaultColor)
+	{
+		if(!pText || pText[0] == '\0')
+			return DefaultColor;
+		const int64_t Value = str_toint64_base(pText, 10);
+		return Value < 0 ? DefaultColor : (unsigned)Value;
+	}
+
+	bool MaHudNameEffectParseEntryRecord(const char *pStart, const char *pEnd, const char *pName, SMaHudNameEffectSettings &Settings)
+	{
+		char aaFields[6][MAX_NAME_LENGTH] = {{0}};
+		int Field = 0;
+		const char *pFieldStart = pStart;
+		for(const char *pCursor = pStart; pCursor <= pEnd && Field < 6; ++pCursor)
+		{
+			if(pCursor == pEnd || *pCursor == '|')
+			{
+				MaHudNameEffectCopyTrimmedField(pFieldStart, pCursor, aaFields[Field], sizeof(aaFields[Field]));
+				++Field;
+				pFieldStart = pCursor + 1;
+			}
+		}
+
+		if(aaFields[0][0] == '\0' || str_comp_nocase(aaFields[0], pName) != 0)
+			return false;
+
+		Settings.m_Style = std::clamp(aaFields[1][0] ? str_toint(aaFields[1]) : g_Config.m_MaNameEffectsStyle, 0, 3);
+		Settings.m_Color1 = MaHudNameEffectParseColor(aaFields[2], g_Config.m_MaNameEffectsColor1);
+		Settings.m_Color2 = MaHudNameEffectParseColor(aaFields[3], g_Config.m_MaNameEffectsColor2);
+		Settings.m_Glow = std::clamp(aaFields[4][0] ? str_toint(aaFields[4]) : g_Config.m_MaNameEffectsGlow, 0, 100);
+		Settings.m_Moving = aaFields[5][0] ? str_toint(aaFields[5]) != 0 : g_Config.m_MaNameEffectsMoving != 0;
+		return true;
+	}
+
+	bool MaHudNameEffectFindConfiguredEntry(const char *pName, SMaHudNameEffectSettings &Settings)
+	{
+		const char *pCursor = g_Config.m_MaNameEffectsEntries;
+		while(*pCursor)
+		{
+			while(*pCursor == ';' || *pCursor == '\n' || *pCursor == '\r')
+				++pCursor;
+			const char *pStart = pCursor;
+			while(*pCursor && *pCursor != ';' && *pCursor != '\n' && *pCursor != '\r')
+				++pCursor;
+			if(pCursor > pStart && MaHudNameEffectParseEntryRecord(pStart, pCursor, pName, Settings))
+				return true;
+		}
+		return false;
+	}
+
+	bool MaHudNameEffectApplies(CGameClient *pGameClient, int ClientId, const char *pName, SMaHudNameEffectSettings &Settings)
+	{
+		if(!g_Config.m_MaNameEffects || !pName || pName[0] == '\0')
+			return false;
+		const bool Local = ClientId >= 0 && (pGameClient->m_aLocalIds[0] == ClientId || pGameClient->m_aLocalIds[1] == ClientId);
+		if(g_Config.m_MaNameEffectsOwn && Local)
+		{
+			MaHudNameEffectFillOwn(Settings);
+			return true;
+		}
+		return MaHudNameEffectFindConfiguredEntry(pName, Settings);
+	}
+
+	ColorRGBA MaHudNameEffectConfigColor(unsigned ConfigColor, float Alpha)
+	{
+		ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(ConfigColor, true));
+		Color.a = std::clamp(Color.a, 0.25f, 1.0f) * Alpha;
+		return Color;
+	}
+
+	ColorRGBA MaHudNameEffectMixColors(ColorRGBA A, ColorRGBA B, float Amount)
+	{
+		Amount = std::clamp(Amount, 0.0f, 1.0f);
+		return ColorRGBA(A.r + (B.r - A.r) * Amount, A.g + (B.g - A.g) * Amount, A.b + (B.b - A.b) * Amount, A.a + (B.a - A.a) * Amount);
+	}
+
+	ColorRGBA MaHudNameEffectLetterColor(int LetterIndex, float Alpha, const SMaHudNameEffectSettings &Settings, int MotionTick)
+	{
+		const int Style = std::clamp(Settings.m_Style, 0, 3);
+		if(Style == 0)
+		{
+			const int HueOffset = Settings.m_Moving ? MotionTick * 8 : 0;
+			const float Hue = (float)(((LetterIndex * 89 + HueOffset) % 360 + 360) % 360) / 360.0f;
+			ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(Hue, 1.0f, 0.62f));
+			Color.a = Alpha;
+			return Color;
+		}
+
+		ColorRGBA Primary = MaHudNameEffectConfigColor(Settings.m_Color1, Alpha);
+		ColorRGBA Accent = MaHudNameEffectConfigColor(Settings.m_Color2, Alpha);
+		if(Settings.m_Moving)
+		{
+			const int Phase = (LetterIndex * 37 + MotionTick * 9) % 120;
+			const float Mix = Phase < 60 ? Phase / 60.0f : (120 - Phase) / 60.0f;
+			return MaHudNameEffectMixColors(Primary, Accent, Mix);
+		}
+		return Primary;
+	}
+
+	float MaHudNameEffectTextWidth(ITextRender *pTextRender, float FontSize, const char *pName, const SMaHudNameEffectSettings &Settings)
+	{
+		float Width = pTextRender->TextWidth(FontSize, pName, -1, -1.0f);
+		const int Style = std::clamp(Settings.m_Style, 0, 3);
+		if(Style == 2 || Style == 3)
+			Width += pTextRender->TextWidth(FontSize, "\xE2\x9C\xA6  \xE2\x9C\xA6", -1, -1.0f);
+		return Width;
+	}
+
+	void MaHudRenderNameEffect(ITextRender *pTextRender, float X, float Y, float FontSize, const char *pName, const SMaHudNameEffectSettings &Settings, float Alpha)
+	{
+		const int Style = std::clamp(Settings.m_Style, 0, 3);
+		const bool Stars = Style == 2 || Style == 3;
+		const int MotionTick = Settings.m_Moving ? (int)((time_get() * 12) / time_freq()) : 0;
+
+		CTextCursor Cursor;
+		Cursor.SetPosition(vec2(X, Y));
+		Cursor.m_FontSize = FontSize;
+
+		if(Stars)
+		{
+			pTextRender->TextColor(MaHudNameEffectConfigColor(Settings.m_Color2, Alpha));
+			pTextRender->TextEx(&Cursor, "\xE2\x9C\xA6 ");
+		}
+
+		const char *pChar = pName;
+		int LetterIndex = 0;
+		while(*pChar)
+		{
+			const char *pNext = pChar;
+			str_utf8_decode(&pNext);
+			const int CharLen = maximum<int>(1, (int)(pNext - pChar));
+			pTextRender->TextColor(MaHudNameEffectLetterColor(LetterIndex, Alpha, Settings, MotionTick));
+			pTextRender->TextEx(&Cursor, pChar, CharLen);
+			pChar += CharLen;
+			++LetterIndex;
+		}
+
+		if(Stars)
+		{
+			pTextRender->TextColor(MaHudNameEffectConfigColor(Settings.m_Color2, Alpha));
+			pTextRender->TextEx(&Cursor, " \xE2\x9C\xA6");
+		}
+		pTextRender->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 	}
 } // namespace
 
@@ -430,8 +606,15 @@ void CHud::RenderScoreHud(bool ForcePreview)
 				{
 					const int Id = aFlagCarrier[t] % MAX_CLIENTS;
 					const char *pName = GameClient()->m_aClients[Id].m_aName;
-					const float NameWidth = TextRender()->TextWidth(NameTextSize, pName, -1, -1.0f);
-					TextRender()->Text(minimum(RightEdge - NameWidth - 1.0f * Scale, RightEdge - ScoreWidthMax - ImageSize - 2.0f * Split), RowY + 20.0f * Scale - 2.0f * Scale, NameTextSize, pName, -1.0f);
+					SMaHudNameEffectSettings NameEffectSettings;
+					const bool NameEffectActive = MaHudNameEffectApplies(GameClient(), Id, pName, NameEffectSettings);
+					const float NameWidth = NameEffectActive ? MaHudNameEffectTextWidth(TextRender(), NameTextSize, pName, NameEffectSettings) : TextRender()->TextWidth(NameTextSize, pName, -1, -1.0f);
+					const float NameX = minimum(RightEdge - NameWidth - 1.0f * Scale, RightEdge - ScoreWidthMax - ImageSize - 2.0f * Split);
+					const float NameY = RowY + 20.0f * Scale - 2.0f * Scale;
+					if(NameEffectActive)
+						MaHudRenderNameEffect(TextRender(), NameX, NameY, NameTextSize, pName, NameEffectSettings, 1.0f);
+					else
+						TextRender()->Text(NameX, NameY, NameTextSize, pName, -1.0f);
 
 					CTeeRenderInfo TeeInfo = GameClient()->m_aClients[Id].m_RenderInfo;
 					TeeInfo.m_Size = ScoreSingleBoxHeight;
@@ -539,8 +722,15 @@ void CHud::RenderScoreHud(bool ForcePreview)
 			if(Id >= 0 && Id < MAX_CLIENTS)
 			{
 				const char *pName = GameClient()->m_aClients[Id].m_aName;
-				const float NameWidth = TextRender()->TextWidth(NameTextSize, pName, -1, -1.0f);
-				TextRender()->Text(minimum(RightEdge - NameWidth - 1.0f * Scale, RightEdge - ScoreWidthMax - ImageSize - 2.0f * Split - PosSize), RowY + 20.0f * Scale - 2.0f * Scale, NameTextSize, pName, -1.0f);
+				SMaHudNameEffectSettings NameEffectSettings;
+				const bool NameEffectActive = MaHudNameEffectApplies(GameClient(), Id, pName, NameEffectSettings);
+				const float NameWidth = NameEffectActive ? MaHudNameEffectTextWidth(TextRender(), NameTextSize, pName, NameEffectSettings) : TextRender()->TextWidth(NameTextSize, pName, -1, -1.0f);
+				const float NameX = minimum(RightEdge - NameWidth - 1.0f * Scale, RightEdge - ScoreWidthMax - ImageSize - 2.0f * Split - PosSize);
+				const float NameY = RowY + 20.0f * Scale - 2.0f * Scale;
+				if(NameEffectActive)
+					MaHudRenderNameEffect(TextRender(), NameX, NameY, NameTextSize, pName, NameEffectSettings, 1.0f);
+				else
+					TextRender()->Text(NameX, NameY, NameTextSize, pName, -1.0f);
 
 				CTeeRenderInfo TeeInfo = GameClient()->m_aClients[Id].m_RenderInfo;
 				TeeInfo.m_Size = ScoreSingleBoxHeight;
@@ -2712,10 +2902,7 @@ CUIRect CHud::GetKeystrokesKeyboardHudEditorRect(float Width, float Height) cons
 	const float KeyW = 40.0f * Scale * WidthStretch;
 	const float KeyH = 40.0f * Scale * HeightStretch;
 	const float Gap = 6.0f * Scale * WidthStretch;
-	const float VerticalGap = 6.0f * Scale * HeightStretch;
-	const float SpaceH = 22.0f * Scale * HeightStretch;
 	const float KeyTotalW = KeyW * 2.0f + Gap;
-	const float KeyTotalH = KeyH + VerticalGap + SpaceH;
 	float KeyPosX;
 	float KeyPosY;
 	if(HudLayout::HasRuntimeOverride(HudLayout::MODULE_KEYSTROKES_KEYBOARD))
@@ -2728,7 +2915,30 @@ CUIRect CHud::GetKeystrokesKeyboardHudEditorRect(float Width, float Height) cons
 		KeyPosX = Width * (g_Config.m_TcKeystrokeHudPosX / 100.0f);
 		KeyPosY = Height * (g_Config.m_TcKeystrokeHudPosY / 100.0f);
 	}
-	return {KeyPosX, KeyPosY, KeyTotalW, KeyTotalH};
+	return {KeyPosX, KeyPosY, KeyTotalW, KeyH};
+}
+
+CUIRect CHud::GetKeystrokesSpaceHudEditorRect(float Width, float Height) const
+{
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_KEYSTROKES_SPACE, Width, Height);
+	const float Scale = g_Config.m_TcKeystrokeHudSpaceSize / 100.0f;
+	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
+	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
+	const float SpaceW = 86.0f * Scale * WidthStretch;
+	const float SpaceH = 22.0f * Scale * HeightStretch;
+	float SpacePosX;
+	float SpacePosY;
+	if(HudLayout::HasRuntimeOverride(HudLayout::MODULE_KEYSTROKES_SPACE))
+	{
+		SpacePosX = Layout.m_X;
+		SpacePosY = Layout.m_Y;
+	}
+	else
+	{
+		SpacePosX = Width * (g_Config.m_TcKeystrokeHudSpacePosX / 100.0f);
+		SpacePosY = Height * (g_Config.m_TcKeystrokeHudSpacePosY / 100.0f);
+	}
+	return {SpacePosX, SpacePosY, SpaceW, SpaceH};
 }
 
 CUIRect CHud::GetKeystrokesMouseHudEditorRect(float Width, float Height) const
@@ -2793,11 +3003,21 @@ void CHud::RenderKeystrokesKeyboardPreview()
 	float KeyW = 40.0f * Scale * WidthStretch;
 	float KeyH = 40.0f * Scale * HeightStretch;
 	float Gap = 6.0f * Scale * WidthStretch;
-	float VerticalGap = 6.0f * Scale * HeightStretch;
-	float SpaceH = 22.0f * Scale * HeightStretch;
 	DrawKeystrokeHudModel(Graphics(), Rect.x, Rect.y, KeyW, KeyH, C, g_Config.m_TcKeystrokeHudStyle, 4.0f * Scale, Scale);
 	DrawKeystrokeHudModel(Graphics(), Rect.x + KeyW + Gap, Rect.y, KeyW, KeyH, C, g_Config.m_TcKeystrokeHudStyle, 4.0f * Scale, Scale);
-	DrawKeystrokeHudModel(Graphics(), Rect.x, Rect.y + KeyH + VerticalGap, Rect.w, SpaceH, C, g_Config.m_TcKeystrokeHudStyle, 4.0f * Scale, Scale);
+}
+
+void CHud::RenderKeystrokesSpacePreview()
+{
+	if(!g_Config.m_TcKeystrokeHud || !g_Config.m_TcKeystrokeHudShowSpace)
+		return;
+	float ScreenW = 300.0f * Graphics()->ScreenAspect();
+	float ScreenH = 300.0f;
+	CUIRect Rect = GetKeystrokesSpaceHudEditorRect(ScreenW, ScreenH);
+	Graphics()->MapScreen(0.0f, 0.0f, ScreenW, ScreenH);
+	float Scale = g_Config.m_TcKeystrokeHudSpaceSize / 100.0f;
+	ColorRGBA C = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_TcKeystrokeHudSpaceColorUnpressed)).WithAlpha(g_Config.m_TcKeystrokeHudSpaceAlpha / 100.0f);
+	DrawKeystrokeHudModel(Graphics(), Rect.x, Rect.y, Rect.w, Rect.h, C, g_Config.m_TcKeystrokeHudSpaceStyle, 4.0f * Scale, Scale);
 }
 
 void CHud::RenderKeystrokesMousePreview()
@@ -2812,14 +3032,13 @@ void CHud::RenderKeystrokesMousePreview()
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_KEYSTROKES_MOUSE, ScreenW, ScreenH);
 	const float WidthStretch = std::clamp(Layout.m_WidthScale / 100.0f, 0.20f, 4.0f);
 	const float HeightStretch = std::clamp(Layout.m_HeightScale / 100.0f, 0.20f, 4.0f);
-	ColorRGBA C = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_TcKeystrokeHudColorUnpressed)).WithAlpha(g_Config.m_TcKeystrokeHudAlpha / 100.0f);
+	ColorRGBA C = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_TcKeystrokeHudMouseColorUnpressed)).WithAlpha(g_Config.m_TcKeystrokeHudMouseAlpha / 100.0f);
 	float MouseW = 40.0f * Scale * WidthStretch;
 	float MouseH = 40.0f * Scale * HeightStretch;
 	float MouseGap = 6.0f * Scale * WidthStretch;
 	DrawKeystrokeHudModel(Graphics(), Rect.x, Rect.y, MouseW, MouseH, C, g_Config.m_TcKeystrokeHudMouseStyle, 4.0f * Scale, Scale);
 	DrawKeystrokeHudModel(Graphics(), Rect.x + MouseW + MouseGap, Rect.y, MouseW, MouseH, C, g_Config.m_TcKeystrokeHudMouseStyle, 4.0f * Scale, Scale);
 }
-
 CUIRect CHud::GetSpectatorCountHudEditorRect(float Width, float Height)
 {
 	m_Width = Width;

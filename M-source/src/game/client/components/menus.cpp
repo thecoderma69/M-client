@@ -565,7 +565,7 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 		bool GotNewsOrUpdate = false;
 
 #if defined(CONF_AUTOUPDATE)
-		int State = Updater()->GetCurrentState();
+		int State = Kernel()->RequestInterface<IUpdater>()->GetCurrentState();
 		bool NeedUpdate = str_comp(Client()->LatestVersion(), "0");
 		if(State == IUpdater::CLEAN && NeedUpdate)
 		{
@@ -1465,7 +1465,10 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 			if(m_Popup == POPUP_RESTART)
 			{
 				m_Popup = POPUP_NONE;
-				Client()->Restart();
+				if(m_NeedRestartUpdate)
+					Kernel()->RequestInterface<IUpdater>()->ApplyUpdateAndRestart();
+				else
+					Client()->Restart();
 			}
 			else
 			{
