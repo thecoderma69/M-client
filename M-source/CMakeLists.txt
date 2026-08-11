@@ -2661,6 +2661,7 @@ if(CLIENT)
     components/ma/ma.h
     components/ma/music_player.cpp
     components/ma/music_player.h
+    components/ma/render_compat.h
     components/ma/stream_chat.cpp
     components/ma/stream_chat.h
     components/ma/hud_editor.cpp

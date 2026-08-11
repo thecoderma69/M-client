@@ -35,6 +35,8 @@
 #include <game/client/components/tclient/colored_parts.h>
 #include <game/client/gameclient.h>
 #include <game/client/components/hud_layout.h>
+#include <game/client/components/ma_name_effects.h>
+#include <game/client/components/ma/render_compat.h>
 #include <game/client/ui_scrollregion.h>
 #include <game/localization.h>
 
@@ -58,6 +60,183 @@ static constexpr float CHAT_MEDIA_MIN_PREVIEW_SIDE = 28.0f;
 static constexpr float CHAT_MEDIA_COMPACT_EXPANDED_HEIGHT = 150.0f;
 static constexpr bool CHAT_MEDIA_ANIMATE_VIDEOS = true;
 
+
+struct SMaChatNameEffectSettings
+{
+	bool m_Active = false;
+	int m_Style = 0;
+	unsigned m_Color1 = 65425;
+	unsigned m_Color2 = 41131;
+	int m_Glow = 70;
+	bool m_Moving = false;
+	bool m_Stars = false;
+};
+
+static void MaChatNameEffectFillOwn(SMaChatNameEffectSettings &Settings)
+{
+	Settings.m_Active = true;
+	Settings.m_Style = std::clamp(g_Config.m_MaNameEffectsOwnStyle, 0, MaNameEffects::STYLE_MAX);
+	Settings.m_Color1 = g_Config.m_MaNameEffectsOwnColor1;
+	Settings.m_Color2 = g_Config.m_MaNameEffectsOwnColor2;
+	Settings.m_Glow = std::clamp(g_Config.m_MaNameEffectsOwnGlow, 0, 100);
+	Settings.m_Moving = g_Config.m_MaNameEffectsOwnMoving != 0;
+	Settings.m_Stars = g_Config.m_MaNameEffectsOwnStars != 0;
+}
+
+static void MaChatNameEffectCopyTrimmedField(const char *pStart, const char *pEnd, char *pDst, int DstSize)
+{
+	while(pStart < pEnd && (*pStart == ' ' || *pStart == '\t'))
+		++pStart;
+	while(pEnd > pStart && (*(pEnd - 1) == ' ' || *(pEnd - 1) == '\t'))
+		--pEnd;
+
+	const int CopyLen = minimum<int>((int)(pEnd - pStart), DstSize - 1);
+	for(int i = 0; i < CopyLen; ++i)
+		pDst[i] = pStart[i];
+	pDst[CopyLen] = '\0';
+}
+
+static unsigned MaChatNameEffectParseColor(const char *pText, unsigned DefaultColor)
+{
+	if(!pText || pText[0] == '\0')
+		return DefaultColor;
+	const int64_t Value = str_toint64_base(pText, 10);
+	return Value < 0 ? DefaultColor : (unsigned)Value;
+}
+
+static bool MaChatNameEffectParseEntryRecord(const char *pStart, const char *pEnd, const char *pName, SMaChatNameEffectSettings &Settings)
+{
+	char aaFields[7][MAX_NAME_LENGTH] = {{0}};
+	int Field = 0;
+	const char *pFieldStart = pStart;
+	for(const char *pCursor = pStart; pCursor <= pEnd && Field < 7; ++pCursor)
+	{
+		if(pCursor == pEnd || *pCursor == '|')
+		{
+			MaChatNameEffectCopyTrimmedField(pFieldStart, pCursor, aaFields[Field], sizeof(aaFields[Field]));
+			++Field;
+			pFieldStart = pCursor + 1;
+		}
+	}
+
+	if(aaFields[0][0] == '\0' || str_comp_nocase(aaFields[0], pName) != 0)
+		return false;
+
+	Settings.m_Active = true;
+	const int RawStyle = aaFields[1][0] ? str_toint(aaFields[1]) : g_Config.m_MaNameEffectsStyle;
+	const bool HasStarsField = aaFields[6][0] != '\0';
+	Settings.m_Style = std::clamp(HasStarsField ? RawStyle : MaNameEffects::NormalizeLegacyStyle(RawStyle), 0, MaNameEffects::STYLE_MAX);
+	Settings.m_Color1 = MaChatNameEffectParseColor(aaFields[2], g_Config.m_MaNameEffectsColor1);
+	Settings.m_Color2 = MaChatNameEffectParseColor(aaFields[3], g_Config.m_MaNameEffectsColor2);
+	Settings.m_Glow = std::clamp(aaFields[4][0] ? str_toint(aaFields[4]) : g_Config.m_MaNameEffectsGlow, 0, 100);
+	Settings.m_Moving = aaFields[5][0] ? str_toint(aaFields[5]) != 0 : g_Config.m_MaNameEffectsMoving != 0;
+	Settings.m_Stars = HasStarsField ? str_toint(aaFields[6]) != 0 : (g_Config.m_MaNameEffectsStars != 0 || MaNameEffects::LegacyStyleHasStars(RawStyle));
+	return true;
+}
+
+static bool MaChatNameEffectFindConfiguredEntry(const char *pName, SMaChatNameEffectSettings &Settings)
+{
+	const char *pCursor = g_Config.m_MaNameEffectsEntries;
+	while(*pCursor)
+	{
+		while(*pCursor == ';' || *pCursor == '\n' || *pCursor == '\r')
+			++pCursor;
+		const char *pStart = pCursor;
+		while(*pCursor && *pCursor != ';' && *pCursor != '\n' && *pCursor != '\r')
+			++pCursor;
+		if(pCursor > pStart && MaChatNameEffectParseEntryRecord(pStart, pCursor, pName, Settings))
+			return true;
+	}
+	return false;
+}
+
+static bool MaChatNameEffectApplies(CGameClient *pGameClient, int ClientId, const char *pName, SMaChatNameEffectSettings &Settings)
+{
+	if(!g_Config.m_MaNameEffects || !pName || pName[0] == '\0')
+		return false;
+	const bool Local = pGameClient && ClientId >= 0 && (pGameClient->m_aLocalIds[0] == ClientId || pGameClient->m_aLocalIds[1] == ClientId);
+	if(g_Config.m_MaNameEffectsOwn && Local)
+	{
+		MaChatNameEffectFillOwn(Settings);
+		return true;
+	}
+	return MaChatNameEffectFindConfiguredEntry(pName, Settings);
+}
+
+static float MaChatNameEffectTextWidth(ITextRender *pTextRender, float Size, const char *pName, const SMaChatNameEffectSettings &Settings)
+{
+	const int Style = std::clamp(Settings.m_Style, 0, MaNameEffects::STYLE_MAX);
+	const char *pPrefix = "";
+	const char *pSuffix = "";
+	MaNameEffects::Decorations(Style, &pPrefix, &pSuffix);
+
+	float Width = pTextRender->TextWidth(Size, pName, -1, -1.0f);
+	if(Settings.m_Stars)
+	{
+		Width += pTextRender->TextWidth(Size, "\xE2\x9C\xA6 ", -1, -1.0f);
+		Width += pTextRender->TextWidth(Size, " \xE2\x9C\xA6", -1, -1.0f);
+	}
+	if(pPrefix[0] != '\0')
+		Width += pTextRender->TextWidth(Size, pPrefix, -1, -1.0f);
+	if(pSuffix[0] != '\0')
+		Width += pTextRender->TextWidth(Size, pSuffix, -1, -1.0f);
+	return Width;
+}
+
+static void MaChatNameEffectAdvanceCursor(CTextCursor *pCursor, float Width)
+{
+	pCursor->m_X += Width;
+	pCursor->m_LongestLineWidth = maximum(pCursor->m_LongestLineWidth, pCursor->m_X - pCursor->m_StartX);
+}
+
+static void MaChatRenderNameEffect(ITextRender *pTextRender, CTextCursor *pCursor, const char *pName, const SMaChatNameEffectSettings &Settings, float Alpha)
+{
+	const int Style = std::clamp(Settings.m_Style, 0, MaNameEffects::STYLE_MAX);
+	const int MotionTick = (Settings.m_Moving || MaNameEffects::StyleAnimates(Style)) ? (int)((time_get() * 12) / time_freq()) : 0;
+	const ColorRGBA Accent = MaNameEffects::AccentColor(Style, Alpha, Settings.m_Color1, Settings.m_Color2, MotionTick);
+	const float OutlineAlpha = (0.20f + 0.55f * MaNameEffects::GlowStrength(Style, Settings.m_Glow, MotionTick)) * Alpha;
+	const char *pPrefix = "";
+	const char *pSuffix = "";
+	MaNameEffects::Decorations(Style, &pPrefix, &pSuffix);
+
+	pTextRender->TextOutlineColor(ColorRGBA(Accent.r, Accent.g, Accent.b, OutlineAlpha));
+	if(Settings.m_Stars)
+	{
+		pTextRender->TextColor(Accent);
+		pTextRender->TextEx(pCursor, "\xE2\x9C\xA6 ");
+	}
+	if(pPrefix[0] != '\0')
+	{
+		pTextRender->TextColor(Accent);
+		pTextRender->TextEx(pCursor, pPrefix);
+	}
+
+	const char *pChar = pName;
+	int LetterIndex = 0;
+	while(*pChar)
+	{
+		const char *pNext = pChar;
+		str_utf8_decode(&pNext);
+		const int CharLen = maximum<int>(1, (int)(pNext - pChar));
+		pTextRender->TextColor(MaNameEffects::LetterColor(LetterIndex, Alpha, Style, Settings.m_Color1, Settings.m_Color2, Settings.m_Moving, MotionTick));
+		pTextRender->TextEx(pCursor, pChar, CharLen);
+		pChar += CharLen;
+		++LetterIndex;
+	}
+
+	if(pSuffix[0] != '\0')
+	{
+		pTextRender->TextColor(Accent);
+		pTextRender->TextEx(pCursor, pSuffix);
+	}
+	if(Settings.m_Stars)
+	{
+		pTextRender->TextColor(Accent);
+		pTextRender->TextEx(pCursor, " \xE2\x9C\xA6");
+	}
+	pTextRender->TextColor(pTextRender->DefaultTextColor());
+	pTextRender->TextOutlineColor(pTextRender->DefaultTextOutlineColor());
+}
 static float NormalizeMediaPreviewCoord(float Value, float Start, float Length)
 {
 	if(Length <= 0.0f)
@@ -230,6 +409,8 @@ class CChat::CMediaDecodeJob : public IJob
 	std::vector<unsigned char> m_vData;
 	char m_aContextName[512];
 	SMediaDecodedFrames m_DecodedFrames;
+	SMediaDecodeLimits m_Limits;
+	int m_StaticMaxDimension = CHAT_MEDIA_MAX_DIMENSION;
 	bool m_Success = false;
 
 protected:
@@ -256,16 +437,12 @@ protected:
 			return !m_DecodedFrames.m_vFrames.empty();
 		};
 
-		SMediaDecodeLimits Limits;
-		Limits.m_MaxDimension = CHAT_MEDIA_MAX_DIMENSION;
-		Limits.m_MaxFrames = CHAT_MEDIA_MAX_GIF_FRAMES;
-		Limits.m_MaxTotalBytes = CHAT_MEDIA_MAX_ANIMATED_MEMORY_BYTES;
-		Limits.m_MaxAnimationDurationMs = CHAT_MEDIA_MAX_VIDEO_ANIMATION_MS;
+		SMediaDecodeLimits Limits = m_Limits;
 
 		switch(m_MediaKind)
 		{
 		case EMediaKind::PHOTO:
-			m_Success = MediaDecoder::DecodeStaticImageCpu(m_pGraphics, m_vData.data(), m_vData.size(), m_aContextName, m_DecodedFrames, CHAT_MEDIA_MAX_DIMENSION);
+			m_Success = MediaDecoder::DecodeStaticImageCpu(m_pGraphics, m_vData.data(), m_vData.size(), m_aContextName, m_DecodedFrames, m_StaticMaxDimension);
 			if(!m_Success)
 				m_Success = DecodeSingleFrameFallback();
 			break;
@@ -305,10 +482,12 @@ protected:
 	}
 
 public:
-	CMediaDecodeJob(IGraphics *pGraphics, EMediaKind MediaKind, const unsigned char *pData, size_t DataSize, const char *pContextName) :
+	CMediaDecodeJob(IGraphics *pGraphics, EMediaKind MediaKind, const unsigned char *pData, size_t DataSize, const char *pContextName, const SMediaDecodeLimits &Limits, int StaticMaxDimension) :
 		m_MediaKind(MediaKind),
 		m_pGraphics(pGraphics),
-		m_vData(pData, pData + DataSize)
+		m_vData(pData, pData + DataSize),
+		m_Limits(Limits),
+		m_StaticMaxDimension(StaticMaxDimension)
 	{
 		str_copy(m_aContextName, pContextName ? pContextName : "chat_media", sizeof(m_aContextName));
 		Abortable(true);
@@ -2336,7 +2515,12 @@ bool CChat::StartMediaDecode(CLine &Line, EMediaKind MediaKind, const unsigned c
 	Line.m_MediaHeight = 0;
 	Line.m_MediaAnimationStart = 0;
 
-	Line.m_pMediaDecodeJob = std::make_shared<CMediaDecodeJob>(Graphics(), MediaKind, pData, DataSize, Line.m_aMediaUrl);
+	SMediaDecodeLimits Limits;
+	Limits.m_MaxDimension = MaRenderCompat::ChatMediaMaxDimension(CHAT_MEDIA_MAX_DIMENSION);
+	Limits.m_MaxFrames = MaRenderCompat::ChatMediaMaxFrames(CHAT_MEDIA_MAX_GIF_FRAMES);
+	Limits.m_MaxTotalBytes = MaRenderCompat::ChatMediaMaxAnimatedBytes(CHAT_MEDIA_MAX_ANIMATED_MEMORY_BYTES);
+	Limits.m_MaxAnimationDurationMs = CHAT_MEDIA_MAX_VIDEO_ANIMATION_MS;
+	Line.m_pMediaDecodeJob = std::make_shared<CMediaDecodeJob>(Graphics(), MediaKind, pData, DataSize, Line.m_aMediaUrl, Limits, Limits.m_MaxDimension);
 	Engine()->AddJob(Line.m_pMediaDecodeJob);
 	Line.m_MediaState = EMediaState::DECODING;
 	str_copy(Line.m_aMediaStatus, "Decoding media...", sizeof(Line.m_aMediaStatus));
@@ -2664,15 +2848,16 @@ void CChat::UpdateMediaDownloads()
 	{
 		if(!Line.m_Initialized || !Line.m_OptMediaDecodedFrames.has_value())
 			continue;
-		if(UploadedTexturesThisFrame >= CHAT_MEDIA_MAX_TEXTURE_UPLOADS_PER_FRAME)
+		const int TextureUploadsLimit = MaRenderCompat::ChatMediaTextureUploadsPerFrame(CHAT_MEDIA_MAX_TEXTURE_UPLOADS_PER_FRAME);
+		if(UploadedTexturesThisFrame >= TextureUploadsLimit)
 			break;
 
 		const int64_t ElapsedUs = ((time_get() - UploadStart) * 1000000) / time_freq();
-		const int64_t RemainingUs = CHAT_MEDIA_TEXTURE_UPLOAD_BUDGET_US - ElapsedUs;
+		const int64_t RemainingUs = MaRenderCompat::ChatMediaTextureUploadBudgetUs(CHAT_MEDIA_TEXTURE_UPLOAD_BUDGET_US) - ElapsedUs;
 		if(RemainingUs <= 0)
 			break;
 
-		const int FramesBudget = CHAT_MEDIA_MAX_TEXTURE_UPLOADS_PER_FRAME - UploadedTexturesThisFrame;
+		const int FramesBudget = TextureUploadsLimit - UploadedTexturesThisFrame;
 		int UploadedNow = 0;
 		bool Finished = false;
 		const bool Success = UploadDecodedFramesStep(Line, FramesBudget, RemainingUs, UploadedNow, Finished);
@@ -3842,17 +4027,33 @@ void CChat::OnPrepareLines(float x, float y)
 	static int s_LastMediaPhotos = -1;
 	static int s_LastMediaGifs = -1;
 	static int s_LastMediaMaxWidth = -1;
+	static int s_LastNameEffects = -1;
+	static int s_LastNameEffectsOwn = -1;
+	static int s_LastNameEffectsOwnStyle = -1;
+	static int s_LastNameEffectsOwnStars = -1;
+	static char s_aLastNameEffectsEntries[sizeof(g_Config.m_MaNameEffectsEntries)] = "";
 	const bool MediaConfigChanged =
 		s_LastMediaPreview != g_Config.m_MaChatMediaPreview ||
 		s_LastMediaPhotos != g_Config.m_MaChatMediaPhotos ||
 		s_LastMediaGifs != g_Config.m_MaChatMediaGifs ||
 		s_LastMediaMaxWidth != g_Config.m_MaChatMediaPreviewMaxWidth;
-	bool ForceRecreate = IsScoreBoardOpen != m_PrevScoreBoardShowed || ShowLargeArea != m_PrevShowChat || std::fabs(s_LastPrepareX - x) > 0.01f || MediaConfigChanged;
+	const bool NameEffectsConfigChanged =
+		s_LastNameEffects != g_Config.m_MaNameEffects ||
+		s_LastNameEffectsOwn != g_Config.m_MaNameEffectsOwn ||
+		s_LastNameEffectsOwnStyle != g_Config.m_MaNameEffectsOwnStyle ||
+		s_LastNameEffectsOwnStars != g_Config.m_MaNameEffectsOwnStars ||
+		str_comp(s_aLastNameEffectsEntries, g_Config.m_MaNameEffectsEntries) != 0;
+	bool ForceRecreate = IsScoreBoardOpen != m_PrevScoreBoardShowed || ShowLargeArea != m_PrevShowChat || std::fabs(s_LastPrepareX - x) > 0.01f || MediaConfigChanged || NameEffectsConfigChanged;
 	s_LastPrepareX = x;
 	s_LastMediaPreview = g_Config.m_MaChatMediaPreview;
 	s_LastMediaPhotos = g_Config.m_MaChatMediaPhotos;
 	s_LastMediaGifs = g_Config.m_MaChatMediaGifs;
 	s_LastMediaMaxWidth = g_Config.m_MaChatMediaPreviewMaxWidth;
+	s_LastNameEffects = g_Config.m_MaNameEffects;
+	s_LastNameEffectsOwn = g_Config.m_MaNameEffectsOwn;
+	s_LastNameEffectsOwnStyle = g_Config.m_MaNameEffectsOwnStyle;
+	s_LastNameEffectsOwnStars = g_Config.m_MaNameEffectsOwnStars;
+	str_copy(s_aLastNameEffectsEntries, g_Config.m_MaNameEffectsEntries, sizeof(s_aLastNameEffectsEntries));
 	m_PrevScoreBoardShowed = IsScoreBoardOpen;
 	m_PrevShowChat = ShowLargeArea;
 
@@ -3915,6 +4116,12 @@ void CChat::OnPrepareLines(float x, float y)
 			str_format(aCount, sizeof(aCount), "[%d] ", Line.m_TimesRepeated + 1);
 		else
 			str_format(aCount, sizeof(aCount), " [%d]", Line.m_TimesRepeated + 1);
+
+		const char *pNameEffectLookup = Line.m_aName;
+		if(Line.m_ClientId >= 0 && Line.m_ClientId < MAX_CLIENTS && GameClient()->m_aClients[Line.m_ClientId].m_aName[0] != '\0')
+			pNameEffectLookup = GameClient()->m_aClients[Line.m_ClientId].m_aName;
+		SMaChatNameEffectSettings NameEffectSettings;
+		const bool UseNameEffect = Line.m_ClientId >= 0 && Line.m_aName[0] != '\0' && MaChatNameEffectApplies(GameClient(), Line.m_ClientId, pNameEffectLookup, NameEffectSettings);
 
 		const char *pText = Line.m_aText;
 		bool StreamerModeTextHidden = false;
@@ -3999,7 +4206,10 @@ void CChat::OnPrepareLines(float x, float y)
 			}
 
 			TextRender()->TextEx(&MeasureCursor, aClientId);
-			TextRender()->TextEx(&MeasureCursor, Line.m_aName);
+			if(UseNameEffect)
+				MaChatRenderNameEffect(TextRender(), &MeasureCursor, Line.m_aName, NameEffectSettings, 1.0f);
+			else
+				TextRender()->TextEx(&MeasureCursor, Line.m_aName);
 			if(Line.m_TimesRepeated > 0)
 				TextRender()->TextEx(&MeasureCursor, aCount);
 
@@ -4050,7 +4260,7 @@ void CChat::OnPrepareLines(float x, float y)
 			float TotalHeight = Line.m_aTextHeight[OffsetType] + RealMsgPaddingY;
 			if(ShouldDisplayMediaSlot(Line))
 			{
-				const float MaxPreviewWidth = minimum(LineWidth, (float)g_Config.m_MaChatMediaPreviewMaxWidth) * CHAT_MEDIA_PREVIEW_SIZE_SCALE;
+				const float MaxPreviewWidth = minimum(LineWidth, (float)MaRenderCompat::ChatMediaPreviewMaxWidth(g_Config.m_MaChatMediaPreviewMaxWidth)) * CHAT_MEDIA_PREVIEW_SIZE_SCALE;
 				const float MaxPreviewHeight = (IsScoreBoardOpen ? CHAT_MEDIA_MAX_PREVIEW_HEIGHT_SCOREBOARD : CHAT_MEDIA_MAX_PREVIEW_HEIGHT) * CHAT_MEDIA_PREVIEW_SIZE_SCALE;
 				if(Line.m_MediaState == EMediaState::READY && Line.m_MediaWidth > 0 && Line.m_MediaHeight > 0 && !Line.m_vMediaFrames.empty())
 				{
@@ -4141,7 +4351,10 @@ void CChat::OnPrepareLines(float x, float y)
 
 		TextRender()->TextColor(NameColor);
 		TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, aClientId);
-		TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, Line.m_aName);
+		if(UseNameEffect)
+			MaChatNameEffectAdvanceCursor(&LineCursor, MaChatNameEffectTextWidth(TextRender(), FontSize, Line.m_aName, NameEffectSettings));
+		else
+			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, Line.m_aName);
 
 		if(Line.m_TimesRepeated > 0)
 		{
@@ -4391,13 +4604,16 @@ void CChat::OnRender()
 	float HeightLimit = IsScoreBoardOpen ? 180.0f : (ShowLargeArea ? 50.0f : (ExpandCompactAreaForMedia ? y - CHAT_MEDIA_COMPACT_EXPANDED_HEIGHT : 200.0f));
 	int OffsetType = IsScoreBoardOpen ? 1 : 0;
 
+	const int TeeSize = MessageTeeSize();
 	float RealMsgPaddingX = MessagePaddingX();
 	float RealMsgPaddingY = MessagePaddingY();
+	float RealMsgPaddingTee = TeeSize + MESSAGE_TEE_PADDING_RIGHT;
 
 	if(g_Config.m_ClChatOld)
 	{
 		RealMsgPaddingX = 0;
 		RealMsgPaddingY = 0;
+		RealMsgPaddingTee = 0;
 	}
 
 	for(int i = 0; i < MAX_LINES; i++)
@@ -4450,6 +4666,27 @@ void CChat::OnRender()
 			const ColorRGBA TextOutlineColor = TextRender()->DefaultTextOutlineColor().WithMultipliedAlpha(Blend);
 			const float TextOffsetY = (y + RealMsgPaddingY / 2.0f) - Line.m_TextYOffset;
 			TextRender()->RenderTextContainer(Line.m_TextContainerIndex, TextColor, TextOutlineColor, 0, TextOffsetY);
+
+			const char *pRenderNameEffectLookup = Line.m_aName;
+			if(Line.m_ClientId >= 0 && Line.m_ClientId < MAX_CLIENTS && GameClient()->m_aClients[Line.m_ClientId].m_aName[0] != '\0')
+				pRenderNameEffectLookup = GameClient()->m_aClients[Line.m_ClientId].m_aName;
+			SMaChatNameEffectSettings RenderNameEffectSettings;
+			if(Line.m_ClientId >= 0 && Line.m_aName[0] != '\0' && MaChatNameEffectApplies(GameClient(), Line.m_ClientId, pRenderNameEffectLookup, RenderNameEffectSettings))
+			{
+				char aRenderClientId[16] = "";
+				if(g_Config.m_ClShowIds)
+					GameClient()->FormatClientId(Line.m_ClientId, aRenderClientId, EClientIdFormat::INDENT_AUTO);
+
+				CTextCursor NameCursor;
+				NameCursor.SetPosition(vec2(x + RealMsgPaddingX / 2.0f, Line.m_TextYOffset + TextOffsetY));
+				NameCursor.m_FontSize = FontSize();
+				NameCursor.m_X += RealMsgPaddingTee;
+				if(Line.m_Friend && g_Config.m_ClMessageFriend)
+					NameCursor.m_X += TextRender()->TextWidth(FontSize(), "\xE2\x99\xA5 ", -1, -1.0f);
+				if(aRenderClientId[0] != '\0')
+					NameCursor.m_X += TextRender()->TextWidth(FontSize(), aRenderClientId, -1, -1.0f);
+				MaChatRenderNameEffect(TextRender(), &NameCursor, Line.m_aName, RenderNameEffectSettings, Blend);
+			}
 
 			const bool ShowMediaSlot = ShouldDisplayMediaSlot(Line);
 			const bool HasMediaPreview = Line.m_aMediaPreviewWidth[OffsetType] > 0.0f && Line.m_aMediaPreviewHeight[OffsetType] > 0.0f;

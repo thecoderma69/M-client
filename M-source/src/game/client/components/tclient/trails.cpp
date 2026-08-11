@@ -6,6 +6,7 @@
 #include <engine/shared/config.h>
 
 #include <game/client/animstate.h>
+#include <game/client/components/ma/render_compat.h>
 #include <game/client/gameclient.h>
 #include <game/client/render.h>
 
@@ -23,25 +24,26 @@ static float ApproachTrailValue(float Current, float Target, float Delta, float 
 static float TrailPerformanceLodScale(float Delta)
 {
 	float Lod = 1.0f;
-	if(Delta <= 0.0f)
-		return Lod;
-	if(Delta > 1.0f / 180.0f)
-		Lod = 0.35f;
-	else if(Delta > 1.0f / 300.0f)
-		Lod = 0.50f;
-	else if(Delta > 1.0f / 500.0f)
-		Lod = 0.68f;
-	else if(Delta > 1.0f / 750.0f)
-		Lod = 0.84f;
-
-	if(g_Config.m_MaPerformanceGuard)
+	if(Delta > 0.0f)
 	{
-		const int TargetFps = std::clamp(g_Config.m_MaPerformanceGuardTargetFps, 60, 1000);
-		const float TargetDelta = 1.0f / (float)TargetFps;
-		if(Delta > TargetDelta)
-			Lod = std::min(Lod, std::clamp(TargetDelta / Delta, 0.35f, 1.0f));
+		if(Delta > 1.0f / 180.0f)
+			Lod = 0.35f;
+		else if(Delta > 1.0f / 300.0f)
+			Lod = 0.50f;
+		else if(Delta > 1.0f / 500.0f)
+			Lod = 0.68f;
+		else if(Delta > 1.0f / 750.0f)
+			Lod = 0.84f;
+
+		if(g_Config.m_MaPerformanceGuard)
+		{
+			const int TargetFps = std::clamp(g_Config.m_MaPerformanceGuardTargetFps, 60, 1000);
+			const float TargetDelta = 1.0f / (float)TargetFps;
+			if(Delta > TargetDelta)
+				Lod = std::min(Lod, std::clamp(TargetDelta / Delta, 0.35f, 1.0f));
+		}
 	}
-	return Lod;
+	return MaRenderCompat::ApplyLod(Lod);
 }
 
 template<std::size_t NumPoints>
@@ -482,7 +484,7 @@ void CTrails::OnRender()
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
 	{
 		const bool Local = GameClient()->m_Snap.m_LocalClientId == ClientId;
-		if(!Local && g_Config.m_MaPerformanceGuard && Lod < 0.55f)
+		if(!Local && (g_Config.m_MaPerformanceGuard || MaRenderCompat::Active()) && Lod < 0.55f)
 			continue;
 
 		const bool ZoomAllowed = GameClient()->m_Camera.ZoomAllowed();
@@ -569,6 +571,7 @@ void CTrails::OnRender()
 			const int GuardMaxLength = Local ? std::clamp(round_to_int(90.0f * Lod), 18, 110) : std::clamp(round_to_int(45.0f * Lod), 8, 60);
 			TrailLength = std::min(TrailLength, GuardMaxLength);
 		}
+		TrailLength = MaRenderCompat::ClampTrailLength(TrailLength, Local, Lod);
 		float Width = g_Config.m_TcTeeTrailWidth;
 
 		static std::vector<CTrailPart> s_Trail;
@@ -691,7 +694,7 @@ void CTrails::OnRender()
 		const int TrailStyle = std::clamp(g_Config.m_TcTeeTrailStyle, (int)TRAILSTYLE_DEFAULT, (int)TRAILSTYLE_SNOWFLAKES);
 		if(TrailStyle != TRAILSTYLE_DEFAULT)
 		{
-			const int MaxSymbols = std::clamp(round_to_int((Local ? 14.0f : 7.0f) * (0.35f + 0.65f * Lod)), Local ? 5 : 2, Local ? 14 : 7);
+			const int MaxSymbols = MaRenderCompat::ClampTrailSymbols(std::clamp(round_to_int((Local ? 14.0f : 7.0f) * (0.35f + 0.65f * Lod)), Local ? 5 : 2, Local ? 14 : 7), Local);
 			const int Step = std::max(2, (int)s_Trail.size() / maximum(1, MaxSymbols));
 			const bool MovementEnabled = g_Config.m_TcTeeTrailMovement != 0;
 			const float MovementSpeed = std::clamp(g_Config.m_TcTeeTrailMovementSpeed, 0, 500) / 100.0f;

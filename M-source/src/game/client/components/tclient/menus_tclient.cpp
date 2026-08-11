@@ -21,6 +21,7 @@
 #include <game/client/components/media_decoder.h>
 #include <game/client/components/menu_background.h>
 #include <game/client/components/menus.h>
+#include <game/client/components/ma_name_effects.h>
 #include <game/client/components/skins.h>
 #include <game/client/components/sounds.h>
 #include <game/client/components/tclient/bindchat.h>
@@ -123,6 +124,7 @@ struct SMaNameEffectMenuEntry
 	unsigned m_Color2 = 41131;
 	int m_Glow = 70;
 	int m_Moving = 0;
+	int m_Stars = 0;
 };
 
 struct SMaNameEffectPlayerRow
@@ -165,7 +167,7 @@ static unsigned MaNameEffectParseMenuColor(const char *pText, unsigned DefaultCo
 
 static bool MaNameEffectDecodeRecord(const std::string &Record, SMaNameEffectMenuEntry &Entry)
 {
-	std::array<std::string, 6> Fields;
+	std::array<std::string, 7> Fields;
 	size_t Start = 0;
 	for(size_t i = 0; i < Fields.size(); ++i)
 	{
@@ -179,11 +181,14 @@ static bool MaNameEffectDecodeRecord(const std::string &Record, SMaNameEffectMen
 	MaNameEffectCopyTrimmedString(Entry.m_aName, sizeof(Entry.m_aName), Fields[0]);
 	if(Entry.m_aName[0] == '\0')
 		return false;
-	Entry.m_Style = std::clamp(Fields[1].empty() ? g_Config.m_MaNameEffectsStyle : str_toint(Fields[1].c_str()), 0, 3);
+	const int RawStyle = Fields[1].empty() ? g_Config.m_MaNameEffectsStyle : str_toint(Fields[1].c_str());
+	const bool HasStarsField = !Fields[6].empty();
+	Entry.m_Style = std::clamp(HasStarsField ? RawStyle : MaNameEffects::NormalizeLegacyStyle(RawStyle), 0, MaNameEffects::STYLE_MAX);
 	Entry.m_Color1 = MaNameEffectParseMenuColor(Fields[2].c_str(), g_Config.m_MaNameEffectsColor1);
 	Entry.m_Color2 = MaNameEffectParseMenuColor(Fields[3].c_str(), g_Config.m_MaNameEffectsColor2);
 	Entry.m_Glow = std::clamp(Fields[4].empty() ? g_Config.m_MaNameEffectsGlow : str_toint(Fields[4].c_str()), 0, 100);
 	Entry.m_Moving = Fields[5].empty() ? g_Config.m_MaNameEffectsMoving : (str_toint(Fields[5].c_str()) != 0);
+	Entry.m_Stars = HasStarsField ? (str_toint(Fields[6].c_str()) != 0) : (g_Config.m_MaNameEffectsStars != 0 || MaNameEffects::LegacyStyleHasStars(RawStyle));
 	return true;
 }
 
@@ -214,7 +219,7 @@ static void MaNameEffectEncodeEntries(const std::vector<SMaNameEffectMenuEntry> 
 		if(Entry.m_aName[0] == '\0')
 			continue;
 		char aRecord[256];
-		str_format(aRecord, sizeof(aRecord), "%s|%d|%u|%u|%d|%d", Entry.m_aName, std::clamp(Entry.m_Style, 0, 3), Entry.m_Color1, Entry.m_Color2, std::clamp(Entry.m_Glow, 0, 100), Entry.m_Moving ? 1 : 0);
+		str_format(aRecord, sizeof(aRecord), "%s|%d|%u|%u|%d|%d|%d", Entry.m_aName, std::clamp(Entry.m_Style, 0, MaNameEffects::STYLE_MAX), Entry.m_Color1, Entry.m_Color2, std::clamp(Entry.m_Glow, 0, 100), Entry.m_Moving ? 1 : 0, Entry.m_Stars ? 1 : 0);
 		if(!Out.empty())
 			Out += ';';
 		if(Out.size() + str_length(aRecord) + 1 >= sizeof(g_Config.m_MaNameEffectsEntries))
@@ -239,9 +244,10 @@ static void MaNameEffectSaveEntry(std::vector<SMaNameEffectMenuEntry> &vEntries,
 	MaNameEffectSanitizeName(Entry.m_aName);
 	if(Entry.m_aName[0] == '\0')
 		return;
-	Entry.m_Style = std::clamp(Entry.m_Style, 0, 3);
+	Entry.m_Style = std::clamp(Entry.m_Style, 0, MaNameEffects::STYLE_MAX);
 	Entry.m_Glow = std::clamp(Entry.m_Glow, 0, 100);
 	Entry.m_Moving = Entry.m_Moving ? 1 : 0;
+	Entry.m_Stars = Entry.m_Stars ? 1 : 0;
 
 	g_Config.m_MaNameEffects = 1;
 
@@ -253,19 +259,46 @@ static void MaNameEffectSaveEntry(std::vector<SMaNameEffectMenuEntry> &vEntries,
 	MaNameEffectEncodeEntries(vEntries);
 }
 
-static SMaNameEffectMenuEntry MaNameEffectMakeEntry(const char *pName, int Style, unsigned Color1, unsigned Color2, int Glow, int Moving)
+static SMaNameEffectMenuEntry MaNameEffectMakeEntry(const char *pName, int Style, unsigned Color1, unsigned Color2, int Glow, int Moving, int Stars)
 {
 	SMaNameEffectMenuEntry Entry;
 	str_copy(Entry.m_aName, pName ? pName : "", sizeof(Entry.m_aName));
 	MaNameEffectSanitizeName(Entry.m_aName);
-	Entry.m_Style = std::clamp(Style, 0, 3);
+	Entry.m_Style = std::clamp(Style, 0, MaNameEffects::STYLE_MAX);
 	Entry.m_Color1 = Color1;
 	Entry.m_Color2 = Color2;
 	Entry.m_Glow = std::clamp(Glow, 0, 100);
 	Entry.m_Moving = Moving ? 1 : 0;
+	Entry.m_Stars = Stars ? 1 : 0;
 	return Entry;
 }
 
+static ColorHSLA MaNameEffectMenuColorHsla(unsigned ColorValue)
+{
+	ColorHSLA Color = (ColorValue & 0xff000000U) != 0 ? ColorHSLA(ColorValue, true) : ColorHSLA(ColorValue);
+	Color.a = 1.0f;
+	return Color;
+}
+
+static unsigned MaNameEffectNormalizeMenuColor(unsigned ColorValue)
+{
+	return MaNameEffectMenuColorHsla(ColorValue).Pack(false);
+}
+
+static unsigned MaNameEffectDefaultColor1()
+{
+	return MaNameEffectNormalizeMenuColor(color_cast<ColorHSLA>(ColorRGBA(1.0f, 1.0f, 1.0f)).Pack(false));
+}
+
+static unsigned MaNameEffectDefaultColor2()
+{
+	return MaNameEffectNormalizeMenuColor(color_cast<ColorHSLA>(ColorRGBA(1.0f, 1.0f, 1.0f)).Pack(false));
+}
+
+static ColorRGBA MaNameEffectMenuColor(unsigned ColorValue)
+{
+	return color_cast<ColorRGBA>(MaNameEffectMenuColorHsla(ColorValue));
+}
 
 static void MaNameEffectAddLegacyNames(std::vector<SMaNameEffectMenuEntry> &vEntries)
 {
@@ -285,11 +318,12 @@ static void MaNameEffectAddLegacyNames(std::vector<SMaNameEffectMenuEntry> &vEnt
 		MaNameEffectCopyTrimmedString(Entry.m_aName, sizeof(Entry.m_aName), Name);
 		if(Entry.m_aName[0] != '\0' && MaNameEffectFindEntryIndex(vEntries, Entry.m_aName) < 0)
 		{
-			Entry.m_Style = std::clamp(g_Config.m_MaNameEffectsStyle, 0, 3);
-			Entry.m_Color1 = g_Config.m_MaNameEffectsColor1;
-			Entry.m_Color2 = g_Config.m_MaNameEffectsColor2;
+			Entry.m_Style = std::clamp(g_Config.m_MaNameEffectsStyle, 0, MaNameEffects::STYLE_MAX);
+			Entry.m_Color1 = MaNameEffectDefaultColor1();
+			Entry.m_Color2 = MaNameEffectDefaultColor2();
 			Entry.m_Glow = std::clamp(g_Config.m_MaNameEffectsGlow, 0, 100);
 			Entry.m_Moving = g_Config.m_MaNameEffectsMoving != 0;
+			Entry.m_Stars = g_Config.m_MaNameEffectsStars != 0;
 			vEntries.push_back(Entry);
 		}
 	}
@@ -4575,7 +4609,7 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 		Ui()->DoScrollbarOption(&g_Config.m_MaTeamStatsPanelOpacity, &g_Config.m_MaTeamStatsPanelOpacity, &Button, TCLocalize("Opacidad fondo"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
 		LeftView.HSplitTop(LineSize, &Button, &LeftView);
 		Ui()->DoScrollbarOption(&g_Config.m_MaTeamStatsPanelTextOpacity, &g_Config.m_MaTeamStatsPanelTextOpacity, &Button, TCLocalize("Opacidad letras"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
-		
+
 		static CButtonContainer s_TeamStatsTitleColor, s_TeamStatsTextColor, s_TeamStatsHighlightColor;
 		DoLine_ColorPicker(&s_TeamStatsTitleColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Color titulo"), &g_Config.m_MaTeamStatsPanelTitleColor, ColorRGBA(0.58f, 0.95f, 1.0f), false);
 		DoLine_ColorPicker(&s_TeamStatsTextColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, TCLocalize("Color texto"), &g_Config.m_MaTeamStatsPanelTextColor, ColorRGBA(1.0f, 1.0f, 1.0f), false);
@@ -5373,6 +5407,7 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 		static unsigned s_NameEffectEditColor2 = 41131;
 		static int s_NameEffectEditGlow = 70;
 		static int s_NameEffectEditMoving = 0;
+		static int s_NameEffectEditStars = 0;
 		static bool s_NameEffectEditLoaded = false;
 		static bool s_NameEffectEditOwn = false;
 		static char s_aNameEffectSavedName[MAX_NAME_LENGTH] = "";
@@ -5381,6 +5416,7 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 		static unsigned s_NameEffectSavedColor2 = 0;
 		static int s_NameEffectSavedGlow = 0;
 		static int s_NameEffectSavedMoving = 0;
+		static int s_NameEffectSavedStars = 0;
 		static bool s_NameEffectSavedOwn = false;
 
 		auto RememberNameEffectSaved = [&]() {
@@ -5390,7 +5426,36 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 			s_NameEffectSavedColor2 = s_NameEffectEditColor2;
 			s_NameEffectSavedGlow = s_NameEffectEditGlow;
 			s_NameEffectSavedMoving = s_NameEffectEditMoving ? 1 : 0;
+			s_NameEffectSavedStars = s_NameEffectEditStars ? 1 : 0;
 			s_NameEffectSavedOwn = s_NameEffectEditOwn;
+		};
+
+		auto DoNameEffectColorPicker = [&](CButtonContainer *pResetId, const char *pText, unsigned *pColorValue, ColorRGBA DefaultColor) {
+			CUIRect Section, ColorPickerButton, ResetButton, TextLabel;
+			RightView.HSplitTop(ColorPickerLineSize, &Section, &RightView);
+			RightView.HSplitTop(ColorPickerLineSpacing, nullptr, &RightView);
+			Section.VSplitRight(70.0f, &Section, &ResetButton);
+			Section.VSplitRight(10.0f, &Section, nullptr);
+			Section.VSplitRight(Section.h, &Section, &ColorPickerButton);
+			Section.VSplitRight(10.0f, &TextLabel, nullptr);
+
+			*pColorValue = MaNameEffectNormalizeMenuColor(*pColorValue);
+			Ui()->DoLabel(&TextLabel, pText, ColorPickerLabelSize, TEXTALIGN_ML);
+			const ColorHSLA PickedColor = DoButton_ColorPicker(&ColorPickerButton, pColorValue, false);
+			*pColorValue = MaNameEffectNormalizeMenuColor(PickedColor.Pack(false));
+
+			CUIRect SwatchFrame = ColorPickerButton;
+			CUIRect SwatchInner;
+			SwatchFrame.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.95f), IGraphics::CORNER_ALL, 5.0f);
+			SwatchFrame.Margin(2.0f, &SwatchInner);
+			SwatchInner.Draw(MaNameEffectMenuColor(*pColorValue), IGraphics::CORNER_ALL, 4.0f);
+			CUIRect Shine = SwatchInner;
+			Shine.HSplitTop(Shine.h * 0.42f, &Shine, nullptr);
+			Shine.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.22f), IGraphics::CORNER_T, 4.0f);
+
+			ResetButton.HMargin(2.0f, &ResetButton);
+			if(DoButton_Menu(pResetId, TCLocalize("Reiniciar"), 0, &ResetButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 4.0f, 0.1f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f)))
+				*pColorValue = MaNameEffectNormalizeMenuColor(color_cast<ColorHSLA>(DefaultColor).Pack(false));
 		};
 
 		auto FindOnlineClientId = [&](const char *pName) -> int {
@@ -5401,6 +5466,108 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 			}
 			return -1;
 		};
+		auto RenderNameEffectMenuLabel = [&](CUIRect Rect, const char *pName, const SMaNameEffectMenuEntry *pEntry, bool Own, float Size, ColorRGBA FallbackColor, int Align) -> bool {
+			if(!pName || pName[0] == '\0')
+				return false;
+
+			int Style = 0;
+			unsigned Color1 = MaNameEffectDefaultColor1();
+			unsigned Color2 = MaNameEffectDefaultColor2();
+			bool Moving = false;
+			bool Stars = false;
+			bool Active = false;
+
+			if(Own && g_Config.m_MaNameEffectsOwn)
+			{
+				Style = std::clamp(g_Config.m_MaNameEffectsOwnStyle, 0, MaNameEffects::STYLE_MAX);
+				Color1 = MaNameEffectNormalizeMenuColor(g_Config.m_MaNameEffectsOwnColor1);
+				Color2 = MaNameEffectNormalizeMenuColor(g_Config.m_MaNameEffectsOwnColor2);
+				Moving = g_Config.m_MaNameEffectsOwnMoving != 0;
+				Stars = g_Config.m_MaNameEffectsOwnStars != 0;
+				Active = true;
+			}
+			else if(pEntry)
+			{
+				Style = std::clamp(pEntry->m_Style, 0, MaNameEffects::STYLE_MAX);
+				Color1 = MaNameEffectNormalizeMenuColor(pEntry->m_Color1);
+				Color2 = MaNameEffectNormalizeMenuColor(pEntry->m_Color2);
+				Moving = pEntry->m_Moving != 0;
+				Stars = pEntry->m_Stars != 0;
+				Active = true;
+			}
+
+			if(!Active)
+			{
+				TextRender()->TextColor(FallbackColor);
+				Ui()->DoLabel(&Rect, pName, Size, Align);
+				TextRender()->TextColor(TextRender()->DefaultTextColor());
+				return false;
+			}
+
+			const int MotionTick = (Moving || MaNameEffects::StyleAnimates(Style)) ? (int)((time_get() * 12) / time_freq()) : 0;
+			const ColorRGBA Accent = MaNameEffects::AccentColor(Style, 1.0f, Color1, Color2, MotionTick);
+			const char *pPrefix = "";
+			const char *pSuffix = "";
+			MaNameEffects::Decorations(Style, &pPrefix, &pSuffix);
+
+			float Width = TextRender()->TextWidth(Size, pName, -1, -1.0f);
+			if(Stars)
+				Width += TextRender()->TextWidth(Size, "\xE2\x9C\xA6  \xE2\x9C\xA6", -1, -1.0f);
+			if(pPrefix[0] != '\0')
+				Width += TextRender()->TextWidth(Size, pPrefix, -1, -1.0f);
+			if(pSuffix[0] != '\0')
+				Width += TextRender()->TextWidth(Size, pSuffix, -1, -1.0f);
+
+			float X = Rect.x;
+			if(Align == TEXTALIGN_MC)
+				X = Rect.x + (Rect.w - Width) * 0.5f;
+			else if(Align == TEXTALIGN_MR)
+				X = Rect.x + Rect.w - Width;
+			const float Y = Rect.y + (Rect.h - Size) * 0.5f;
+
+			CTextCursor Cursor;
+			Cursor.SetPosition(vec2(X, Y));
+			Cursor.m_FontSize = Size;
+			TextRender()->TextOutlineColor(ColorRGBA(Accent.r, Accent.g, Accent.b, Style == 11 ? 0.95f : 0.45f));
+
+			if(Stars)
+			{
+				TextRender()->TextColor(Accent);
+				TextRender()->TextEx(&Cursor, "\xE2\x9C\xA6 ");
+			}
+			if(pPrefix[0] != '\0')
+			{
+				TextRender()->TextColor(Accent);
+				TextRender()->TextEx(&Cursor, pPrefix);
+			}
+
+			const char *pChar = pName;
+			int LetterIndex = 0;
+			while(*pChar)
+			{
+				const char *pNext = pChar;
+				str_utf8_decode(&pNext);
+				const int CharLen = maximum<int>(1, (int)(pNext - pChar));
+				TextRender()->TextColor(MaNameEffects::LetterColor(LetterIndex, 1.0f, Style, Color1, Color2, Moving, MotionTick));
+				TextRender()->TextEx(&Cursor, pChar, CharLen);
+				pChar += CharLen;
+				++LetterIndex;
+			}
+
+			if(pSuffix[0] != '\0')
+			{
+				TextRender()->TextColor(Accent);
+				TextRender()->TextEx(&Cursor, pSuffix);
+			}
+			if(Stars)
+			{
+				TextRender()->TextColor(Accent);
+				TextRender()->TextEx(&Cursor, " \xE2\x9C\xA6");
+			}
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+			TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
+			return true;
+		};
 
 		auto LoadNameEffectPlayer = [&](const char *pName, bool Own) {
 			str_copy(s_aNameEffectEditName, pName, sizeof(s_aNameEffectEditName));
@@ -5408,11 +5575,12 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 			s_NameEffectEditOwn = Own;
 			if(Own)
 			{
-				s_NameEffectEditStyle = std::clamp(g_Config.m_MaNameEffectsOwnStyle, 0, 3);
-				s_NameEffectEditColor1 = g_Config.m_MaNameEffectsOwnColor1;
-				s_NameEffectEditColor2 = g_Config.m_MaNameEffectsOwnColor2;
+				s_NameEffectEditStyle = std::clamp(g_Config.m_MaNameEffectsOwnStyle, 0, MaNameEffects::STYLE_MAX);
+				s_NameEffectEditColor1 = MaNameEffectNormalizeMenuColor(g_Config.m_MaNameEffectsOwnColor1);
+				s_NameEffectEditColor2 = MaNameEffectNormalizeMenuColor(g_Config.m_MaNameEffectsOwnColor2);
 				s_NameEffectEditGlow = std::clamp(g_Config.m_MaNameEffectsOwnGlow, 0, 100);
 				s_NameEffectEditMoving = g_Config.m_MaNameEffectsOwnMoving != 0;
+				s_NameEffectEditStars = g_Config.m_MaNameEffectsOwnStars != 0;
 			}
 			else
 			{
@@ -5420,19 +5588,21 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 				if(EntryIndex >= 0)
 				{
 					const SMaNameEffectMenuEntry &Entry = vNameEffectEntries[EntryIndex];
-					s_NameEffectEditStyle = std::clamp(Entry.m_Style, 0, 3);
-					s_NameEffectEditColor1 = Entry.m_Color1;
-					s_NameEffectEditColor2 = Entry.m_Color2;
+					s_NameEffectEditStyle = std::clamp(Entry.m_Style, 0, MaNameEffects::STYLE_MAX);
+					s_NameEffectEditColor1 = MaNameEffectNormalizeMenuColor(Entry.m_Color1);
+					s_NameEffectEditColor2 = MaNameEffectNormalizeMenuColor(Entry.m_Color2);
 					s_NameEffectEditGlow = std::clamp(Entry.m_Glow, 0, 100);
 					s_NameEffectEditMoving = Entry.m_Moving ? 1 : 0;
+					s_NameEffectEditStars = Entry.m_Stars ? 1 : 0;
 				}
 				else
 				{
-					s_NameEffectEditStyle = std::clamp(g_Config.m_MaNameEffectsStyle, 0, 3);
-					s_NameEffectEditColor1 = g_Config.m_MaNameEffectsColor1;
-					s_NameEffectEditColor2 = g_Config.m_MaNameEffectsColor2;
+					s_NameEffectEditStyle = std::clamp(g_Config.m_MaNameEffectsStyle, 0, MaNameEffects::STYLE_MAX);
+					s_NameEffectEditColor1 = MaNameEffectDefaultColor1();
+					s_NameEffectEditColor2 = MaNameEffectDefaultColor2();
 					s_NameEffectEditGlow = std::clamp(g_Config.m_MaNameEffectsGlow, 0, 100);
 					s_NameEffectEditMoving = g_Config.m_MaNameEffectsMoving != 0;
+					s_NameEffectEditStars = g_Config.m_MaNameEffectsStars != 0;
 				}
 			}
 			s_NameEffectEditLoaded = true;
@@ -5444,14 +5614,17 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 			if(s_aNameEffectEditName[0] == '\0')
 				return;
 			g_Config.m_MaNameEffects = 1;
+			s_NameEffectEditColor1 = MaNameEffectNormalizeMenuColor(s_NameEffectEditColor1);
+			s_NameEffectEditColor2 = MaNameEffectNormalizeMenuColor(s_NameEffectEditColor2);
 			if(s_NameEffectEditOwn)
 			{
 				g_Config.m_MaNameEffectsOwn = 1;
-				g_Config.m_MaNameEffectsOwnStyle = std::clamp(s_NameEffectEditStyle, 0, 3);
+				g_Config.m_MaNameEffectsOwnStyle = std::clamp(s_NameEffectEditStyle, 0, MaNameEffects::STYLE_MAX);
 				g_Config.m_MaNameEffectsOwnColor1 = s_NameEffectEditColor1;
 				g_Config.m_MaNameEffectsOwnColor2 = s_NameEffectEditColor2;
 				g_Config.m_MaNameEffectsOwnGlow = std::clamp(s_NameEffectEditGlow, 0, 100);
 				g_Config.m_MaNameEffectsOwnMoving = s_NameEffectEditMoving ? 1 : 0;
+				g_Config.m_MaNameEffectsOwnStars = s_NameEffectEditStars ? 1 : 0;
 
 				const int ExistingIndex = MaNameEffectFindEntryIndex(vNameEffectEntries, s_aNameEffectEditName);
 				if(ExistingIndex >= 0)
@@ -5462,7 +5635,7 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 			}
 			else
 			{
-				MaNameEffectSaveEntry(vNameEffectEntries, MaNameEffectMakeEntry(s_aNameEffectEditName, s_NameEffectEditStyle, s_NameEffectEditColor1, s_NameEffectEditColor2, s_NameEffectEditGlow, s_NameEffectEditMoving));
+				MaNameEffectSaveEntry(vNameEffectEntries, MaNameEffectMakeEntry(s_aNameEffectEditName, s_NameEffectEditStyle, s_NameEffectEditColor1, s_NameEffectEditColor2, s_NameEffectEditGlow, s_NameEffectEditMoving, s_NameEffectEditStars));
 			}
 			RememberNameEffectSaved();
 		};
@@ -5474,7 +5647,8 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 			       s_NameEffectSavedColor1 != s_NameEffectEditColor1 ||
 			       s_NameEffectSavedColor2 != s_NameEffectEditColor2 ||
 			       s_NameEffectSavedGlow != s_NameEffectEditGlow ||
-			       s_NameEffectSavedMoving != (s_NameEffectEditMoving ? 1 : 0);
+			       s_NameEffectSavedMoving != (s_NameEffectEditMoving ? 1 : 0) ||
+			       s_NameEffectSavedStars != (s_NameEffectEditStars ? 1 : 0);
 		};
 
 		if(!s_NameEffectEditLoaded)
@@ -5593,7 +5767,9 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 
 			CUIRect NameRect, ClanRect;
 			TextRect.HSplitMid(&NameRect, &ClanRect, 0.0f);
-			Ui()->DoLabel(&NameRect, RowData.m_aName, StandardFontSize, TEXTALIGN_ML);
+			const int RowEntryIndex = MaNameEffectFindEntryIndex(vNameEffectEntries, RowData.m_aName);
+			const SMaNameEffectMenuEntry *pRowEntry = RowEntryIndex >= 0 ? &vNameEffectEntries[RowEntryIndex] : nullptr;
+			RenderNameEffectMenuLabel(NameRect, RowData.m_aName, pRowEntry, false, StandardFontSize, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), TEXTALIGN_ML);
 			TextRender()->TextColor(RowData.m_Configured ? ColorRGBA(1.0f, 0.65f, 1.0f, 1.0f) : ColorRGBA(0.8f, 0.8f, 0.8f, 0.78f));
 			Ui()->DoLabel(&ClanRect, RowData.m_Configured ? TCLocalize("personalizado") : RowData.m_aClan, 11.0f, TEXTALIGN_ML);
 			TextRender()->TextColor(RowData.m_Online ? ColorRGBA(0.25f, 1.0f, 0.35f, 1.0f) : ColorRGBA(0.55f, 0.55f, 0.55f, 0.9f));
@@ -5634,7 +5810,7 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 		CUIRect OwnName, OwnInfo;
 		OwnText.HSplitMid(&OwnName, &OwnInfo, 0.0f);
 		const char *pOwnName = g_Config.m_PlayerName[0] ? g_Config.m_PlayerName : Client()->PlayerName();
-		Ui()->DoLabel(&OwnName, pOwnName, StandardFontSize, TEXTALIGN_ML);
+		RenderNameEffectMenuLabel(OwnName, pOwnName, nullptr, true, StandardFontSize, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), TEXTALIGN_ML);
 		TextRender()->TextColor(ColorRGBA(0.85f, 0.85f, 0.85f, 0.78f));
 		Ui()->DoLabel(&OwnInfo, TCLocalize("jugador local"), 11.0f, TEXTALIGN_ML);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
@@ -5707,19 +5883,20 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 		Button.VSplitLeft(120.0f, &Label, &Button);
 		Ui()->DoLabel(&Label, TCLocalize("Estilo"), FontSize, TEXTALIGN_ML);
 		static std::vector<const char *> s_NameEffectStyleNames;
-		s_NameEffectStyleNames = {TCLocalize("Letras arcoiris"), TCLocalize("Neon"), TCLocalize("Estrellas"), TCLocalize("Neon + estrellas")};
+		s_NameEffectStyleNames = {TCLocalize("Letras arcoiris"), TCLocalize("Neon"), TCLocalize("Degradado doble"), TCLocalize("Arcoiris en movimiento"), TCLocalize("Neon pulsante"), TCLocalize("Glitch hacker"), TCLocalize("Fuego"), TCLocalize("Hielo"), TCLocalize("Electricidad"), TCLocalize("Galaxy"), TCLocalize("Oro brillante"), TCLocalize("Sombra / outline"), TCLocalize("Latido"), TCLocalize("Pixel arcade")};
 		static CUi::SDropDownState s_NameEffectStyleState;
 		static CScrollRegion s_NameEffectStyleScrollRegion;
 		s_NameEffectStyleState.m_SelectionPopupContext.m_pScrollRegion = &s_NameEffectStyleScrollRegion;
-		s_NameEffectEditStyle = Ui()->DoDropDown(&Button, std::clamp(s_NameEffectEditStyle, 0, 3), s_NameEffectStyleNames.data(), s_NameEffectStyleNames.size(), s_NameEffectStyleState);
+		s_NameEffectEditStyle = Ui()->DoDropDown(&Button, std::clamp(s_NameEffectEditStyle, 0, MaNameEffects::STYLE_MAX), s_NameEffectStyleNames.data(), s_NameEffectStyleNames.size(), s_NameEffectStyleState);
+		DoButton_CheckBoxAutoVMarginAndSet(&s_NameEffectEditStars, TCLocalize("Estrellas a los lados"), &s_NameEffectEditStars, &RightView, LineSize);
 
 		DoButton_CheckBoxAutoVMarginAndSet(&s_NameEffectEditMoving, TCLocalize("Movimiento de colores"), &s_NameEffectEditMoving, &RightView, LineSize);
 		RightView.HSplitTop(LineSize, &Button, &RightView);
 		Ui()->DoScrollbarOption(&s_NameEffectEditGlow, &s_NameEffectEditGlow, &Button, TCLocalize("Intensidad neon"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
 
 		static CButtonContainer s_NameEffectEditColor1Picker, s_NameEffectEditColor2Picker;
-		DoLine_ColorPicker(&s_NameEffectEditColor1Picker, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, TCLocalize("Color principal"), &s_NameEffectEditColor1, ColorRGBA(0.5f, 1.0f, 1.0f), false, nullptr, true);
-		DoLine_ColorPicker(&s_NameEffectEditColor2Picker, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, TCLocalize("Color efecto"), &s_NameEffectEditColor2, ColorRGBA(1.0f, 0.4f, 1.0f), false, nullptr, true);
+		DoNameEffectColorPicker(&s_NameEffectEditColor1Picker, TCLocalize("Color principal"), &s_NameEffectEditColor1, ColorRGBA(0.5f, 1.0f, 1.0f));
+		DoNameEffectColorPicker(&s_NameEffectEditColor2Picker, TCLocalize("Color efecto"), &s_NameEffectEditColor2, ColorRGBA(1.0f, 0.4f, 1.0f));
 
 		if(!NameEffectNameInputActive && s_aNameEffectEditName[0] != '\0' && NameEffectEditChangedSinceSaved())
 		{
@@ -5756,13 +5933,19 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 		RightView.HSplitTop(LineSize, &Button, &RightView);
 		Button.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.22f), IGraphics::CORNER_ALL, 5.0f);
-		TextRender()->TextColor(color_cast<ColorRGBA>(ColorHSLA(s_NameEffectEditColor1, true)));
+		TextRender()->TextColor(MaNameEffectMenuColor(s_NameEffectEditColor1));
 		char aPreview[96];
-		str_format(aPreview, sizeof(aPreview), "%s%s%s", (s_NameEffectEditStyle == 2 || s_NameEffectEditStyle == 3) ? "* " : "", s_aNameEffectEditName[0] ? s_aNameEffectEditName : TCLocalize("Jugador"), (s_NameEffectEditStyle == 2 || s_NameEffectEditStyle == 3) ? " *" : "");
+		str_format(aPreview, sizeof(aPreview), "%s%s%s%s%s", s_NameEffectEditStars ? "* " : "", s_NameEffectEditStyle == 13 ? "[" : "", s_aNameEffectEditName[0] ? s_aNameEffectEditName : TCLocalize("Jugador"), s_NameEffectEditStyle == 13 ? "]" : "", s_NameEffectEditStars ? " *" : "");
 		Ui()->DoLabel(&Button, aPreview, FontSize, TEXTALIGN_MC);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 
-		RightView.HSplitTop(MarginBetweenSections * 0.45f, nullptr, &RightView);
+		RightView.HSplitTop(MarginExtraSmall, nullptr, &RightView);
+		RightView.HSplitTop(LineSize, &Button, &RightView);
+		TextRender()->TextColor(ColorRGBA(1.0f, 0.45f, 0.45f, 1.0f));
+		Ui()->DoLabel(&Button, TCLocalize("Para que se vea el color reinicia"), 12.0f, TEXTALIGN_MC);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+		RightView.HSplitTop(MarginBetweenSections * 0.35f, nullptr, &RightView);
 		RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
 		Ui()->DoLabel(&Label, TCLocalize("Jugadores en linea"), HeadlineFontSize, TEXTALIGN_ML);
 		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
@@ -5812,7 +5995,10 @@ void CMenus::RenderMaNickNames(CUIRect MainView)
 			CTeeRenderInfo TeeInfo = Client.m_RenderInfo;
 			TeeInfo.m_Size = 24.0f;
 			RenderTeeCute(CAnimState::GetIdle(), &TeeInfo, 0, vec2(1.0f, 0.0f), TeeRect.Center() + vec2(-1.0f, 2.0f), true);
-			Ui()->DoLabel(&NameRect, Client.m_aName, StandardFontSize, TEXTALIGN_ML);
+			const bool OnlineOwn = ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1];
+			const int OnlineEntryIndex = MaNameEffectFindEntryIndex(vNameEffectEntries, Client.m_aName);
+			const SMaNameEffectMenuEntry *pOnlineEntry = OnlineEntryIndex >= 0 ? &vNameEffectEntries[OnlineEntryIndex] : nullptr;
+			RenderNameEffectMenuLabel(NameRect, Client.m_aName, pOnlineEntry, OnlineOwn, StandardFontSize, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), TEXTALIGN_ML);
 			TextRender()->TextColor(MaNameEffectFindEntryIndex(vNameEffectEntries, Client.m_aName) >= 0 ? ColorRGBA(1.0f, 0.65f, 1.0f, 1.0f) : ColorRGBA(0.75f, 0.75f, 0.75f, 0.75f));
 			Ui()->DoLabel(&TagRect, MaNameEffectFindEntryIndex(vNameEffectEntries, Client.m_aName) >= 0 ? TCLocalize("listo") : TCLocalize("agregar"), 11.0f, TEXTALIGN_MR);
 			TextRender()->TextColor(TextRender()->DefaultTextColor());
@@ -5880,6 +6066,7 @@ void CMenus::RenderMaConfiguracion(CUIRect MainView)
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaOptimizer, TCLocalize("Enable optimizer"), &g_Config.m_MaOptimizer, &LeftView, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaPerformanceGuard, TCLocalize("Proteccion automatica de FPS"), &g_Config.m_MaPerformanceGuard, &LeftView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaRenderCompatibility, TCLocalize("Compatibilidad de render"), &g_Config.m_MaRenderCompatibility, &LeftView, LineSize);
 	if(g_Config.m_MaPerformanceGuard)
 	{
 		LeftView.HSplitTop(LineSize, &Button, &LeftView);

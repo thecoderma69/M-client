@@ -20,6 +20,7 @@
 #include <generated/protocol.h>
 
 #include <game/client/animstate.h>
+#include <game/client/components/ma_name_effects.h>
 #include <game/client/components/scoreboard.h>
 #include <game/client/gameclient.h>
 #include <game/client/prediction/entities/character.h>
@@ -192,15 +193,17 @@ namespace
 		unsigned m_Color2 = 41131;
 		int m_Glow = 70;
 		bool m_Moving = false;
+		bool m_Stars = false;
 	};
 
 	void MaHudNameEffectFillOwn(SMaHudNameEffectSettings &Settings)
 	{
-		Settings.m_Style = std::clamp(g_Config.m_MaNameEffectsOwnStyle, 0, 3);
+		Settings.m_Style = std::clamp(g_Config.m_MaNameEffectsOwnStyle, 0, MaNameEffects::STYLE_MAX);
 		Settings.m_Color1 = g_Config.m_MaNameEffectsOwnColor1;
 		Settings.m_Color2 = g_Config.m_MaNameEffectsOwnColor2;
 		Settings.m_Glow = std::clamp(g_Config.m_MaNameEffectsOwnGlow, 0, 100);
 		Settings.m_Moving = g_Config.m_MaNameEffectsOwnMoving != 0;
+		Settings.m_Stars = g_Config.m_MaNameEffectsOwnStars != 0;
 	}
 
 	void MaHudNameEffectCopyTrimmedField(const char *pStart, const char *pEnd, char *pDst, int DstSize)
@@ -226,10 +229,10 @@ namespace
 
 	bool MaHudNameEffectParseEntryRecord(const char *pStart, const char *pEnd, const char *pName, SMaHudNameEffectSettings &Settings)
 	{
-		char aaFields[6][MAX_NAME_LENGTH] = {{0}};
+		char aaFields[7][MAX_NAME_LENGTH] = {{0}};
 		int Field = 0;
 		const char *pFieldStart = pStart;
-		for(const char *pCursor = pStart; pCursor <= pEnd && Field < 6; ++pCursor)
+		for(const char *pCursor = pStart; pCursor <= pEnd && Field < 7; ++pCursor)
 		{
 			if(pCursor == pEnd || *pCursor == '|')
 			{
@@ -242,11 +245,14 @@ namespace
 		if(aaFields[0][0] == '\0' || str_comp_nocase(aaFields[0], pName) != 0)
 			return false;
 
-		Settings.m_Style = std::clamp(aaFields[1][0] ? str_toint(aaFields[1]) : g_Config.m_MaNameEffectsStyle, 0, 3);
+		const int RawStyle = aaFields[1][0] ? str_toint(aaFields[1]) : g_Config.m_MaNameEffectsStyle;
+		const bool HasStarsField = aaFields[6][0] != '\0';
+		Settings.m_Style = std::clamp(HasStarsField ? RawStyle : MaNameEffects::NormalizeLegacyStyle(RawStyle), 0, MaNameEffects::STYLE_MAX);
 		Settings.m_Color1 = MaHudNameEffectParseColor(aaFields[2], g_Config.m_MaNameEffectsColor1);
 		Settings.m_Color2 = MaHudNameEffectParseColor(aaFields[3], g_Config.m_MaNameEffectsColor2);
 		Settings.m_Glow = std::clamp(aaFields[4][0] ? str_toint(aaFields[4]) : g_Config.m_MaNameEffectsGlow, 0, 100);
 		Settings.m_Moving = aaFields[5][0] ? str_toint(aaFields[5]) != 0 : g_Config.m_MaNameEffectsMoving != 0;
+		Settings.m_Stars = HasStarsField ? str_toint(aaFields[6]) != 0 : (g_Config.m_MaNameEffectsStars != 0 || MaNameEffects::LegacyStyleHasStars(RawStyle));
 		return true;
 	}
 
@@ -281,63 +287,50 @@ namespace
 
 	ColorRGBA MaHudNameEffectConfigColor(unsigned ConfigColor, float Alpha)
 	{
-		ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(ConfigColor, true));
-		Color.a = std::clamp(Color.a, 0.25f, 1.0f) * Alpha;
-		return Color;
-	}
-
-	ColorRGBA MaHudNameEffectMixColors(ColorRGBA A, ColorRGBA B, float Amount)
-	{
-		Amount = std::clamp(Amount, 0.0f, 1.0f);
-		return ColorRGBA(A.r + (B.r - A.r) * Amount, A.g + (B.g - A.g) * Amount, A.b + (B.b - A.b) * Amount, A.a + (B.a - A.a) * Amount);
+		return MaNameEffects::ConfigColor(ConfigColor, Alpha);
 	}
 
 	ColorRGBA MaHudNameEffectLetterColor(int LetterIndex, float Alpha, const SMaHudNameEffectSettings &Settings, int MotionTick)
 	{
-		const int Style = std::clamp(Settings.m_Style, 0, 3);
-		if(Style == 0)
-		{
-			const int HueOffset = Settings.m_Moving ? MotionTick * 8 : 0;
-			const float Hue = (float)(((LetterIndex * 89 + HueOffset) % 360 + 360) % 360) / 360.0f;
-			ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(Hue, 1.0f, 0.62f));
-			Color.a = Alpha;
-			return Color;
-		}
-
-		ColorRGBA Primary = MaHudNameEffectConfigColor(Settings.m_Color1, Alpha);
-		ColorRGBA Accent = MaHudNameEffectConfigColor(Settings.m_Color2, Alpha);
-		if(Settings.m_Moving)
-		{
-			const int Phase = (LetterIndex * 37 + MotionTick * 9) % 120;
-			const float Mix = Phase < 60 ? Phase / 60.0f : (120 - Phase) / 60.0f;
-			return MaHudNameEffectMixColors(Primary, Accent, Mix);
-		}
-		return Primary;
+		return MaNameEffects::LetterColor(LetterIndex, Alpha, Settings.m_Style, Settings.m_Color1, Settings.m_Color2, Settings.m_Moving, MotionTick);
 	}
 
 	float MaHudNameEffectTextWidth(ITextRender *pTextRender, float FontSize, const char *pName, const SMaHudNameEffectSettings &Settings)
 	{
 		float Width = pTextRender->TextWidth(FontSize, pName, -1, -1.0f);
-		const int Style = std::clamp(Settings.m_Style, 0, 3);
-		if(Style == 2 || Style == 3)
+		const char *pPrefix = "";
+		const char *pSuffix = "";
+		MaNameEffects::Decorations(Settings.m_Style, &pPrefix, &pSuffix);
+		if(Settings.m_Stars)
 			Width += pTextRender->TextWidth(FontSize, "\xE2\x9C\xA6  \xE2\x9C\xA6", -1, -1.0f);
+		if(pPrefix[0] != '\0')
+			Width += pTextRender->TextWidth(FontSize, pPrefix, -1, -1.0f);
+		if(pSuffix[0] != '\0')
+			Width += pTextRender->TextWidth(FontSize, pSuffix, -1, -1.0f);
 		return Width;
 	}
 
 	void MaHudRenderNameEffect(ITextRender *pTextRender, float X, float Y, float FontSize, const char *pName, const SMaHudNameEffectSettings &Settings, float Alpha)
 	{
-		const int Style = std::clamp(Settings.m_Style, 0, 3);
-		const bool Stars = Style == 2 || Style == 3;
-		const int MotionTick = Settings.m_Moving ? (int)((time_get() * 12) / time_freq()) : 0;
+		const int Style = MaNameEffects::ClampStyle(Settings.m_Style);
+		const int MotionTick = (Settings.m_Moving || MaNameEffects::StyleAnimates(Style)) ? (int)((time_get() * 12) / time_freq()) : 0;
+		const char *pPrefix = "";
+		const char *pSuffix = "";
+		MaNameEffects::Decorations(Style, &pPrefix, &pSuffix);
 
 		CTextCursor Cursor;
 		Cursor.SetPosition(vec2(X, Y));
 		Cursor.m_FontSize = FontSize;
 
-		if(Stars)
+		if(Settings.m_Stars)
 		{
-			pTextRender->TextColor(MaHudNameEffectConfigColor(Settings.m_Color2, Alpha));
+			pTextRender->TextColor(MaNameEffects::AccentColor(Style, Alpha, Settings.m_Color1, Settings.m_Color2, MotionTick));
 			pTextRender->TextEx(&Cursor, "\xE2\x9C\xA6 ");
+		}
+		if(pPrefix[0] != '\0')
+		{
+			pTextRender->TextColor(MaNameEffects::AccentColor(Style, Alpha, Settings.m_Color1, Settings.m_Color2, MotionTick));
+			pTextRender->TextEx(&Cursor, pPrefix);
 		}
 
 		const char *pChar = pName;
@@ -353,9 +346,14 @@ namespace
 			++LetterIndex;
 		}
 
-		if(Stars)
+		if(pSuffix[0] != '\0')
 		{
-			pTextRender->TextColor(MaHudNameEffectConfigColor(Settings.m_Color2, Alpha));
+			pTextRender->TextColor(MaNameEffects::AccentColor(Style, Alpha, Settings.m_Color1, Settings.m_Color2, MotionTick));
+			pTextRender->TextEx(&Cursor, pSuffix);
+		}
+		if(Settings.m_Stars)
+		{
+			pTextRender->TextColor(MaNameEffects::AccentColor(Style, Alpha, Settings.m_Color1, Settings.m_Color2, MotionTick));
 			pTextRender->TextEx(&Cursor, " \xE2\x9C\xA6");
 		}
 		pTextRender->TextColor(1.0f, 1.0f, 1.0f, 1.0f);

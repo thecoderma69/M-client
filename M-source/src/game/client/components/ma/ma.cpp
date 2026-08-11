@@ -1,5 +1,6 @@
 #include "ma.h"
 
+#include "render_compat.h"
 #include "visualizer/service.h"
 
 #include <base/log.h>
@@ -90,25 +91,26 @@ static float MusicVideoBaseShape(float Angle)
 static float PerformanceLodScale(float Delta)
 {
 	float Lod = 1.0f;
-	if(Delta <= 0.0f)
-		return Lod;
-	if(Delta > 1.0f / 180.0f)
-		Lod = 0.35f;
-	else if(Delta > 1.0f / 300.0f)
-		Lod = 0.50f;
-	else if(Delta > 1.0f / 500.0f)
-		Lod = 0.68f;
-	else if(Delta > 1.0f / 750.0f)
-		Lod = 0.84f;
-
-	if(g_Config.m_MaPerformanceGuard)
+	if(Delta > 0.0f)
 	{
-		const int TargetFps = std::clamp(g_Config.m_MaPerformanceGuardTargetFps, 60, 1000);
-		const float TargetDelta = 1.0f / (float)TargetFps;
-		if(Delta > TargetDelta)
-			Lod = std::min(Lod, std::clamp(TargetDelta / Delta, 0.35f, 1.0f));
+		if(Delta > 1.0f / 180.0f)
+			Lod = 0.35f;
+		else if(Delta > 1.0f / 300.0f)
+			Lod = 0.50f;
+		else if(Delta > 1.0f / 500.0f)
+			Lod = 0.68f;
+		else if(Delta > 1.0f / 750.0f)
+			Lod = 0.84f;
+
+		if(g_Config.m_MaPerformanceGuard)
+		{
+			const int TargetFps = std::clamp(g_Config.m_MaPerformanceGuardTargetFps, 60, 1000);
+			const float TargetDelta = 1.0f / (float)TargetFps;
+			if(Delta > TargetDelta)
+				Lod = std::min(Lod, std::clamp(TargetDelta / Delta, 0.35f, 1.0f));
+		}
 	}
-	return Lod;
+	return MaRenderCompat::ApplyLod(Lod);
 }
 
 static bool IsLocalClientId(CGameClient *pGameClient, int ClientId)
@@ -1789,8 +1791,8 @@ void CMa::RenderMusicVideoEffect(bool ForcePreview)
 	const bool AudioMotionActive = ForcePreview || !g_Config.m_MaMusicVideoEffectMusicOnly || MusicPlaying;
 	const float Time = (float)(time_get() / (double)time_freq());
 	const float Lod = ForcePreview ? 1.0f : PerformanceLodScale(Delta);
-	const int NumPoints = std::clamp(round_to_int(std::clamp(g_Config.m_MaMusicVideoEffectPoints, 32, MAX_MUSIC_VIDEO_POINTS) * Lod), 32, MAX_MUSIC_VIDEO_POINTS);
-	const int TrailLines = std::clamp(round_to_int(std::clamp(g_Config.m_MaMusicVideoEffectTrailLines, 1, 10) * (0.55f + 0.45f * Lod)), 1, 10);
+	const int NumPoints = MaRenderCompat::ClampMusicVideoPoints(std::clamp(round_to_int(std::clamp(g_Config.m_MaMusicVideoEffectPoints, 32, MAX_MUSIC_VIDEO_POINTS) * Lod), 32, MAX_MUSIC_VIDEO_POINTS));
+	const int TrailLines = MaRenderCompat::ClampMusicVideoTrailLines(std::clamp(round_to_int(std::clamp(g_Config.m_MaMusicVideoEffectTrailLines, 1, 10) * (0.55f + 0.45f * Lod)), 1, 10));
 	const float Intensity = std::clamp(g_Config.m_MaMusicVideoEffectIntensity / 100.0f, 0.0f, 3.0f);
 
 	EnsureMusicVideoCenterImageLoaded();
@@ -1895,7 +1897,7 @@ void CMa::RenderMusicVideoEffect(bool ForcePreview)
 		Graphics()->LinesDraw(aLines.data(), NumPoints);
 	}
 	BuildLines(0.0f, 1.08f, 0.0f);
-	if(Lod >= 0.55f)
+	if(Lod >= 0.55f && !MaRenderCompat::ForceLowDetail())
 	{
 		Graphics()->SetColor(EffectColor.r, EffectColor.g, EffectColor.b, std::clamp(Alpha * (0.18f + Level * 0.18f), 0.0f, 0.55f));
 		Graphics()->LinesDraw(aRadialLines.data(), NumPoints);

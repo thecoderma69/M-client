@@ -1,5 +1,6 @@
-﻿#include "particles3d.h"
+#include "particles3d.h"
 
+#include "render_compat.h"
 #include "visualizer/service.h"
 
 #include <base/math.h>
@@ -58,13 +59,15 @@ static float ApproachValue(float Current, float Target, float Delta, float Speed
 
 static float PerformanceGuardLodScale(float Delta)
 {
-	if(!g_Config.m_MaPerformanceGuard || Delta <= 0.0f)
-		return 1.0f;
-	const int TargetFps = std::clamp(g_Config.m_MaPerformanceGuardTargetFps, 60, 1000);
-	const float TargetDelta = 1.0f / (float)TargetFps;
-	if(Delta <= TargetDelta)
-		return 1.0f;
-	return std::clamp(TargetDelta / Delta, 0.35f, 1.0f);
+	float Lod = 1.0f;
+	if(g_Config.m_MaPerformanceGuard && Delta > 0.0f)
+	{
+		const int TargetFps = std::clamp(g_Config.m_MaPerformanceGuardTargetFps, 60, 1000);
+		const float TargetDelta = 1.0f / (float)TargetFps;
+		if(Delta > TargetDelta)
+			Lod = std::clamp(TargetDelta / Delta, 0.35f, 1.0f);
+	}
+	return MaRenderCompat::ApplyLod(Lod);
 }
 
 static const std::array<vec3, 8> g_aCubeVertices = { {
@@ -454,6 +457,7 @@ void CMa3DParticles::OnRender()
 		const int GuardMax = std::clamp(g_Config.m_MaPerformanceGuardMax3dParticles, 10, PARTICLE_MAX);
 		TargetCount = std::min(TargetCount, GuardMax);
 	}
+	TargetCount = MaRenderCompat::Clamp3dParticleCount(TargetCount);
 	if((int)m_vParticles.size() > TargetCount)
 		m_vParticles.resize(TargetCount);
 
@@ -526,7 +530,8 @@ void CMa3DParticles::OnRender()
 	}
 
 	int Missing = TargetCount - (int)m_vParticles.size();
-	const int SpawnBudget = g_Config.m_MaPerformanceGuard ? std::clamp(round_to_int(8.0f * Lod), 1, 8) : 8;
+	const int BaseSpawnBudget = g_Config.m_MaPerformanceGuard ? std::clamp(round_to_int(8.0f * Lod), 1, 8) : 8;
+	const int SpawnBudget = MaRenderCompat::Clamp3dSpawnBudget(BaseSpawnBudget);
 	int SpawnNow = std::min(Missing, SpawnBudget);
 
 	for(int i = 0; i < SpawnNow; i++)
@@ -574,8 +579,8 @@ void CMa3DParticles::RenderParticles(float VMinX, float VMaxX, float VMinY, floa
 
 	Graphics()->TextureClear();
 
-	const bool LowDetail = g_Config.m_MaPerformanceGuard && Lod < 0.62f;
-	const bool GlowEnabled = g_Config.m_Ma3dParticlesGlow != 0 && (!g_Config.m_MaPerformanceGuard || Lod >= 0.72f);
+	const bool LowDetail = MaRenderCompat::ForceLowDetail() || (g_Config.m_MaPerformanceGuard && Lod < 0.62f);
+	const bool GlowEnabled = g_Config.m_Ma3dParticlesGlow != 0 && (!g_Config.m_MaPerformanceGuard || Lod >= 0.72f) && MaRenderCompat::AllowGlow(Lod);
 	const float GlowAlpha = std::clamp(g_Config.m_Ma3dParticlesGlowAlpha / 100.0f, 0.0f, 1.0f);
 	const float GlowOffset = (float)g_Config.m_Ma3dParticlesGlowOffset;
 	const vec3 GlowOffsetVec(-GlowOffset, -GlowOffset, 0.0f);

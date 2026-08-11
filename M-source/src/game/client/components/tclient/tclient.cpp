@@ -19,6 +19,7 @@
 #include <game/client/animstate.h>
 #include <game/client/components/chat.h>
 #include <game/client/components/hud_layout.h>
+#include <game/client/components/ma/render_compat.h>
 #include <game/client/components/particles.h>
 #include <game/client/components/sounds.h>
 #include <game/client/gameclient.h>
@@ -768,13 +769,15 @@ bool CTClient::ServerCommandExists(const char *pCommand)
 
 static float WeatherPerformanceLodScale(float FrameTime)
 {
-	if(!g_Config.m_MaPerformanceGuard || FrameTime <= 0.0f)
-		return 1.0f;
-	const int TargetFps = std::clamp(g_Config.m_MaPerformanceGuardTargetFps, 60, 1000);
-	const float TargetDelta = 1.0f / (float)TargetFps;
-	if(FrameTime <= TargetDelta)
-		return 1.0f;
-	return std::clamp(TargetDelta / FrameTime, 0.35f, 1.0f);
+	float Lod = 1.0f;
+	if(g_Config.m_MaPerformanceGuard && FrameTime > 0.0f)
+	{
+		const int TargetFps = std::clamp(g_Config.m_MaPerformanceGuardTargetFps, 60, 1000);
+		const float TargetDelta = 1.0f / (float)TargetFps;
+		if(FrameTime > TargetDelta)
+			Lod = std::clamp(TargetDelta / FrameTime, 0.35f, 1.0f);
+	}
+	return MaRenderCompat::ApplyLod(Lod);
 }
 
 void CTClient::RenderWeatherParticles()
@@ -804,14 +807,14 @@ void CTClient::RenderWeatherParticles()
 	const float ScreenW = ScreenX1 - ScreenX0;
 	const float ScreenH = ScreenY1 - ScreenY0;
 	const float Lod = WeatherPerformanceLodScale(FrameTime);
-	const float Amount = (g_Config.m_TcWeatherAmount / 100.0f) * (g_Config.m_MaPerformanceGuard ? Lod : 1.0f);
+	const float Amount = (g_Config.m_TcWeatherAmount / 100.0f) * ((g_Config.m_MaPerformanceGuard || MaRenderCompat::Active()) ? Lod : 1.0f);
 	const float Speed = g_Config.m_TcWeatherSpeed / 100.0f;
 	const float Size = g_Config.m_TcWeatherSize / 100.0f;
 	const float Alpha = g_Config.m_TcWeatherAlpha / 100.0f;
 	const float SpawnRate = 12.0f + Amount * 150.0f;
 
 	m_WeatherParticleRemainder += FrameTime * SpawnRate;
-	const int MaxSpawnPerFrame = g_Config.m_MaPerformanceGuard ? std::clamp(round_to_int(24.0f * Lod), 4, 24) : 24;
+	const int MaxSpawnPerFrame = MaRenderCompat::ClampWeatherSpawnBudget((g_Config.m_MaPerformanceGuard || MaRenderCompat::Active()) ? std::clamp(round_to_int(24.0f * Lod), 4, 24) : 24);
 	const int SpawnCount = minimum((int)m_WeatherParticleRemainder, MaxSpawnPerFrame);
 	m_WeatherParticleRemainder -= SpawnCount;
 

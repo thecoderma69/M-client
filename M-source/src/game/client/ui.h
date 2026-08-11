@@ -546,7 +546,11 @@ public:
 		}
 		return false;
 	}
-	void SetHotScrollRegion(CScrollRegion *pId) { m_pBecomingHotScrollRegion = pId; }
+	void SetHotScrollRegion(CScrollRegion *pId)
+	{
+		if(pId == nullptr || m_pBecomingHotScrollRegion == nullptr)
+			m_pBecomingHotScrollRegion = pId;
+	}
 	const void *HotItem() const { return m_pHotItem; }
 	const void *NextHotItem() const { return m_pBecomingHotItem; }
 	const void *ActiveItem() const { return m_pActiveItem; }
