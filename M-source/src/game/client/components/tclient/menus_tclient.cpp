@@ -509,15 +509,15 @@ static int MaKeystrokePackScan(const char *pName, int IsDir, int DirType, void *
 }static const char *MaAudioPackDisplayName(const char *pName)
 {
 	if(str_comp(pName, "ma_space_pulse") == 0 || str_comp(pName, "ma_fx") == 0)
-		return "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Space Pulse";
+		return "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ Space Pulse";
 	if(str_comp(pName, "ma_retro_arcade") == 0)
-		return "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Retro Arcade";
+		return "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ Retro Arcade";
 	if(str_comp(pName, "ma_demon_core") == 0)
-		return "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Demon Core";
+		return "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ Demon Core";
 	if(str_comp(pName, "ma_magic_stars") == 0)
-		return "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Magic Stars";
+		return "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ Magic Stars";
 	if(str_comp(pName, "ma_dark_void") == 0)
-		return "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Dark Void";
+		return "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ Dark Void";
 	return pName;
 }
 
@@ -2867,7 +2867,7 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 
 	if(DoButtonLineSize_Menu(&s_GithubButton, TCLocalize("Github"), 0, &ButtonLeft, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
 		Client()->ViewLink("https://github.com/sjrc6/TaterClient-ddnet");
-	if(DoButtonLineSize_Menu(&s_SupportButton, TCLocalize("Support ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢Ãƒâ€šÃ‚Â¥"), 0, &ButtonRight, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+	if(DoButtonLineSize_Menu(&s_SupportButton, TCLocalize("Support ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥"), 0, &ButtonRight, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
 		Client()->ViewLink("https://ko-fi.com/Totar");
 
 	LeftView = LowerLeftView;
@@ -2923,10 +2923,10 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 	{
 		RightView.HSplitTop(CardSize, &DevCardRect, &RightView);
 		DevCardRect.VSplitLeft(CardSize, &TeeRect, &Label);
-		Label.VSplitLeft(TextRender()->TextWidth(LineSize, "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾"), &Label, &Button);
+		Label.VSplitLeft(TextRender()->TextWidth(LineSize, "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾"), &Label, &Button);
 		Button.VSplitLeft(MarginSmall, nullptr, &Button);
 		Button.w = LineSize, Button.h = LineSize, Button.y = Label.y + (Label.h / 2.0f - Button.h / 2.0f);
-		Ui()->DoLabel(&Label, "MÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã‚Â£Ãƒâ€ Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾", LineSize, TEXTALIGN_ML);
+		Ui()->DoLabel(&Label, "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾", LineSize, TEXTALIGN_ML);
 		if(Ui()->DoButton_FontIcon(&s_LinkButton6, FontIcon::ARROW_UP_RIGHT_FROM_SQUARE, 0, &Button, IGraphics::CORNER_ALL))
 			Client()->ViewLink("https://github.com/thecoderma69");
 		RenderDevSkin(TeeRect.Center(), TeeSize, "ahl_blackbop", "default", false, 0, 0, 0, false, true);
@@ -4602,6 +4602,7 @@ void CMenus::RenderMaVisual(CUIRect MainView)
 	if(g_Config.m_MaTeamStatsPanel)
 	{
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaTeamStatsPanelOnlyInTeam, TCLocalize("Solo al estar en team"), &g_Config.m_MaTeamStatsPanelOnlyInTeam, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaTeamStatsPanelOnlyFinish, TCLocalize("Mostrar solo al final del mapa"), &g_Config.m_MaTeamStatsPanelOnlyFinish, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_MaTeamStatsPanelShowSelf, TCLocalize("Mostrar mi puntuacion"), &g_Config.m_MaTeamStatsPanelShowSelf, &LeftView, LineSize);
 		LeftView.HSplitTop(LineSize, &Button, &LeftView);
 		Ui()->DoScrollbarOption(&g_Config.m_MaTeamStatsPanelMaxPlayers, &g_Config.m_MaTeamStatsPanelMaxPlayers, &Button, TCLocalize("Jugadores mostrados"), 1, 12);

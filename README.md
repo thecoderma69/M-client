@@ -1,4 +1,4 @@
-# MΛ ツ Client 2.2
+# MΛ ツ Client 2.2.1
 
 Cliente personalizado basado en DDNet/TClient para Windows x64, preparado para descargar, extraer y jugar.
 
@@ -8,7 +8,7 @@ Repositorio oficial: [thecoderma69/M-client](https://github.com/thecoderma69/M-c
 
 MΛ ツ Client es una version modificada del cliente DDNet con mejoras visuales, opciones de personalizacion, herramientas de comodidad, recursos propios y apartados especiales para stream, HUD, GIFs, musica y efectos visuales.
 
-La version 2.2 mejora el apartado GIF: ahora usa GIPHY como buscador online, permite organizar la rueda GIF arrastrando cada GIF al lugar exacto que quieras y agrega un tutorial separado para crear la API key.
+La version 2.2.1 corrige y mejora las estadisticas de team: el panel vuelve a mostrarse siempre cuando esta activo, agrega la opcion para mostrarlo solo al final del mapa y escribe un resumen local en el chat al terminar.
 
 ## Descargar
 
@@ -19,19 +19,19 @@ El juego listo para usar esta en:
 Descarga:
 
 ```txt
-M-Client-v2.2-win64.zip
+M-Client-v2.2.1-win64.zip
 ```
 
 Luego extrae el `.zip`. Dentro encontraras una carpeta:
 
 ```txt
-M-Client-v2.2-win64/
+M-Client-v2.2.1-win64/
 ```
 
 Abre el juego desde:
 
 ```txt
-M-Client-v2.2-win64/DDNet.exe
+M-Client-v2.2.1-win64/DDNet.exe
 ```
 
 ## Codigo Fuente
@@ -41,6 +41,14 @@ El codigo fuente esta en:
 ```txt
 M-source/
 ```
+
+## Novedades De La Version 2.2.1
+
+- Nuevo ajuste en `MΛ ツ > Configuracion > Estadisticas de team`: `Mostrar solo al final del mapa`.
+- Si esa opcion esta desactivada, las estadisticas de team se muestran siempre como antes.
+- Al terminar el mapa se escribe un resumen local en el chat del cliente, visible solo para quien usa el cliente.
+- Se corrigio que el panel de estadisticas desapareciera cuando no correspondia.
+- Texto del menu principal actualizado a la version `2.2.1`.
 
 ## Novedades De La Version 2.2
 

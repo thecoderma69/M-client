@@ -1107,6 +1107,7 @@ void CMa::ResetTeamStats()
 	m_TeamStatsFinishTick = -1;
 	m_TeamStatsRunActive = false;
 	m_TeamStatsRunFinished = false;
+	m_TeamStatsChatSummaryPrinted = false;
 }
 
 void CMa::FinishTeamStatsRun(int FinishTick)
@@ -1134,6 +1135,29 @@ void CMa::FinishTeamStatsRun(int FinishTick)
 	m_TeamStatsFinishTick = SafeFinishTick;
 	m_TeamStatsFinishedRaceStartTick = m_TeamStatsRaceStartTick;
 	m_TeamStatsLastTick = SafeFinishTick;
+	PrintTeamStatsChatSummary();
+}
+
+void CMa::PrintTeamStatsChatSummary()
+{
+	if(m_TeamStatsChatSummaryPrinted || !g_Config.m_MaEnabled || !g_Config.m_MaTeamStatsPanel)
+		return;
+
+	char aaLines[MAX_CLIENTS + 8][MAX_NAME_LENGTH + 96] = {};
+	bool aHighlight[MAX_CLIENTS + 8] = {};
+	const int LineCount = BuildTeamStatsPanelLines(false, aaLines, aHighlight, MAX_CLIENTS);
+	if(LineCount <= 0)
+		return;
+
+	m_TeamStatsChatSummaryPrinted = true;
+	char aChatLine[MAX_NAME_LENGTH + 128];
+	str_copy(aChatLine, "MΛ ツ: Estadisticas de team", sizeof(aChatLine));
+	GameClient()->m_Chat.Echo(aChatLine);
+	for(int i = 0; i < LineCount; ++i)
+	{
+		str_format(aChatLine, sizeof(aChatLine), "MΛ ツ: %s", aaLines[i]);
+		GameClient()->m_Chat.Echo(aChatLine);
+	}
 }
 
 void CMa::UpdateTeamStatsShowAll()
@@ -1207,6 +1231,7 @@ void CMa::UpdateTeamStats()
 		m_TeamStatsRaceStartTick = RaceStartTick;
 		m_TeamStatsRunActive = true;
 		m_TeamStatsRunFinished = false;
+		m_TeamStatsChatSummaryPrinted = false;
 		m_TeamStatsLastTick = -1;
 	}
 
@@ -1333,7 +1358,7 @@ void CMa::UpdateTeamStats()
 	m_TeamStatsLastTick = Tick;
 }
 
-int CMa::BuildTeamStatsPanelLines(bool ForcePreview, char aaLines[MAX_CLIENTS + 8][MAX_NAME_LENGTH + 96], bool aHighlight[MAX_CLIENTS + 8]) const
+int CMa::BuildTeamStatsPanelLines(bool ForcePreview, char aaLines[MAX_CLIENTS + 8][MAX_NAME_LENGTH + 96], bool aHighlight[MAX_CLIENTS + 8], int MaxPlayersOverride) const
 {
 	int LineCount = 0;
 	auto AddLine = [&](const char *pText, bool Highlight = false) {
@@ -1425,7 +1450,7 @@ int CMa::BuildTeamStatsPanelLines(bool ForcePreview, char aaLines[MAX_CLIENTS + 
 	str_format(aLine, sizeof(aLine), "Mejor rescate: %s %d", GameClient()->m_aClients[pBestSaves->m_ClientId].m_aName, pBestSaves->m_Saves);
 	AddLine(aLine, pBestSaves->m_Local);
 
-	const int MaxPlayers = std::clamp(g_Config.m_MaTeamStatsPanelMaxPlayers, 1, 12);
+	const int MaxPlayers = MaxPlayersOverride > 0 ? std::clamp(MaxPlayersOverride, 1, (int)MAX_CLIENTS) : std::clamp(g_Config.m_MaTeamStatsPanelMaxPlayers, 1, 12);
 	bool LocalShown = false;
 	const int VisiblePlayers = minimum(MaxPlayers, (int)vEntries.size());
 	for(int i = 0; i < VisiblePlayers; ++i)
@@ -1496,6 +1521,8 @@ CUIRect CMa::GetTeamStatsPanelHudEditorRect(bool ForcePreview) const
 void CMa::RenderTeamStatsPanel(bool ForcePreview)
 {
 	if(!ForcePreview && (!g_Config.m_MaTeamStatsPanel || !HudLayout::IsEnabled(HudLayout::MODULE_MA_TEAM_STATS)))
+		return;
+	if(!ForcePreview && g_Config.m_MaTeamStatsPanelOnlyFinish == 1 && !m_TeamStatsRunFinished)
 		return;
 
 	char aaLines[MAX_CLIENTS + 8][MAX_NAME_LENGTH + 96] = {};

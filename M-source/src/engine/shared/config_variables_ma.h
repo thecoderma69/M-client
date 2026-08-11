@@ -198,6 +198,7 @@ MACRO_CONFIG_INT(MaSpectatorPanelHudScale, ma_spectator_panel_hud_scale, 100, 25
 // ===== TEAM STATS PANEL =====
 MACRO_CONFIG_INT(MaTeamStatsPanel, ma_team_stats_panel, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show MA team statistics HUD panel")
 MACRO_CONFIG_INT(MaTeamStatsPanelOnlyInTeam, ma_team_stats_panel_only_in_team, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Only show team statistics after joining a DDNet team")
+MACRO_CONFIG_INT(MaTeamStatsPanelOnlyFinish, ma_team_stats_panel_only_finish, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Only show MA team statistics panel after finishing the map")
 MACRO_CONFIG_INT(MaTeamStatsPanelShowSelf, ma_team_stats_panel_show_self, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Always show your own team statistics")
 MACRO_CONFIG_INT(MaTeamStatsPanelMaxPlayers, ma_team_stats_panel_max_players, 3, 1, 12, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum players shown in the MA team statistics panel")
 MACRO_CONFIG_INT(MaTeamStatsPanelOpacity, ma_team_stats_panel_opacity, 78, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MA team statistics panel background opacity")
