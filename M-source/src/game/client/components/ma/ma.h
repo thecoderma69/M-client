@@ -46,6 +46,7 @@ class CMa : public CComponent
 	void RenderSpectatorPanel(bool ForcePreview);
 	void ResetTeamStats();
 	void FinishTeamStatsRun(int FinishTick);
+	void UpdateTeamStatsShowAll();
 	void UpdateTeamStats();
 	int BuildTeamStatsPanelLines(bool ForcePreview, char aaLines[MAX_CLIENTS + 8][MAX_NAME_LENGTH + 96], bool aHighlight[MAX_CLIENTS + 8]) const;
 	CUIRect GetTeamStatsPanelRect(float Width, float Height, bool ForcePreview) const;
@@ -112,6 +113,7 @@ class CMa : public CComponent
 	int m_TeamStatsFinishTick = -1;
 	bool m_TeamStatsRunActive = false;
 	bool m_TeamStatsRunFinished = false;
+	bool m_TeamStatsAutoShowAllActive = false;
 
 public:
 	CMa();

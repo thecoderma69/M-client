@@ -1136,6 +1136,25 @@ void CMa::FinishTeamStatsRun(int FinishTick)
 	m_TeamStatsLastTick = SafeFinishTick;
 }
 
+void CMa::UpdateTeamStatsShowAll()
+{
+	const bool Online = Client()->State() == IClient::STATE_ONLINE;
+	if(!Online || !GameClient()->m_Snap.m_pLocalInfo || GameClient()->m_Snap.m_LocalClientId < 0)
+	{
+		m_TeamStatsAutoShowAllActive = false;
+		return;
+	}
+
+	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
+	const int LocalTeam = GameClient()->m_Teams.Team(LocalId);
+	const bool Wanted = g_Config.m_MaEnabled && g_Config.m_MaTeamStatsPanel && LocalTeam > TEAM_FLOCK;
+	if(Wanted == m_TeamStatsAutoShowAllActive)
+		return;
+
+	GameClient()->m_Chat.SendChat(0, Wanted ? "/showall 1" : "/showall 0");
+	m_TeamStatsAutoShowAllActive = Wanted;
+}
+
 void CMa::UpdateTeamStats()
 {
 	if(!g_Config.m_MaTeamStatsPanel)
@@ -1928,6 +1947,7 @@ void CMa::OnRender()
 
 void CMa::OnNewSnapshot()
 {
+	UpdateTeamStatsShowAll();
 	if(!g_Config.m_MaEnabled)
 		return;
 	UpdateTeamStats();
