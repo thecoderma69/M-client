@@ -1,4 +1,4 @@
-/* Copyright (c) 2026 BestProject Team */
+﻿/* Copyright (c) 2026 BestProject Team */
 #include "gif_wheel.h"
 
 #include <base/math.h>
@@ -108,15 +108,58 @@ static const char *EyeEmoteCommandName(int Emote)
 // Click zone (in the same world-space units as the segment layout below) for the switch-back-to-
 // emotes button, dead center. Must match EMOTICON_CENTER_RADIUS in emoticon.cpp.
 static constexpr float GIFWHEEL_CENTER_BUTTON_RADIUS = 40.0f;
-static constexpr int GIFWHEEL_MIN_VISIBLE_SLOTS = 8;
 
-static int GifWheelDisplaySlotCount(int SlotCount)
+static int GifWheelPageSlotCountConfigValue(int Page)
 {
-	if(SlotCount <= 0)
-		return 0;
-	return std::clamp(std::max(GIFWHEEL_MIN_VISIBLE_SLOTS, SlotCount), 1, (int)GIFWHEEL_MAX_SLOTS);
+	switch(std::clamp(Page, 0, (int)GIFWHEEL_MAX_PAGES - 1))
+	{
+	case 0: return g_Config.m_MaGifWheelSlotsPage1;
+	case 1: return g_Config.m_MaGifWheelSlotsPage2;
+	case 2: return g_Config.m_MaGifWheelSlotsPage3;
+	case 3: return g_Config.m_MaGifWheelSlotsPage4;
+	default: return GIFWHEEL_BASE_SLOTS_PER_PAGE;
+	}
 }
 
+static int GifWheelVisibleSlotCountForPage(int Page)
+{
+	return std::clamp(GifWheelPageSlotCountConfigValue(Page), 1, (int)GIFWHEEL_SLOTS_PER_PAGE);
+}
+
+static int GifWheelActivePage()
+{
+	const int Page = std::clamp(g_Config.m_MaGifWheelPage, 0, (int)GIFWHEEL_MAX_PAGES - 1);
+	if(g_Config.m_MaGifWheelPage != Page)
+		g_Config.m_MaGifWheelPage = Page;
+	return Page;
+}
+
+static int GifWheelSlotIndex(int Page, int LocalIndex)
+{
+	if(LocalIndex < 0 || LocalIndex >= GIFWHEEL_SLOTS_PER_PAGE)
+		return -1;
+	const int ClampedPage = std::clamp(Page, 0, (int)GIFWHEEL_MAX_PAGES - 1);
+	if(LocalIndex < GIFWHEEL_BASE_SLOTS_PER_PAGE)
+		return ClampedPage * GIFWHEEL_BASE_SLOTS_PER_PAGE + LocalIndex;
+	return GIFWHEEL_LEGACY_MAX_SLOTS + ClampedPage * (GIFWHEEL_SLOTS_PER_PAGE - GIFWHEEL_BASE_SLOTS_PER_PAGE) + (LocalIndex - GIFWHEEL_BASE_SLOTS_PER_PAGE);
+}
+
+static int GifWheelActivePageSlotIndex(int LocalIndex)
+{
+	return GifWheelSlotIndex(GifWheelActivePage(), LocalIndex);
+}
+
+static bool GifWheelPageHasSlots(const std::vector<CGifWheel::CSlot> &vSlots, int Page)
+{
+	const int VisibleSlots = GifWheelVisibleSlotCountForPage(Page);
+	for(int i = 0; i < VisibleSlots; ++i)
+	{
+		const int SlotIndex = GifWheelSlotIndex(Page, i);
+		if(SlotIndex >= 0 && SlotIndex < (int)vSlots.size() && !vSlots[SlotIndex].IsEmpty())
+			return true;
+	}
+	return false;
+}
 
 CGifWheel::CGifWheel()
 {
@@ -475,7 +518,8 @@ void CGifWheel::OnRender()
 	const float MouseDistance = length(GameClient()->m_Emoticon.m_SelectorMouse);
 	const float SelectedAngle = angle(GameClient()->m_Emoticon.m_SelectorMouse);
 
-	const int SegmentCount = GifWheelDisplaySlotCount((int)m_vSlots.size());
+	const int ActivePage = GifWheelActivePage();
+	const int SegmentCount = GifWheelPageHasSlots(m_vSlots, ActivePage) ? GifWheelVisibleSlotCountForPage(ActivePage) : 0;
 	if(SegmentCount == 0 || MouseDistance <= s_InnerOuterMouseBoundaryRadius)
 		m_SelectedSlot = -1;
 	else
@@ -512,14 +556,18 @@ void CGifWheel::OnRender()
 	Graphics()->QuadsEnd();
 
 	const vec2 ScreenCenter = Screen.Center();
+	const float SlotDensityScale = SegmentCount > GIFWHEEL_BASE_SLOTS_PER_PAGE ? std::clamp(std::sqrt((float)GIFWHEEL_BASE_SLOTS_PER_PAGE / (float)SegmentCount), 0.50f, 1.0f) : 1.0f;
+	const float ThumbnailSize = s_ThumbnailSize * SlotDensityScale;
+	const float ThumbnailSizeSelected = s_ThumbnailSizeSelected * std::clamp(SlotDensityScale + 0.12f, 0.50f, 1.0f);
 	const float Theta = pi * 2.0f / std::max<float>(1.0f, (float)SegmentCount);
 	for(int i = 0; i < SegmentCount; i++)
 	{
-		const bool HasSlot = i < (int)m_vSlots.size() && !m_vSlots[i].IsEmpty();
-		CSlot *pSlot = HasSlot ? &m_vSlots[i] : nullptr;
+		const int SlotIndex = GifWheelSlotIndex(ActivePage, i);
+		const bool HasSlot = SlotIndex < (int)m_vSlots.size() && !m_vSlots[SlotIndex].IsEmpty();
+		CSlot *pSlot = HasSlot ? &m_vSlots[SlotIndex] : nullptr;
 		const float Angle = Theta * i;
 		const float Phase = ItemAnimationTime == 0.0f ? (i == m_SelectedSlot ? 1.0f : 0.0f) : QuadEaseInOut(m_aAnimationTimeItems[i] / ItemAnimationTime);
-		const float Size = (s_ThumbnailSize + Phase * (s_ThumbnailSizeSelected - s_ThumbnailSize)) * aAnimationPhase[1];
+		const float Size = (ThumbnailSize + Phase * (ThumbnailSizeSelected - ThumbnailSize)) * aAnimationPhase[1];
 		const vec2 Pos = ScreenCenter + direction(Angle) * s_OuterItemRadius * aAnimationPhase[1];
 
 		if(pSlot && pSlot->m_Thumbnail.IsValid())
@@ -590,21 +638,24 @@ void CGifWheel::OnRender()
 
 void CGifWheel::ExecuteSlot(int Index)
 {
-	if(Index < 0 || Index >= (int)m_vSlots.size() || m_vSlots[Index].m_aUrl[0] == '\0')
+	const int ActivePage = GifWheelActivePage();
+	const int VisibleSlots = GifWheelVisibleSlotCountForPage(ActivePage);
+	const int SlotIndex = GifWheelSlotIndex(ActivePage, Index);
+	if(Index < 0 || Index >= VisibleSlots || SlotIndex < 0 || SlotIndex >= (int)m_vSlots.size() || m_vSlots[SlotIndex].m_aUrl[0] == '\0')
 		return;
 	// Last line of defense: only ever post links that are actually pinned to CherryGifs, in case
 	// a slot's url was ever tampered with (e.g. a hand-edited settings_BestClient.cfg).
-	if(!IsCherryGifsUrl(m_vSlots[Index].m_aUrl))
+	if(!IsCherryGifsUrl(m_vSlots[SlotIndex].m_aUrl))
 		return;
 	// Just a normal chat message with the gif's direct link; the server sees plain text.
 	// Chat Media (inline preview) and the above-head bubble both key off that link client-side.
-	GameClient()->m_Chat.SendChat(0, m_vSlots[Index].m_aUrl);
+	GameClient()->m_Chat.SendChat(0, m_vSlots[SlotIndex].m_aUrl);
 
 	// Same as picking an eye emote from the regular emote wheel: a separate /emote chat command,
 	// applied on top of (not instead of) the gif. Duration is tied to the gif bubble's own
 	// lifetime (not the user's regular cl_eye_duration, which usually stays "forever") so the
 	// eyes revert exactly when the bubble disappears, same as a normal temporary eye emote.
-	const char *pEyeEmoteCommand = EyeEmoteCommandName(m_vSlots[Index].m_EyeEmote);
+	const char *pEyeEmoteCommand = EyeEmoteCommandName(m_vSlots[SlotIndex].m_EyeEmote);
 	if(pEyeEmoteCommand)
 	{
 		char aBuf[32];

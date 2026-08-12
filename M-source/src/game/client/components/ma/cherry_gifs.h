@@ -32,7 +32,7 @@ struct SCherryGif
 	bool m_ThumbnailFailed = false;
 };
 
-// Client for MA GIF browser sources: local database, Tenor, and CherryGifs fallback.
+// Client for MA GIF browser sources: local database and GIPHY search.
 class CCherryGifs : public CComponent
 {
 	enum class EListProvider
@@ -44,8 +44,10 @@ class CCherryGifs : public CComponent
 	};
 
 	std::vector<SCherryGif> m_vResults;
+	std::vector<SCherryGif> m_vFavorites;
 	std::vector<SCherryGif> m_vLocalDatabase;
 	bool m_LocalDatabaseLoaded = false;
+	bool m_FavoritesLoaded = false;
 	int m_Offset = 0;
 	int m_Total = 0;
 	char m_aNextPos[128] = "";
@@ -72,6 +74,8 @@ class CCherryGifs : public CComponent
 	{
 		std::shared_ptr<CHttpRequest> m_pRequest;
 		char m_aGifId[32] = "";
+		char m_aUrl[256] = "";
+		bool m_Favorite = false;
 	};
 	std::vector<SThumbnailJob> m_vThumbnailJobs;
 
@@ -81,8 +85,12 @@ class CCherryGifs : public CComponent
 	std::unordered_map<std::string, bool> m_NsfwByUrl;
 
 	void EnsureLocalDatabase();
+	void EnsureFavorites();
+	void SaveFavorites();
+	int FindFavoriteIndex(const char *pUrl) const;
 	void AppendLocalMatches();
 	bool DecodeThumbnailBytes(SCherryGif &Gif, const unsigned char *pData, size_t DataSize);
+	void RequestThumbnail(SCherryGif &Gif, bool Favorite);
 
 	void ApplyFilters();
 	void StartListRequest(bool Reset);
@@ -101,11 +109,16 @@ public:
 	void ReloadLocalDatabase();
 	void LoadMore();
 	void RequestThumbnail(int Index);
+	void RequestFavoriteThumbnail(int Index);
 	bool GetThumbnailTexture(const SCherryGif &Gif, IGraphics::CTextureHandle &Texture) const;
 
 	// Returns true if we know whether pUrl is nsfw (filling OutNsfw), false if we've never seen
 	// this url from the API (e.g. someone else posted a CherryGifs link we haven't browsed to).
 	bool TryGetNsfw(const char *pUrl, bool &OutNsfw) const;
+
+	bool IsFavorite(const char *pUrl);
+	void ToggleFavorite(const SCherryGif &Gif);
+	const std::vector<SCherryGif> &Favorites();
 
 	const std::vector<SCherryGif> &Results() const { return m_vResults; }
 	bool IsLoading() const { return m_Loading; }

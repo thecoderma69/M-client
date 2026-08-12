@@ -1,4 +1,4 @@
-#include <base/log.h>
+﻿#include <base/log.h>
 #include <base/math.h>
 #include <base/system.h>
 #include <base/types.h>
@@ -509,15 +509,15 @@ static int MaKeystrokePackScan(const char *pName, int IsDir, int DirType, void *
 }static const char *MaAudioPackDisplayName(const char *pName)
 {
 	if(str_comp(pName, "ma_space_pulse") == 0 || str_comp(pName, "ma_fx") == 0)
-		return "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ Space Pulse";
+        return "M\316\233 \343\203\204 Space Pulse";
 	if(str_comp(pName, "ma_retro_arcade") == 0)
-		return "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ Retro Arcade";
+        return "M\316\233 \343\203\204 Retro Arcade";
 	if(str_comp(pName, "ma_demon_core") == 0)
-		return "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ Demon Core";
+        return "M\316\233 \343\203\204 Demon Core";
 	if(str_comp(pName, "ma_magic_stars") == 0)
-		return "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ Magic Stars";
+        return "M\316\233 \343\203\204 Magic Stars";
 	if(str_comp(pName, "ma_dark_void") == 0)
-		return "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ Dark Void";
+        return "M\316\233 \343\203\204 Dark Void";
 	return pName;
 }
 
@@ -2848,7 +2848,7 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 	RightView.Margin(8.0f, &RightView);
 
 	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("TClient Links"), HeadlineFontSize, TEXTALIGN_ML);
+    Ui()->DoLabel(&Label, "Enlaces M\316\233 \343\203\204", HeadlineFontSize, TEXTALIGN_ML);
 	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
 
 	static CButtonContainer s_DiscordButton, s_WebsiteButton, s_GithubButton, s_SupportButton;
@@ -2866,9 +2866,9 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 	Button.VSplitMid(&ButtonLeft, &ButtonRight, MarginSmall);
 
 	if(DoButtonLineSize_Menu(&s_GithubButton, TCLocalize("Github"), 0, &ButtonLeft, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
-		Client()->ViewLink("https://github.com/sjrc6/TaterClient-ddnet");
-	if(DoButtonLineSize_Menu(&s_SupportButton, TCLocalize("Support ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥"), 0, &ButtonRight, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
-		Client()->ViewLink("https://ko-fi.com/Totar");
+        Client()->ViewLink("https://github.com/thecoderma69/M-client");
+    if(DoButtonLineSize_Menu(&s_SupportButton, TCLocalize("Soporte"), 0, &ButtonRight, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+        Client()->ViewLink("https://github.com/thecoderma69");
 
 	LeftView = LowerLeftView;
 	LeftView.HSplitBottom(LineSize * 4.0f + MarginSmall * 2.0f + HeadlineFontSize, nullptr, &LeftView);
@@ -2912,7 +2912,7 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 	// =======RIGHT VIEW========
 
 	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("TClient Developers"), HeadlineFontSize, TEXTALIGN_ML);
+    Ui()->DoLabel(&Label, "Desarrolladores de M\316\233 \343\203\204", HeadlineFontSize, TEXTALIGN_ML);
 	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 
@@ -2923,10 +2923,10 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 	{
 		RightView.HSplitTop(CardSize, &DevCardRect, &RightView);
 		DevCardRect.VSplitLeft(CardSize, &TeeRect, &Label);
-		Label.VSplitLeft(TextRender()->TextWidth(LineSize, "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾"), &Label, &Button);
+        Label.VSplitLeft(TextRender()->TextWidth(LineSize, "M\316\233 \343\203\204"), &Label, &Button);
 		Button.VSplitLeft(MarginSmall, nullptr, &Button);
 		Button.w = LineSize, Button.h = LineSize, Button.y = Label.y + (Label.h / 2.0f - Button.h / 2.0f);
-		Ui()->DoLabel(&Label, "MÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾", LineSize, TEXTALIGN_ML);
+        Ui()->DoLabel(&Label, "M\316\233 \343\203\204", LineSize, TEXTALIGN_ML);
 		if(Ui()->DoButton_FontIcon(&s_LinkButton6, FontIcon::ARROW_UP_RIGHT_FROM_SQUARE, 0, &Button, IGraphics::CORNER_ALL))
 			Client()->ViewLink("https://github.com/thecoderma69");
 		RenderDevSkin(TeeRect.Center(), TeeSize, "ahl_blackbop", "default", false, 0, 0, 0, false, true);
@@ -3862,7 +3862,24 @@ void CMenus::RenderMaGif(CUIRect MainView)
 		g_Config.m_MaGifApiSource = 1;
 		CherryGifs.ReloadLocalDatabase();
 	}
-
+	static int s_GifBrowserSection = 0;
+	CherryPanel.HSplitTop(MarginSmall, nullptr, &CherryPanel);
+	CherryPanel.HSplitTop(LineSize, &Row, &CherryPanel);
+	CUIRect SectionAll, SectionFavorites, SectionWheel, SectionRest;
+	const float SectionWidth = (Row.w - MarginSmall * 2.0f) / 3.0f;
+	Row.VSplitLeft(SectionWidth, &SectionAll, &SectionRest);
+	SectionRest.VSplitLeft(MarginSmall, nullptr, &SectionRest);
+	SectionRest.VSplitLeft(SectionWidth, &SectionFavorites, &SectionRest);
+	SectionRest.VSplitLeft(MarginSmall, nullptr, &SectionWheel);
+	static CButtonContainer s_GifSectionAll;
+	static CButtonContainer s_GifSectionFavorites;
+	static CButtonContainer s_GifSectionWheel;
+	if(DoButton_Menu(&s_GifSectionAll, TCLocalize("Todos"), s_GifBrowserSection == 0, &SectionAll, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
+		s_GifBrowserSection = 0;
+	if(DoButton_Menu(&s_GifSectionFavorites, TCLocalize("Favoritos"), s_GifBrowserSection == 1, &SectionFavorites, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
+		s_GifBrowserSection = 1;
+	if(DoButton_Menu(&s_GifSectionWheel, TCLocalize("En rueda"), s_GifBrowserSection == 2, &SectionWheel, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+		s_GifBrowserSection = 2;
 	CherryPanel.HSplitTop(MarginSmall, nullptr, &CherryPanel);
 	if(g_Config.m_MaGifApiSource == 1)
 	{
@@ -3912,14 +3929,54 @@ void CMenus::RenderMaGif(CUIRect MainView)
 	CherryPanel.HSplitBottom(MarginSmall, &CherryPanel, nullptr);
 	CherryPanel.HSplitTop(MarginSmall, nullptr, &CherryPanel);
 	CUIRect Grid = CherryPanel;
+	if(g_Config.m_MaGifWheelPage < 0 || g_Config.m_MaGifWheelPage >= GIFWHEEL_MAX_PAGES)
+		g_Config.m_MaGifWheelPage = 0;
+	const int ActiveGifWheelPage = g_Config.m_MaGifWheelPage;
+	auto GifWheelSlotCountConfigForPage = [](int Page) -> int * {
+		switch(std::clamp(Page, 0, (int)GIFWHEEL_MAX_PAGES - 1))
+		{
+		case 0: return &g_Config.m_MaGifWheelSlotsPage1;
+		case 1: return &g_Config.m_MaGifWheelSlotsPage2;
+		case 2: return &g_Config.m_MaGifWheelSlotsPage3;
+		case 3: return &g_Config.m_MaGifWheelSlotsPage4;
+		default: return &g_Config.m_MaGifWheelSlotsPage1;
+		}
+	};
+	auto GifWheelSlotIndexForPage = [](int Page, int LocalIndex) -> int {
+		if(LocalIndex < 0 || LocalIndex >= GIFWHEEL_SLOTS_PER_PAGE)
+			return -1;
+		const int ClampedPage = std::clamp(Page, 0, (int)GIFWHEEL_MAX_PAGES - 1);
+		if(LocalIndex < GIFWHEEL_BASE_SLOTS_PER_PAGE)
+			return ClampedPage * GIFWHEEL_BASE_SLOTS_PER_PAGE + LocalIndex;
+		return GIFWHEEL_LEGACY_MAX_SLOTS + ClampedPage * (GIFWHEEL_SLOTS_PER_PAGE - GIFWHEEL_BASE_SLOTS_PER_PAGE) + (LocalIndex - GIFWHEEL_BASE_SLOTS_PER_PAGE);
+	};
+	int *pActiveGifWheelSlotCount = GifWheelSlotCountConfigForPage(ActiveGifWheelPage);
+	*pActiveGifWheelSlotCount = std::clamp(*pActiveGifWheelSlotCount, 1, (int)GIFWHEEL_SLOTS_PER_PAGE);
+	const int ActiveGifWheelSlotCount = *pActiveGifWheelSlotCount;
 
-	const std::vector<SCherryGif> &vResults = CherryGifs.Results();
+	const bool ShowFavorites = s_GifBrowserSection == 1;
+	const bool ShowWheelBrowser = s_GifBrowserSection == 2;
+	const std::vector<SCherryGif> &vResults = ShowFavorites ? CherryGifs.Favorites() : CherryGifs.Results();
+	std::vector<const CGifWheel::CSlot *> vWheelBrowserSlots;
+	if(ShowWheelBrowser)
+	{
+		for(int i = 0; i < ActiveGifWheelSlotCount; ++i)
+		{
+			const int SlotIndex = GifWheelSlotIndexForPage(ActiveGifWheelPage, i);
+			if(SlotIndex >= 0 && SlotIndex < (int)GifWheel.m_vSlots.size() && !GifWheel.m_vSlots[SlotIndex].IsEmpty())
+				vWheelBrowserSlots.push_back(&GifWheel.m_vSlots[SlotIndex]);
+		}
+	}
+	const int DisplayCount = ShowWheelBrowser ? (int)vWheelBrowserSlots.size() : (int)vResults.size();
 	static CListBox s_ListBox;
+	static std::vector<CButtonContainer> s_vGifFavoriteButtons;
+	if((int)s_vGifFavoriteButtons.size() < DisplayCount)
+		s_vGifFavoriteButtons.resize(DisplayCount);
 	constexpr float CardSize = 84.0f;
 	constexpr float CardMargin = 8.0f;
 	const int ItemsPerRow = std::max(1, (int)(Grid.w / (CardSize + CardMargin)));
 
-	if(vResults.empty() && CherryGifs.IsLoading())
+	if(!ShowFavorites && !ShowWheelBrowser && vResults.empty() && CherryGifs.IsLoading())
 	{
 		const int PlaceholderRows = (int)std::ceil(Grid.h / (CardSize + 20.0f)) + 1;
 		CUIRect PlaceholderGrid = Grid;
@@ -3938,34 +3995,70 @@ void CMenus::RenderMaGif(CUIRect MainView)
 			}
 		}
 	}
-	else if(vResults.empty())
+	else if(DisplayCount == 0)
 	{
 		CUIRect Help = Grid;
 		Help.Margin(12.0f, &Help);
-		const char *pHelpText = CherryGifs.HasError() ? CherryGifs.ErrorText() : TCLocalize("No hay GIFs para mostrar");
+		const char *pHelpText = TCLocalize("No hay GIFs para mostrar");
+		if(!ShowFavorites && !ShowWheelBrowser && CherryGifs.HasError())
+			pHelpText = CherryGifs.ErrorText();
+		else if(ShowFavorites)
+			pHelpText = TCLocalize("Marca GIFs con la estrella para verlos aca");
+		else if(ShowWheelBrowser)
+			pHelpText = TCLocalize("Arrastra GIFs a la rueda para verlos aca");
 		Ui()->DoLabel(&Help, pHelpText, 14.0f, TEXTALIGN_MC);
 	}
 	else
 	{
-		s_ListBox.DoStart(CardSize + 20.0f, (int)vResults.size(), ItemsPerRow, 1, -1, &Grid, false);
+		s_ListBox.DoStart(CardSize + 20.0f, DisplayCount, ItemsPerRow, 1, -1, &Grid, false);
 		bool LastItemVisible = false;
-		for(int i = 0; i < (int)vResults.size(); i++)
+		bool StopList = false;
+		for(int i = 0; i < DisplayCount; i++)
 		{
-			const SCherryGif &Gif = vResults[i];
-			const CListboxItem Item = s_ListBox.DoNextItem(&Gif, false);
+			SCherryGif WheelGif;
+			const CGifWheel::CSlot *pSlot = nullptr;
+			const SCherryGif *pGif = nullptr;
+			if(ShowWheelBrowser)
+			{
+				pSlot = vWheelBrowserSlots[i];
+				str_copy(WheelGif.m_aId, pSlot->m_aGifId, sizeof(WheelGif.m_aId));
+				str_copy(WheelGif.m_aUrl, pSlot->m_aUrl, sizeof(WheelGif.m_aUrl));
+				str_copy(WheelGif.m_aPreviewUrl, pSlot->m_aUrl, sizeof(WheelGif.m_aPreviewUrl));
+				str_copy(WheelGif.m_aCaption, pSlot->m_aCaption, sizeof(WheelGif.m_aCaption));
+				pGif = &WheelGif;
+			}
+			else
+			{
+				pGif = &vResults[i];
+			}
+
+			const CListboxItem Item = s_ListBox.DoNextItem(ShowWheelBrowser ? (const void *)pSlot : (const void *)pGif, false);
 			if(!Item.m_Visible)
 				continue;
-			if(i == (int)vResults.size() - 1)
+			if(i == DisplayCount - 1)
 				LastItemVisible = true;
 
 			CUIRect CardRect = Item.m_Rect;
 			CardRect.Margin(CardMargin / 2.0f, &CardRect);
 			CUIRect Thumb, Caption;
 			CardRect.HSplitBottom(14.0f, &Thumb, &Caption);
-			CherryGifs.RequestThumbnail(i);
 
 			IGraphics::CTextureHandle ThumbnailTexture;
-			if(CherryGifs.GetThumbnailTexture(Gif, ThumbnailTexture))
+			if(ShowWheelBrowser)
+			{
+				if(pSlot && pSlot->m_Thumbnail.IsValid())
+					ThumbnailTexture = pSlot->m_Thumbnail;
+			}
+			else
+			{
+				if(ShowFavorites)
+					CherryGifs.RequestFavoriteThumbnail(i);
+				else
+					CherryGifs.RequestThumbnail(i);
+				CherryGifs.GetThumbnailTexture(*pGif, ThumbnailTexture);
+			}
+
+			if(ThumbnailTexture.IsValid())
 			{
 				Graphics()->WrapClamp();
 				Graphics()->TextureSet(ThumbnailTexture);
@@ -3982,51 +4075,105 @@ void CMenus::RenderMaGif(CUIRect MainView)
 				Graphics()->DrawRect(Thumb.x, Thumb.y, Thumb.w, Thumb.h, ColorRGBA(0.15f, 0.15f, 0.15f, 0.5f), IGraphics::CORNER_ALL, 6.0f);
 			}
 
+			CUIRect StarButton{Thumb.x + Thumb.w - 17.0f, Thumb.y + 2.0f, 15.0f, 15.0f};
+			const bool IsFavorite = CherryGifs.IsFavorite(pGif->m_aUrl);
+			const bool StarHovered = Ui()->MouseInside(&StarButton);
+			Graphics()->DrawRect(StarButton.x - 1.5f, StarButton.y - 1.5f, StarButton.w + 3.0f, StarButton.h + 3.0f, ColorRGBA(0.0f, 0.0f, 0.0f, StarHovered ? 0.48f : 0.30f), IGraphics::CORNER_ALL, 5.0f);
+			if(Ui()->DoButtonLogic(&s_vGifFavoriteButtons[i], IsFavorite ? 1 : 0, &StarButton, BUTTONFLAG_LEFT))
+			{
+				CherryGifs.ToggleFavorite(*pGif);
+				if(ShowFavorites)
+					StopList = true;
+			}
+			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+			TextRender()->TextColor(IsFavorite ? ColorRGBA(1.0f, 0.76f, 0.12f, 1.0f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.95f));
+			Ui()->DoLabel(&StarButton, FontIcon::STAR, 11.0f, TEXTALIGN_MC);
+			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+			if(StopList)
+				break;
+
 			char aCaptionText[64];
-			if(Gif.m_aCaption[0] != '\0')
-				str_copy(aCaptionText, Gif.m_aCaption, sizeof(aCaptionText));
-			else if(!Gif.m_vTags.empty())
-				str_copy(aCaptionText, Gif.m_vTags.front().c_str(), sizeof(aCaptionText));
+			if(pGif->m_aCaption[0] != '\0')
+				str_copy(aCaptionText, pGif->m_aCaption, sizeof(aCaptionText));
+			else if(!pGif->m_vTags.empty())
+				str_copy(aCaptionText, pGif->m_vTags.front().c_str(), sizeof(aCaptionText));
 			else
-				str_format(aCaptionText, sizeof(aCaptionText), "%d %s", Gif.m_Likes, TCLocalize("likes"));
+				str_format(aCaptionText, sizeof(aCaptionText), "%d %s", pGif->m_Likes, TCLocalize("likes"));
 			Ui()->DoLabel(&Caption, aCaptionText, 9.0f, TEXTALIGN_MC);
 
-			if(!s_DragActive && Ui()->MouseButton(0) && !Ui()->MouseButtonClicked(0) && Ui()->MouseInside(&Thumb))
+			if(!s_DragActive && Ui()->MouseButton(0) && !Ui()->MouseButtonClicked(0) && Ui()->MouseInside(&Thumb) && !Ui()->MouseInside(&StarButton))
 			{
 				s_DragActive = true;
-				str_copy(s_aDragGifId, Gif.m_aId, sizeof(s_aDragGifId));
-				str_copy(s_aDragUrl, Gif.m_aUrl, sizeof(s_aDragUrl));
-				str_copy(s_aDragCaption, Gif.m_aCaption, sizeof(s_aDragCaption));
+				str_copy(s_aDragGifId, pGif->m_aId, sizeof(s_aDragGifId));
+				str_copy(s_aDragUrl, pGif->m_aUrl, sizeof(s_aDragUrl));
+				str_copy(s_aDragCaption, pGif->m_aCaption, sizeof(s_aDragCaption));
 				s_DragThumbnail = ThumbnailTexture;
 			}
+			if(StopList)
+				break;
 		}
 		s_ListBox.DoEnd();
 
-		if(LastItemVisible && CherryGifs.HasMore() && !CherryGifs.IsLoading())
+		if(!ShowFavorites && !ShowWheelBrowser && LastItemVisible && CherryGifs.HasMore() && !CherryGifs.IsLoading())
 			CherryGifs.LoadMore();
 	}
 
-	if(CherryGifs.HasError())
+	if(!ShowFavorites && !ShowWheelBrowser && CherryGifs.HasError())
 	{
 		TextRender()->TextColor(ColorRGBA(1.0f, 0.4f, 0.4f, 1.0f));
 		Ui()->DoLabel(&StatusRow, CherryGifs.ErrorText(), 12.0f, TEXTALIGN_ML);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
-	else if(CherryGifs.IsLoading() && !vResults.empty())
+	else if(!ShowFavorites && !ShowWheelBrowser && CherryGifs.IsLoading() && !vResults.empty())
 	{
 		Ui()->DoLabel(&StatusRow, TCLocalize("Loading..."), 12.0f, TEXTALIGN_ML);
+	}
+	else if(ShowFavorites)
+	{
+		char aStatus[96];
+		str_format(aStatus, sizeof(aStatus), "%d %s", DisplayCount, TCLocalize("favoritos"));
+		Ui()->DoLabel(&StatusRow, aStatus, 12.0f, TEXTALIGN_ML);
+	}
+	else if(ShowWheelBrowser)
+	{
+		char aStatus[96];
+		str_format(aStatus, sizeof(aStatus), "%d %s", DisplayCount, TCLocalize("GIFs en la rueda"));
+		Ui()->DoLabel(&StatusRow, aStatus, 12.0f, TEXTALIGN_ML);
 	}
 	else if(vResults.empty())
 	{
 		Ui()->DoLabel(&StatusRow, TCLocalize("Search gifs to add them to the wheel"), 12.0f, TEXTALIGN_ML);
 	}
-
 	CUIRect WheelPanel;
 	BeginPanel(RightView, 475.0f, "Gif Wheel", WheelPanel);
 	WheelPanel.HSplitTop(LineSize, &Row, &WheelPanel);
 	Ui()->DoScrollbarOption(&g_Config.m_MaGifWheelScale, &g_Config.m_MaGifWheelScale, &Row, TCLocalize("Wheel scale"), 50, 200, &CUi::ms_LinearScrollbarScale, 0, "%");
 	WheelPanel.HSplitTop(MarginSmall, nullptr, &WheelPanel);
-
+	WheelPanel.HSplitTop(LineSize, &Row, &WheelPanel);
+	CUIRect PageLabel, PageButtons;
+	Row.VSplitLeft(94.0f, &PageLabel, &PageButtons);
+	Ui()->DoLabel(&PageLabel, TCLocalize("Apartado"), 14.0f, TEXTALIGN_ML);
+	static CButtonContainer s_aGifWheelPageButtons[GIFWHEEL_MAX_PAGES];
+	for(int Page = 0; Page < GIFWHEEL_MAX_PAGES; ++Page)
+	{
+		CUIRect PageButton;
+		const float ButtonW = PageButtons.w / (float)(GIFWHEEL_MAX_PAGES - Page);
+		PageButtons.VSplitLeft(ButtonW, &PageButton, &PageButtons);
+		char aPageLabel[16];
+		str_format(aPageLabel, sizeof(aPageLabel), "%d", Page + 1);
+		const int Corners = Page == 0 ? IGraphics::CORNER_L : (Page == GIFWHEEL_MAX_PAGES - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
+		if(DoButton_Menu(&s_aGifWheelPageButtons[Page], aPageLabel, g_Config.m_MaGifWheelPage == Page, &PageButton, BUTTONFLAG_LEFT, nullptr, Corners))
+			g_Config.m_MaGifWheelPage = Page;
+	}
+	int *pWheelPanelSlotCount = GifWheelSlotCountConfigForPage(g_Config.m_MaGifWheelPage);
+	*pWheelPanelSlotCount = std::clamp(*pWheelPanelSlotCount, 1, (int)GIFWHEEL_SLOTS_PER_PAGE);
+	WheelPanel.HSplitTop(MarginSmall, nullptr, &WheelPanel);
+	WheelPanel.HSplitTop(LineSize, &Row, &WheelPanel);
+	Ui()->DoScrollbarOption(pWheelPanelSlotCount, pWheelPanelSlotCount, &Row, TCLocalize("GIFs en este apartado"), 1, GIFWHEEL_SLOTS_PER_PAGE);
+	const int WheelPanelSlotCount = *pWheelPanelSlotCount;
+	auto WheelPanelSlotIndex = [&](int Index) -> int { return GifWheelSlotIndexForPage(g_Config.m_MaGifWheelPage, Index); };
+	WheelPanel.HSplitTop(MarginSmall, nullptr, &WheelPanel);
 	CUIRect WheelControls;
 	WheelPanel.HSplitBottom(LineSize * 4.0f + MarginSmall * 3.0f, &WheelPanel, &WheelControls);
 	const float Radius = std::min(WheelPanel.w, WheelPanel.h) / 2.0f;
@@ -4039,8 +4186,7 @@ void CMenus::RenderMaGif(CUIRect MainView)
 	Graphics()->QuadsEnd();
 
 	static int s_SelectedSlotIndex = -1;
-	constexpr int PreviewSlotCount = 8;
-	int SegmentCount = std::clamp(std::max(PreviewSlotCount, (int)GifWheel.m_vSlots.size()), 1, (int)GIFWHEEL_MAX_SLOTS);
+	const int SegmentCount = WheelPanelSlotCount;
 	const float MouseDist = distance(Center, Ui()->MousePos());
 	auto SlotIndexAt = [&](vec2 Pos) -> int {
 		const float Dist = distance(Center, Pos);
@@ -4053,7 +4199,8 @@ void CMenus::RenderMaGif(CUIRect MainView)
 		return std::clamp((int)(HoveringAngle / (2.0f * pi) * SegmentCount), 0, SegmentCount - 1);
 	};
 	auto SlotHasGif = [&](int Index) -> bool {
-		return Index >= 0 && Index < (int)GifWheel.m_vSlots.size() && !GifWheel.m_vSlots[Index].IsEmpty();
+		const int SlotIndex = WheelPanelSlotIndex(Index);
+		return Index >= 0 && Index < SegmentCount && SlotIndex >= 0 && SlotIndex < (int)GifWheel.m_vSlots.size() && !GifWheel.m_vSlots[SlotIndex].IsEmpty();
 	};
 	const int HoveringIndex = SlotIndexAt(Ui()->MousePos());
 
@@ -4065,7 +4212,7 @@ void CMenus::RenderMaGif(CUIRect MainView)
 				s_SelectedSlotIndex = HoveringIndex;
 			else if(Ui()->MouseButtonClicked(1) && SlotHasGif(HoveringIndex))
 			{
-				GifWheel.RemoveSlot(HoveringIndex);
+				GifWheel.RemoveSlot(WheelPanelSlotIndex(HoveringIndex));
 				s_SelectedSlotIndex = -1;
 			}
 		}
@@ -4077,16 +4224,23 @@ void CMenus::RenderMaGif(CUIRect MainView)
 	if(s_SelectedSlotIndex >= SegmentCount)
 		s_SelectedSlotIndex = -1;
 	const bool SelectedSlotHasGif = SlotHasGif(s_SelectedSlotIndex);
-	const bool HasAnyWheelGif = std::any_of(GifWheel.m_vSlots.begin(), GifWheel.m_vSlots.end(), [](const CGifWheel::CSlot &Slot) { return !Slot.IsEmpty(); });
+	bool HasAnyWheelGif = false;
+	for(int i = 0; i < SegmentCount; ++i)
+		HasAnyWheelGif = HasAnyWheelGif || SlotHasGif(i);
 
+	const float SlotDensityScale = SegmentCount > GIFWHEEL_BASE_SLOTS_PER_PAGE ? std::clamp(std::sqrt((float)GIFWHEEL_BASE_SLOTS_PER_PAGE / (float)SegmentCount), 0.52f, 1.0f) : 1.0f;
+	const float SlotBaseSize = 46.0f * SlotDensityScale;
+	const float SlotHoverSize = 56.0f * std::clamp(SlotDensityScale + 0.08f, 0.52f, 1.0f);
+	const float SlotSelectedSize = 62.0f * std::clamp(SlotDensityScale + 0.12f, 0.52f, 1.0f);
 	const float Theta = pi * 2.0f / std::max(1, SegmentCount);
 	for(int i = 0; i < SegmentCount; i++)
 	{
 		const bool HasSlot = SlotHasGif(i);
-		const CGifWheel::CSlot *pSlot = HasSlot ? &GifWheel.m_vSlots[i] : nullptr;
+		const int SlotIndex = WheelPanelSlotIndex(i);
+		const CGifWheel::CSlot *pSlot = HasSlot && SlotIndex >= 0 ? &GifWheel.m_vSlots[SlotIndex] : nullptr;
 		const float Angle = Theta * i;
 		const vec2 Pos = Center + direction(Angle) * (Radius * 0.72f);
-		const float Size = i == s_SelectedSlotIndex ? 62.0f : (i == HoveringIndex ? 56.0f : 46.0f);
+		const float Size = i == s_SelectedSlotIndex ? SlotSelectedSize : (i == HoveringIndex ? SlotHoverSize : SlotBaseSize);
 		CUIRect SlotRect{Pos.x - Size / 2.0f, Pos.y - Size / 2.0f, Size, Size};
 
 		if(i == s_SelectedSlotIndex)
@@ -4134,9 +4288,9 @@ void CMenus::RenderMaGif(CUIRect MainView)
 		const int DropIndex = SlotIndexAt(Ui()->MousePos());
 		if(DropIndex >= 0)
 		{
-			GifWheel.SetSlot(DropIndex, s_aDragGifId, s_aDragUrl, s_aDragCaption);
+			GifWheel.SetSlot(WheelPanelSlotIndex(DropIndex), s_aDragGifId, s_aDragUrl, s_aDragCaption);
 			if(s_DragFromWheelIndex >= 0 && s_DragFromWheelIndex != DropIndex)
-				GifWheel.RemoveSlot(s_DragFromWheelIndex);
+				GifWheel.RemoveSlot(WheelPanelSlotIndex(s_DragFromWheelIndex));
 			s_SelectedSlotIndex = DropIndex;
 		}
 		s_DragActive = false;
@@ -4154,15 +4308,16 @@ void CMenus::RenderMaGif(CUIRect MainView)
 		GifWheel.ExecuteSlot(s_SelectedSlotIndex);
 	if(DoButton_Menu(&s_RemoveSelectedGifButton, TCLocalize("Remove selected"), SelectedSlotHasGif ? 0 : -1, &RemoveButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f) && SelectedSlotHasGif)
 	{
-		GifWheel.RemoveSlot(s_SelectedSlotIndex);
+		GifWheel.RemoveSlot(WheelPanelSlotIndex(s_SelectedSlotIndex));
 		s_SelectedSlotIndex = -1;
 	}
 	WheelControls.HSplitTop(MarginSmall, nullptr, &WheelControls);
 	WheelControls.HSplitTop(LineSize, &Row, &WheelControls);
 	static CButtonContainer s_ClearGifWheelButton;
-	if(DoButton_Menu(&s_ClearGifWheelButton, TCLocalize("Clear wheel"), HasAnyWheelGif ? 0 : -1, &Row, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f) && HasAnyWheelGif)
+	if(DoButton_Menu(&s_ClearGifWheelButton, TCLocalize("Limpiar apartado"), HasAnyWheelGif ? 0 : -1, &Row, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f) && HasAnyWheelGif)
 	{
-		GifWheel.RemoveAllSlots();
+		for(int i = GIFWHEEL_SLOTS_PER_PAGE - 1; i >= 0; --i)
+			GifWheel.RemoveSlot(GifWheelSlotIndexForPage(g_Config.m_MaGifWheelPage, i));
 		s_SelectedSlotIndex = -1;
 	}
 

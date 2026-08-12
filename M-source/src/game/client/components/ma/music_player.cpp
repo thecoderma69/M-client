@@ -1,4 +1,4 @@
-/* Copyright Â© 2026 BestProject Team */
+/* Copyright (c) 2026 BestProject Team */
 #include "music_player.h"
 
 #include "visualizer/analyzer.h"

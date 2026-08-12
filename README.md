@@ -1,4 +1,4 @@
-# MΛ ツ Client 2.2.1
+# MΛ ツ Client 2.2.2
 
 Cliente personalizado basado en DDNet/TClient para Windows x64, preparado para descargar, extraer y jugar.
 
@@ -8,7 +8,7 @@ Repositorio oficial: [thecoderma69/M-client](https://github.com/thecoderma69/M-c
 
 MΛ ツ Client es una version modificada del cliente DDNet con mejoras visuales, opciones de personalizacion, herramientas de comodidad, recursos propios y apartados especiales para stream, HUD, GIFs, musica y efectos visuales.
 
-La version 2.2.1 corrige y mejora las estadisticas de team: el panel vuelve a mostrarse siempre cuando esta activo, agrega la opcion para mostrarlo solo al final del mapa y escribe un resumen local en el chat al terminar.
+La version 2.2.2 mejora el apartado GIF: agrega favoritos, apartados/perfiles para la rueda GIF y permite elegir cuantos GIFs quieres colocar en cada apartado.
 
 ## Descargar
 
@@ -19,19 +19,19 @@ El juego listo para usar esta en:
 Descarga:
 
 ```txt
-M-Client-v2.2.1-win64.zip
+M-Client-v2.2.2-win64.zip
 ```
 
 Luego extrae el `.zip`. Dentro encontraras una carpeta:
 
 ```txt
-M-Client-v2.2.1-win64/
+M-Client-v2.2.2-win64/
 ```
 
 Abre el juego desde:
 
 ```txt
-M-Client-v2.2.1-win64/DDNet.exe
+M-Client-v2.2.2-win64/DDNet.exe
 ```
 
 ## Codigo Fuente
@@ -41,6 +41,17 @@ El codigo fuente esta en:
 ```txt
 M-source/
 ```
+
+## Novedades De La Version 2.2.2
+
+- Nuevo sistema de `Favoritos` en el buscador GIF.
+- La rueda GIF ahora tiene `Apartado 1`, `Apartado 2`, `Apartado 3` y `Apartado 4` como perfiles separados.
+- Cada apartado de la rueda puede tener una cantidad editable de GIFs con `GIFs en este apartado`.
+- Cada apartado permite de 1 a 32 espacios para GIFs.
+- Los primeros 8 espacios antiguos se mantienen compatibles para no perder los GIFs que ya estaban guardados.
+- El apartado `En rueda` muestra los GIFs del apartado seleccionado.
+- Se ajusto el tamano visual de los GIFs de la rueda para que quepan mejor cuando hay muchos.
+- Texto del menu principal actualizado a la version `2.2.2`.
 
 ## Novedades De La Version 2.2.1
 
@@ -53,12 +64,12 @@ M-source/
 ## Novedades De La Version 2.2
 
 - Buscador GIF simplificado: se quito Tenor del apartado y se dejo `Local` + `GIPHY`.
-- La rueda GIF ahora permite colocar cada GIF en una posicion exacta arrastrandolo al hueco que quieras.
+- La rueda GIF permite colocar cada GIF en una posicion exacta arrastrandolo al hueco que quieras.
 - Puedes mover GIFs ya puestos dentro de la rueda arrastrandolos a otra posicion.
 - Se agregaron slots fijos visibles en la rueda para que no se asignen de forma aleatoria.
 - Se corrigio un crash al iniciar cuando habia GIFs guardados en la configuracion.
 - Se agrego el tutorial `CREAR_API_PARA_GIF.md` para explicar como obtener la API key de GIPHY.
-- El `.zip` del release ahora incluye una carpeta principal para que al descomprimir no queden todos los archivos sueltos.
+- El `.zip` del release incluye una carpeta principal para que al descomprimir no queden todos los archivos sueltos.
 - Texto del menu principal actualizado a `MΛ ツ 2.2`.
 
 ## Novedades De La Version 2.1.7

@@ -158,6 +158,17 @@ static std::string TrimCopy(const std::string &Text)
 	return Text.substr(Begin, End - Begin);
 }
 
+
+static std::string SanitizeFavoriteField(const char *pText)
+{
+	std::string Result = pText ? pText : "";
+	for(char &c : Result)
+	{
+		if(c == '|' || c == ';' || c == '\r' || c == '\n')
+			c = ' ';
+	}
+	return TrimCopy(Result);
+}
 static std::vector<std::string> SplitFields(const std::string &Line, char Separator)
 {
 	std::vector<std::string> vFields;
@@ -330,6 +341,107 @@ bool CCherryGifs::DecodeThumbnailBytes(SCherryGif &Gif, const unsigned char *pDa
 bool CCherryGifs::GetThumbnailTexture(const SCherryGif &Gif, IGraphics::CTextureHandle &Texture) const
 {
 	return MediaDecoder::GetCurrentFrameTexture(Gif.m_vThumbnailFrames, Gif.m_ThumbnailAnimated, Gif.m_ThumbnailAnimationStart, Texture);
+}
+void CCherryGifs::EnsureFavorites()
+{
+	if(m_FavoritesLoaded)
+		return;
+	m_FavoritesLoaded = true;
+	m_vFavorites.clear();
+
+	std::string Data(g_Config.m_MaGifFavorites);
+	size_t Start = 0;
+	while(Start <= Data.size())
+	{
+		const size_t End = Data.find(';', Start);
+		const std::string Record = Data.substr(Start, End == std::string::npos ? std::string::npos : End - Start);
+		std::vector<std::string> vFields = SplitFields(Record, '|');
+		if(vFields.size() >= 2 && !vFields[1].empty() && IsTrustedGifUrl(vFields[1].c_str()))
+		{
+			SCherryGif Gif;
+			str_copy(Gif.m_aId, vFields[0].empty() ? vFields[1].c_str() : vFields[0].c_str(), sizeof(Gif.m_aId));
+			str_copy(Gif.m_aUrl, vFields[1].c_str(), sizeof(Gif.m_aUrl));
+			const char *pPreview = vFields.size() >= 3 && !vFields[2].empty() ? vFields[2].c_str() : Gif.m_aUrl;
+			str_copy(Gif.m_aPreviewUrl, (IsTrustedGifUrl(pPreview) || IsSafeLocalPreviewPath(pPreview)) ? pPreview : Gif.m_aUrl, sizeof(Gif.m_aPreviewUrl));
+			if(vFields.size() >= 4 && !vFields[3].empty())
+				str_copy(Gif.m_aCaption, vFields[3].c_str(), sizeof(Gif.m_aCaption));
+			if(FindFavoriteIndex(Gif.m_aUrl) < 0)
+				m_vFavorites.push_back(std::move(Gif));
+		}
+		if(End == std::string::npos)
+			break;
+		Start = End + 1;
+	}
+}
+
+void CCherryGifs::SaveFavorites()
+{
+	std::string Out;
+	Out.reserve(sizeof(g_Config.m_MaGifFavorites));
+	for(const SCherryGif &Gif : m_vFavorites)
+	{
+		if(Gif.m_aUrl[0] == '\0')
+			continue;
+		const std::string Id = SanitizeFavoriteField(Gif.m_aId);
+		const std::string Url = SanitizeFavoriteField(Gif.m_aUrl);
+		const std::string Preview = SanitizeFavoriteField(Gif.m_aPreviewUrl[0] ? Gif.m_aPreviewUrl : Gif.m_aUrl);
+		const std::string Caption = SanitizeFavoriteField(Gif.m_aCaption);
+		const std::string Record = Id + "|" + Url + "|" + Preview + "|" + Caption;
+		if(Out.size() + Record.size() + 1 >= sizeof(g_Config.m_MaGifFavorites))
+			break;
+		if(!Out.empty())
+			Out += ';';
+		Out += Record;
+	}
+	str_copy(g_Config.m_MaGifFavorites, Out.c_str(), sizeof(g_Config.m_MaGifFavorites));
+}
+
+int CCherryGifs::FindFavoriteIndex(const char *pUrl) const
+{
+	if(!pUrl || pUrl[0] == '\0')
+		return -1;
+	for(size_t i = 0; i < m_vFavorites.size(); ++i)
+	{
+		if(str_comp(m_vFavorites[i].m_aUrl, pUrl) == 0)
+			return (int)i;
+	}
+	return -1;
+}
+
+bool CCherryGifs::IsFavorite(const char *pUrl)
+{
+	EnsureFavorites();
+	return FindFavoriteIndex(pUrl) >= 0;
+}
+
+void CCherryGifs::ToggleFavorite(const SCherryGif &Gif)
+{
+	EnsureFavorites();
+	const int Existing = FindFavoriteIndex(Gif.m_aUrl);
+	if(Existing >= 0)
+	{
+		MediaDecoder::UnloadFrames(Graphics(), m_vFavorites[Existing].m_vThumbnailFrames);
+		m_vFavorites.erase(m_vFavorites.begin() + Existing);
+		SaveFavorites();
+		return;
+	}
+
+	SCherryGif Favorite;
+	str_copy(Favorite.m_aId, Gif.m_aId[0] ? Gif.m_aId : Gif.m_aUrl, sizeof(Favorite.m_aId));
+	str_copy(Favorite.m_aUrl, Gif.m_aUrl, sizeof(Favorite.m_aUrl));
+	str_copy(Favorite.m_aPreviewUrl, Gif.m_aPreviewUrl[0] ? Gif.m_aPreviewUrl : Gif.m_aUrl, sizeof(Favorite.m_aPreviewUrl));
+	str_copy(Favorite.m_aCaption, Gif.m_aCaption, sizeof(Favorite.m_aCaption));
+	Favorite.m_Likes = Gif.m_Likes;
+	Favorite.m_Nsfw = Gif.m_Nsfw;
+	Favorite.m_vTags = Gif.m_vTags;
+	m_vFavorites.insert(m_vFavorites.begin(), std::move(Favorite));
+	SaveFavorites();
+}
+
+const std::vector<SCherryGif> &CCherryGifs::Favorites()
+{
+	EnsureFavorites();
+	return m_vFavorites;
 }
 void CCherryGifs::EnsureLocalDatabase()
 {
@@ -792,7 +904,19 @@ void CCherryGifs::RequestThumbnail(int Index)
 {
 	if(Index < 0 || Index >= (int)m_vResults.size())
 		return;
-	SCherryGif &Gif = m_vResults[Index];
+	RequestThumbnail(m_vResults[Index], false);
+}
+
+void CCherryGifs::RequestFavoriteThumbnail(int Index)
+{
+	EnsureFavorites();
+	if(Index < 0 || Index >= (int)m_vFavorites.size())
+		return;
+	RequestThumbnail(m_vFavorites[Index], true);
+}
+
+void CCherryGifs::RequestThumbnail(SCherryGif &Gif, bool Favorite)
+{
 	if(!Gif.m_vThumbnailFrames.empty() || Gif.m_ThumbnailRequested || Gif.m_ThumbnailFailed)
 		return;
 	if((int)m_vThumbnailJobs.size() >= CHERRYGIFS_MAX_CONCURRENT_THUMBNAILS)
@@ -827,6 +951,8 @@ void CCherryGifs::RequestThumbnail(int Index)
 
 	SThumbnailJob Job;
 	str_copy(Job.m_aGifId, Gif.m_aId, sizeof(Job.m_aGifId));
+	str_copy(Job.m_aUrl, Gif.m_aUrl, sizeof(Job.m_aUrl));
+	Job.m_Favorite = Favorite;
 
 	std::shared_ptr<CHttpRequest> pGet = HttpGet(Gif.m_aPreviewUrl);
 	pGet->Timeout(CTimeout{8000, 0, 4096, 8});
@@ -838,7 +964,6 @@ void CCherryGifs::RequestThumbnail(int Index)
 
 	m_vThumbnailJobs.push_back(std::move(Job));
 }
-
 void CCherryGifs::PollThumbnails()
 {
 	for(size_t i = 0; i < m_vThumbnailJobs.size();)
@@ -850,15 +975,18 @@ void CCherryGifs::PollThumbnails()
 			continue;
 		}
 
-		SCherryGif *pGif = nullptr;
-		for(SCherryGif &Candidate : m_vResults)
-		{
-			if(str_comp(Candidate.m_aId, Job.m_aGifId) == 0)
+		auto FindTarget = [&](std::vector<SCherryGif> &vGifs) -> SCherryGif * {
+			for(SCherryGif &Candidate : vGifs)
 			{
-				pGif = &Candidate;
-				break;
+				if((Job.m_aUrl[0] != '\0' && str_comp(Candidate.m_aUrl, Job.m_aUrl) == 0) || str_comp(Candidate.m_aId, Job.m_aGifId) == 0)
+					return &Candidate;
 			}
-		}
+			return nullptr;
+		};
+
+		SCherryGif *pGif = Job.m_Favorite ? FindTarget(m_vFavorites) : FindTarget(m_vResults);
+		if(!pGif)
+			pGif = Job.m_Favorite ? FindTarget(m_vResults) : FindTarget(m_vFavorites);
 
 		if(pGif && Job.m_pRequest->State() == EHttpState::DONE && Job.m_pRequest->StatusCode() == 200)
 		{
@@ -875,7 +1003,6 @@ void CCherryGifs::PollThumbnails()
 		m_vThumbnailJobs.erase(m_vThumbnailJobs.begin() + i);
 	}
 }
-
 bool CCherryGifs::TryGetNsfw(const char *pUrl, bool &OutNsfw) const
 {
 	const auto It = m_NsfwByUrl.find(pUrl);

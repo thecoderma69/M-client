@@ -1,4 +1,4 @@
-// This file can be included several times.
+﻿// This file can be included several times.
 
 #ifndef MACRO_CONFIG_INT
 #error "The config macros must be defined"
@@ -85,7 +85,13 @@ MACRO_CONFIG_INT(MaGifApiSource, ma_gif_api_source, 1, 0, 1, CFGFLAG_CLIENT | CF
 MACRO_CONFIG_STR(MaTenorApiKey, ma_tenor_api_key, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Tenor API key for online GIF search")
 MACRO_CONFIG_STR(MaTenorClientKey, ma_tenor_client_key, 64, "ma_client", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Tenor client_key for online GIF search")
 MACRO_CONFIG_STR(MaGiphyApiKey, ma_giphy_api_key, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "GIPHY API key for online GIF search")
+MACRO_CONFIG_STR(MaGifFavorites, ma_gif_favorites, 8192, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Favorite GIF metadata for the MA GIF browser")
 MACRO_CONFIG_INT(MaGifWheelScale, ma_gif_wheel_scale, 100, 50, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Scale of the MA GIF wheel")
+MACRO_CONFIG_INT(MaGifWheelPage, ma_gif_wheel_page, 0, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Selected MA GIF wheel page")
+MACRO_CONFIG_INT(MaGifWheelSlotsPage1, ma_gif_wheel_slots_page1, 8, 1, 32, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Visible GIF slots in MA GIF wheel page 1")
+MACRO_CONFIG_INT(MaGifWheelSlotsPage2, ma_gif_wheel_slots_page2, 8, 1, 32, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Visible GIF slots in MA GIF wheel page 2")
+MACRO_CONFIG_INT(MaGifWheelSlotsPage3, ma_gif_wheel_slots_page3, 8, 1, 32, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Visible GIF slots in MA GIF wheel page 3")
+MACRO_CONFIG_INT(MaGifWheelSlotsPage4, ma_gif_wheel_slots_page4, 8, 1, 32, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Visible GIF slots in MA GIF wheel page 4")
 MACRO_CONFIG_INT(MaGifBubbleAboveHead, ma_gif_bubble_above_head, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show a floating gif bubble above the sender when a recognized gif link is posted in chat")
 MACRO_CONFIG_STR(MaGifBubbleDomains, ma_gif_bubble_domains, 256, "gifs.teeworlds.xyz; i.imgur.com; media.giphy.com; i.giphy.com; giphy.com; tenor.com; media.tenor.com; media1.tenor.com; c.tenor.com", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Semicolon-separated domains that trigger the above-head gif bubble")
 MACRO_CONFIG_INT(MaGifBubbleDurationMs, ma_gif_bubble_duration_ms, 5000, 1000, 15000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long the above-head gif bubble stays visible")
