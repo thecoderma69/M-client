@@ -1192,7 +1192,8 @@ void CMenus::RenderSettingsGraphics(CUIRect MainView)
 		}
 	}
 
-	// GPU list
+	// GPU list. Vulkan can enumerate/select exact devices. OpenGL normally cannot,
+	// so on Windows the executable requests the high-performance GPU at startup.
 	const auto &GpuList = Graphics()->GetGpus();
 	if(GpuList.m_vGpus.size() > 1)
 	{
@@ -1250,7 +1251,40 @@ void CMenus::RenderSettingsGraphics(CUIRect MainView)
 			s_GfxGpuChanged = NewGpu != s_OldSelectedGpu;
 		}
 	}
+	else
+	{
+		CUIRect Text, CurrentGpu, InfoA, InfoB;
+		MainView.HSplitTop(10.0f, nullptr, &MainView);
+		MainView.HSplitTop(20.0f, &Text, &MainView);
+		MainView.HSplitTop(2.0f, nullptr, &MainView);
+		MainView.HSplitTop(14.0f, &CurrentGpu, &MainView);
+		MainView.HSplitTop(2.0f, nullptr, &MainView);
+		MainView.HSplitTop(12.0f, &InfoA, &MainView);
+		MainView.HSplitTop(12.0f, &InfoB, &MainView);
+		Ui()->DoLabel(&Text, Localize("Graphics card"), 16.0f, TEXTALIGN_MC);
 
+		char aGpuCurrent[512];
+		const char *pRenderer = Graphics()->GetRendererString();
+		const char *pVendor = Graphics()->GetVendorString();
+		if(pRenderer && pRenderer[0] != '\0' && pVendor && pVendor[0] != '\0')
+			str_format(aGpuCurrent, sizeof(aGpuCurrent), "GPU actual: %s - %s", pRenderer, pVendor);
+		else if(pRenderer && pRenderer[0] != '\0')
+			str_format(aGpuCurrent, sizeof(aGpuCurrent), "GPU actual: %s", pRenderer);
+		else
+			str_copy(aGpuCurrent, "GPU actual: no detectada", sizeof(aGpuCurrent));
+		Ui()->DoLabel(&CurrentGpu, aGpuCurrent, 10.0f, TEXTALIGN_MC);
+
+		if(str_comp_nocase(g_Config.m_GfxBackend, "Vulkan") == 0)
+		{
+			Ui()->DoLabel(&InfoA, "Vulkan solo detecto una tarjeta disponible.", 9.0f, TEXTALIGN_MC);
+			Ui()->DoLabel(&InfoB, "Si tienes otra GPU, revisa drivers o cambia el renderer.", 9.0f, TEXTALIGN_MC);
+		}
+		else
+		{
+			Ui()->DoLabel(&InfoA, "OpenGL no muestra lista de GPUs; la elige Windows/NVIDIA.", 9.0f, TEXTALIGN_MC);
+			Ui()->DoLabel(&InfoB, "Para elegir por nombre usa Vulkan y reinicia el cliente.", 9.0f, TEXTALIGN_MC);
+		}
+	}
 	// check if the new settings require a restart
 	if(CheckSettings)
 	{

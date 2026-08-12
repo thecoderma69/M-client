@@ -53,6 +53,7 @@
 #include <engine/shared/rust_version.h>
 #include <engine/shared/snapshot.h>
 #include <engine/shared/uuid_manager.h>
+
 #include <engine/sound.h>
 #include <engine/steam.h>
 #include <engine/storage.h>
@@ -86,6 +87,13 @@
 
 using namespace std::chrono_literals;
 
+#if defined(CONF_FAMILY_WINDOWS)
+extern "C"
+{
+__declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#endif
 static constexpr ColorRGBA CLIENT_NETWORK_PRINT_COLOR = ColorRGBA(0.7f, 1, 0.7f, 1.0f);
 static constexpr ColorRGBA CLIENT_NETWORK_PRINT_ERROR_COLOR = ColorRGBA(1.0f, 0.25f, 0.25f, 1.0f);
 

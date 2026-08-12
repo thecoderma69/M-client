@@ -4645,6 +4645,13 @@ void CChat::OnRender()
 
 		if(Line.m_TextContainerIndex.Valid())
 		{
+			const float LineClipPadding = maximum(1.0f, FontSize() * 0.18f);
+			const float LineClipY = maximum(0.0f, y - LineClipPadding);
+			const float LineClipH = minimum(Height, y + Line.m_aYOffset[OffsetType] + LineClipPadding) - LineClipY;
+			const float LineClipYScale = Graphics()->ScreenHeight() / Height;
+			if(LineClipH > 0.0f)
+				Graphics()->ClipEnable(0, (int)(LineClipY * LineClipYScale), Graphics()->ScreenWidth(), (int)(LineClipH * LineClipYScale));
+
 			if(!g_Config.m_ClChatOld && Line.m_pManagedTeeRenderInfo != nullptr)
 			{
 				CTeeRenderInfo &TeeRenderInfo = Line.m_pManagedTeeRenderInfo->TeeRenderInfo();
@@ -4734,6 +4741,9 @@ void CChat::OnRender()
 					TextRender()->TextColor(TextRender()->DefaultTextColor());
 				}
 			}
+
+			if(LineClipH > 0.0f)
+				Graphics()->ClipDisable();
 		}
 	}
 
